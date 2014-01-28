@@ -1,0 +1,76 @@
+Module SimpleOutput
+	Use ProblemSize
+	Implicit None
+	Integer :: my_nshells = 0! How many of the shells to output do I own	
+	Integer, Allocatable :: my_shells(:)
+	Integer, Parameter :: max_nshells = 100
+	Integer :: output_shells(1:max_nshells)=-1
+	Namelist /Output_Namelist/ output_shells
+	
+	
+Contains
+
+Subroutine Initialize_Output()
+	Implicit None
+	Integer :: i,j, ind
+	! Find number of local shells to output
+	! process 0 from each row broadcasts it's nshells to process 0 of column 0 (main IO node)
+	Do i = 1, max_nshells
+		j = output_shells(i)
+		if (j .gt. 0) then
+			if ( (j .le. my_r%max) .and. (j .ge. my_r%min) ) then
+				my_nshells = my_nshells+1
+			endif
+		Endif
+
+	Enddo
+	if (my_nshells .gt. 0) Then
+		Allocate(my_shells(1:my_nshells))
+		ind = 1
+		Do i = 1, max_nshells
+			j = output_shells(i)
+			if (j .gt. 0) then
+				if ( (j .le. my_r%max) .and. (j .ge. my_r%min) ) then
+					my_shells(ind) = j
+					ind = ind+1
+				endif
+			Endif
+		Enddo
+	Endif
+	write(6,*)my_shells, my_r%min, my_r%max
+End Subroutine Initialize_Output
+
+Subroutine Shell_Output(ovars,arr)
+	! This routine grabs indices contained in ovars from arr
+	! and outputs shell slices at the desired levels
+	Implicit None
+	Integer, Intent(In) :: ovars(:)
+	Real*8, Intent(In) :: arr(:,:,:,:)	! probably should be intent(in) to be safe
+	Real*8, Allocatable :: my_chunk(:,:,:,:)
+	Integer :: oshape(1), i, j, nvars, vind, rind
+	oshape = shape(ovars)
+	nvars = oshape(1)
+	If (my_nshells .gt. 0) Then
+		Allocate(my_chunk(1:n_phi, my_theta%min:my_theta%max, 1:my_nshells,nvars))	! note that I'm using my_theta here ...
+		! This output module might become integrated with physics block code initially.  want to separate them.		
+		Do i = 1, nvars
+			vind = ovars(i)
+			Do j = 1, my_nshells
+				rind = my_shells(j)
+				my_chunk(:,:,j,i) = arr(:,rind,:,vind)
+			Enddo
+		Enddo
+
+		!//// Broadcast my_chunk to rank 0 of the row
+		!D_ISend_4D(x, irq,n_elements, dest, tag, grp, indstart)
+		!D_IReceive_4D(x, irq,n_elements, source, tag, grp,indstart)
+		!If my row rank is zero, broadcast to Main IO node (column 0, row 0 by default)
+		
+
+
+	Endif
+	
+End Subroutine Shell_Output
+
+
+End Module SimpleOutput

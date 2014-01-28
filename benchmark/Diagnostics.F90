@@ -1,0 +1,121 @@
+Module Diagnostics
+	Use ProblemSize
+	Use Spherical_IO
+	Use Fields
+	Use Legendre_Polynomials, Only : gl_weights
+	Implicit None
+	!/////////////////////////////////////////////////////////
+	!  Quantity Codes (some care must be taken to
+	Integer, Parameter, Private :: V_r = 1,   V_theta = 2, V_phi = 3
+  	Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
+
+	! We have some "known" outputs as well that allow us to verify that
+	! the spherical_io interface is functional
+	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
+
+
+	!///////////////////////////////////
+	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
+
+Contains
+
+	Subroutine Initialize_Diagnostics()
+		Implicit None
+        Integer :: i
+        Real*8 :: delr
+        Real*8, Allocatable :: rweights(:), tweights(:)
+
+        Allocate(tweights(1:n_theta))
+        tweights(:) = gl_weights(:)/2.0d0
+
+        Allocate(rweights(1:n_r))
+        Do i = 2, n_r-1
+            delr = (radius(i-1)-radius(i+1))/2.0d0
+            rweights(i) = delr*radius(i)**2
+        Enddo
+        delr = ( radius(1)-radius(2) )/ 2.0d0
+        rweights(1) = delr*radius(1)**2
+
+        delr = (radius(n_r-1)-radius(n_r))/2.0d0
+        rweights(n_r) = delr*radius(n_r)**2
+
+        rweights = rweights/sum(rweights)
+		  Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta)	
+
+        DeAllocate(rweights)
+        DeAllocate(tweights)
+		!Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
+	End Subroutine Initialize_Diagnostics
+
+	Subroutine PS_Output(buffer,iteration)
+		Implicit None
+		Integer, Intent(In) :: iteration
+		Real*8, Intent(InOut) :: buffer(:,:,:,:)
+		Real*8 :: mypi
+		Integer :: p,t,r
+		
+		If (mod(iteration,output_frequency) .eq. 0) Then
+			Call Begin_Outputting()
+			Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+
+			If (compute_q(v_r)) Then
+				
+				qty(:,:,:) = buffer(:,:,:,vr)
+				!write(6,*)'Computing vr ', maxval(qty)
+				Call Add_Quantity(v_r,qty)
+			Endif		
+
+			If (compute_q(v_theta)) Then
+				
+				qty(:,:,:) = buffer(:,:,:,vtheta)
+				Call Add_Quantity(v_theta,qty)
+			Endif		
+
+			If (compute_q(v_phi)) Then
+				
+				qty(:,:,:) = buffer(:,:,:,tvar)  ! vphi!!!!
+				Call Add_Quantity(v_phi,qty)
+			Endif	
+
+			If (compute_q(temperature)) Then
+				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
+				qty(:,:,:) = buffer(:,:,:,pvar)
+				Call Add_Quantity(temperature,qty)
+			Endif		
+
+
+
+			If (compute_q(diagnostic1)) Then
+				mypi = acos(-1.0d0)
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+							qty(p,r,t) = sin(p*2.0d0*mypi/n_phi)*(sintheta(t)**2)*radius(r)
+
+						Enddo
+					Enddo
+				Enddo
+				Call Add_Quantity(diagnostic1,qty)
+			Endif
+
+			If (compute_q(diagnostic2)) Then
+				mypi = acos(-1.0d0)
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+							qty(p,r,t) = sin(p*4.0d0*mypi/n_phi)*(sintheta(t)*costheta(t))*radius(r)**2
+
+						Enddo
+					Enddo
+				Enddo
+				Call Add_Quantity(diagnostic2,qty)
+			Endif
+
+
+			DeAllocate(qty)
+			Call Complete_Output(iteration)
+
+		Endif
+	End Subroutine PS_Output
+
+End Module Diagnostics

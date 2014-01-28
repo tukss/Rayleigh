@@ -1,0 +1,21 @@
+This directory contains the portions of the PseudoCode that govern the 
+parallel framework of the code.  Here you will find:
+
+Communication.f90 -  routines related to the MPI communication
+Load_Balancing.f90 - establishes the load_balancing for each 
+configuration
+Transposes.f90  - routines for moving between between different 
+configurations via transposes
+
+configuration convention:
+1a - z/r in processor (physical) ; delta  m/l or kx/ky
+1b - z/r in processor (spectral) ; delta  m/l or kx/ky
+
+2a - y/theta in processor (physical) delta  r/m or z/ky
+2b - y/theta in processor (spectral)  delta r/m or z/kx
+
+3a - m/kx in processor (physical) delta  r/theta or z/x
+3b - m/kx in processor (spectral)  delta r/theta or z/x
+
+
+
