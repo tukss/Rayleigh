@@ -11,7 +11,9 @@ Module Initial_Conditions
 	Integer :: init_tag = 8989
 	Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
 	Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0
-	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w
+	Logical :: custom_t
+	Character*120 :: custom_t_file
+	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file
 Contains
 	
 	Subroutine Initialize_Fields()
@@ -319,6 +321,7 @@ Contains
 		Integer :: mode_count, my_mode_start, my_mode_end, fcount(3,2)
 		Real*8, Allocatable :: rand(:), rfunc1(:), rfunc2(:), lpow(:)
 		Real*8 :: amp, phase, lmid, alpha,x
+		Real*8, Allocatable :: new_temp(:)
 		type(SphericalBuffer) :: tempfield
 		fcount(:,:) = 1
 
@@ -331,7 +334,20 @@ Contains
 			rfunc1(r) = 0.2d0*(1.0d0-3.0d0*x*x+3.0d0*x**4-x**6)
 			rfunc2(r) = r_outer*r_inner/radius(r)-r_inner
 		Enddo
-		!write(6,*)'rf max ', maxval(rfunc1)
+		If (custom_t) Then
+			! Processors owning m = 0 (and thus ell = 0)
+			! Should read a custom temperature file and replace rfunc2
+			Do mp = 1, my_mp%max		
+				m = m_values(mp)
+				If (m .eq. 0) Then
+					Allocate(new_temp(1:N_R))
+					Call Load_Radial_Profile(custom_t_file,new_temp)
+					rfunc2(my_r%min:my_r%max) = new_temp(my_r%min:my_r%max)
+					DeAllocate(new_temp)
+				Endif
+			Enddo
+		Endif
+
 
 		! We put our temporary field in spectral space
 		Call tempfield%init(field_count = fcount, config = 's2b')		
@@ -427,4 +443,127 @@ Contains
 
 	End Subroutine Random_Init
 
+	Subroutine Load_Radial_Profile(profile_file,profile_out)
+		Implicit None
+		Character*120, Intent(In) :: profile_file
+		Real*8, Intent(InOut) :: profile_out(1:)
+		Real*8, Allocatable :: radius_in(:), profile_in(:), spy2(:)
+		Real*8 :: min_r_in, max_r_in, min_p_in, max_p_in
+		Real*8 :: splx, sply
+		Integer :: nr_in, r
+		! Reads in a 1-D radial profile of some quantity,
+		! interpolates it (using cubic splines) to the current grid, 
+		! and stores it in profile_out.
+
+      Open(unit=892, file = custom_t_file, form = 'unformatted', status = 'old')
+      Read(892)nr_in
+      Allocate(profile_in(1:nr_in))
+      Allocate(radius_in(1:nr_in))
+      Read(892)(radius_in(r),r=1,nr_in)
+      Read(892)(profile_in(r),r = 1, nr_in)
+      Close(892)
+
+     !--------------------------------------------------------------
+      ! Interpolate onto our grid (assume custom_radius and custom_entropy are backwards
+      min_r_in = radius_in(nr_in)
+      max_r_in = radius_in(1)
+      max_p_in = profile_in(nr_in)
+      min_p_in = profile_in(1)
+
+      Allocate(spy2(1:nr_in))
+      spy2(1:nr_in) = 0.0d0
+      profile_out(1:N_R) = 0.0d0
+      Call Spline(radius_in, profile_in, nr_in, 2.0D30, 2.0D30, spy2)
+      Do r = 1, N_R
+         If ( (radius(r) .le. max_r_in) .and. (radius(r) .ge. min_r_in) ) Then
+            splx = radius(r)
+            Call Splint(radius_in, profile_in,spy2,nr_in, splx, sply)
+            profile_out(r) = sply
+         Endif
+      Enddo
+
+      ! Take care of any out of bounds radial values
+      Do r = 1, N_R
+         If (radius(r) .ge. max_r_in) Then
+            profile_out(r) = min_p_in
+         Endif
+         If (radius(r) .le. min_r_in) Then
+            profile_out(r) = max_p_in
+         Endif
+      Enddo
+
+		DeAllocate(radius_in, profile_in, spy2)
+	End Subroutine Load_Radial_Profile
+
+	!/////////////////////////////////////////////////////
+	! Numerical Recipes Routines for Spline Interpolation
+	Subroutine Spline(x,y,n,yp1,ypn,y2)
+		! From Numerical Recipes in Fortran
+		Integer:: n, NMAX
+		Real(8) :: yp1, ypn, x(n), y(n), y2(n)
+		PARAMETER (NMAX = 10000)
+		Integer :: i, k
+		Real(8) :: p, qn, sig, un, u(NMAX)
+
+		If (yp1 .gt. 0.99D30) Then
+			y2(1) = 0.0D0
+			u(1) = 0.0D0
+		Else
+			y2(1) = -0.5D0
+			u(1) = ( 3.0D0 / ( x(2)-x(1) ) ) * ( (y(2)-y(1))/(x(2)-x(1)) -yp1 )
+		Endif
+
+		Do i = 2, n-1
+			sig = (x(i)-x(i-1)) / (x(i+1)-x(i-1))
+			p = sig*y2(i-1)+2.0D0
+			y2(i) = (sig-1.0D0)/p
+			u(i) = (6.0D0*( (y(i+1)-y(i)) / (x(i+1)-x(i)) - (y(i)-y(i-1)) &
+				& /(x(i)-x(i-1)))/(x(i+1)-x(i-1))-sig*u(i-1))/p
+		Enddo
+
+		If (ypn .gt. 0.99D30) Then
+			qn = 0.0D0
+			un = 0.0D0
+		Else
+			qn = 0.5D0
+			un = (3.0D0/(x(n)-x(n-1)))*(ypn-(y(n)-y(n-1))/(x(n)-x(n-1)))
+		Endif
+
+		y2(n) = (un-qn*u(n-1))/(qn*y2(n-1)+1.0D0)
+
+		Do k = n-1, 1, -1
+			y2(k) = y2(k)*y2(k+1)+u(k)
+		Enddo
+		Return
+	End Subroutine Spline
+
+	Subroutine Splint(xa,ya,y2a,n,x,y)
+		! From Numerical Recipes in Fortan
+		Integer :: n
+		Real(8) x, y, xa(n), y2a(n), ya(n)
+		Integer :: k, khi, klo
+		Real(8) a,b,h
+
+		klo = 1
+		khi = n
+1   If ( (khi-klo) .gt. 1) Then
+			k = (khi+klo)/2
+			If (xa(k) .lt. x) Then		! if xa is in ascending order, change lt to gt
+				khi = k
+			else
+         	klo = k
+			endif
+			Goto 1
+		Endif
+
+    	h = xa(khi)-xa(klo)
+    	If (h .eq. 0.0D0) pause 'bad xa input in splint'
+    	a = (xa(khi)-x)/h
+    	b = (x-xa(klo))/h
+
+    	y = a*ya(klo)+ b*ya(khi)+ &
+			& ( (a**3-a)*y2a(klo)+(b**3-b)*y2a(khi) )*(h**2)/6.0D0
+
+		Return
+	End Subroutine Splint
 End Module Initial_Conditions

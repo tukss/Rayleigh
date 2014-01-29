@@ -1,1 +1,1 @@
-../benchmark/Makefile
+../benchmark/Makefile_LCD
