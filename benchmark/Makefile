@@ -40,7 +40,7 @@ PFOBJ = MPI_Base.o All_to_All.o SendReceive.o ISendReceive.o General_MPI.o MPI_L
 MOBJ  = Timing.o Finite_Difference.o Chebyshev_Polynomials.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o \
         Fourier_Transform.o Spectral_Derivatives.o
 IOOBJ = Spherical_IO.o
-POBJ  = Controls.o ProblemSize.o Fields.o Initial_Conditions.o Diagnostics.o BoundaryConditions.o Physics.o
+POBJ  = Controls.o ProblemSize.o Fields.o Initial_Conditions.o Diagnostics.o BoundaryConditions.o Checkpointing.o Physics.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
 MAINOBJ = Input.o Main.o
 

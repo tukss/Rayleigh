@@ -10,7 +10,7 @@ Module ProblemSize
 	!//////////////////////////////////////////////////////////////
 	! Processor Configuration
 	Integer :: ncpu = 1, nprow = 1, npcol =1 
-	Integer :: my_rank
+	Integer :: my_rank, my_row_rank, my_column_rank ! rank *within* row and rank *within* column
 	!//////////////////////////////////////////////////////////////
 	! Horizontal Grid Variables
 	Integer              :: n_theta, n_phi
@@ -79,6 +79,8 @@ Contains
 		Call pfi%init(ppars)
 		Call Map_Indices()
 		my_rank = pfi%gcomm%rank
+		my_row_rank = pfi%rcomm%rank
+		my_column_rank = pfi%ccomm%rank
 		!//////////////////////////////////////////////////
 		! Intialize Legendre Transforms & Horizontal Grid
 		tmp = my_mp%delta
