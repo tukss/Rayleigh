@@ -432,10 +432,10 @@ Contains
 		Call sintheta_div(dtdt)
 		Call sintheta_div(dvrdt)
 
-		If (sdivt) Then
-			Call sintheta_div(dvpdp)
-			Call sintheta_div(dvtdp)
-		Endif
+
+		Call sintheta_div(dvpdp)
+		Call sintheta_div(dvtdp)
+		
 
 		!////////////////////////////////////////////////////////////////////////
 		!This is a good spot to do some simple diagnostic output while we debug the code

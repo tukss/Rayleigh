@@ -5,7 +5,6 @@ Module Controls
 	Logical :: chebyshev = .false.
 	Logical :: magnetism = .false.
 	Logical :: nonlinear = .true.
-	Logical :: sdivt = .false.
 	Integer :: max_iterations = 1000000
-	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, sdivt
+	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit
 End Module Controls
