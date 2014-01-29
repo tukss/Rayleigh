@@ -1,5 +1,9 @@
 *~
 
+*.mod
+
+*.o
+
 fd_notes.log
 
 fd_notes.aux
