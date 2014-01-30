@@ -705,7 +705,8 @@ Contains
 					mpointer(1+row,k+col) = mpointer(1+row,k+col)+amp(1)*coefs(k,1)
 				Enddo		
 				Do k = max_stencil_size-nbpts+1, max_stencil_size
-					mpointer(n_x_fd+row,col+n_x_fd+(k-max_stencil_size)) = mpointer(n_x_fd+row,col+n_x_fd+(k-max_stencil_size))+amp(n_x_fd)*coefs(k,n_x_fd)
+					mpointer(n_x_fd+row,col+n_x_fd+(k-max_stencil_size)) = &
+                        mpointer(n_x_fd+row,col+n_x_fd+(k-max_stencil_size))+amp(n_x_fd)*coefs(k,n_x_fd)
 				Enddo		
 				Do r = 2, n_x_fd-1
 					itemp(1) = 1
