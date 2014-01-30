@@ -211,7 +211,7 @@ Contains
 		self%rdisp32v2  = 2*self%rdisp32
 
 		If (present(report)) Then
-			If (report == .true.) Then
+			If (report .eqv. .true.) Then
 			report_file = 'parallel_framework/reports/buff_init/sr32_'//Trim(report_tag)
 			Open(unit=report_unit,file = report_file,form='unformatted',status='replace')
 			Write(report_unit)np

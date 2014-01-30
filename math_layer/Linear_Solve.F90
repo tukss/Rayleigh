@@ -255,7 +255,7 @@ Module Linear_Solve
 				ndim = ndim1*equation_set(1,k)%nlinks
 				Allocate(equation_set(1,k)%rhs(1:ndim,1:2,1:n_modes_total))
 				If(present(zero_rhs)) Then
-					If (zero_rhs == .true.) Then
+					If (zero_rhs .eqv. .true.) Then
 						equation_set(1,k)%rhs(:,:,:) = 0.0d0
 					Endif
 				Endif
@@ -303,7 +303,7 @@ Module Linear_Solve
 		Do k = 1, n_equations
 			Do j = 1, n_modes
 				If (equation_set(j,k)%primary .and. equation_set(j,k)%solvefor) Then
-					If (band_solve == .True.) Then
+					If (band_solve .eqv. .True.) Then
 						!Call lu_solve_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%RHS , Equation_Set(j,k)%Pivot)
 					Else
 						Call lu_solve_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%rhs_pointer , Equation_Set(j,k)%Pivot)
