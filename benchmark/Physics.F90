@@ -14,6 +14,7 @@ Module Physics
 	Use BoundaryConditions
 	Use General_MPI, Only : global_max
 	Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
+    Use Checkpointing
 	Implicit None
 
 	Real*8 :: old_ab_factor = 1.0d0, new_ab_factor = 1.0d0
@@ -81,7 +82,10 @@ Contains
 			Call Physical_Space()
 			Call rlm_spaceb()
 			Call AdvanceTime()
-			
+            Write(6,*)iterations, checkpoint_frequency
+			If (Mod(iteration,checkpoint_frequency) .eq. 0) Then
+                Call Write_Checkpoint(wsp%p1b)                    
+            Endif
 		Enddo
 	End Subroutine Main_Loop
 	Subroutine Post_Solve()	

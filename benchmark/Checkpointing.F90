@@ -8,7 +8,7 @@ Module Checkpointing
 	Type(SphericalBuffer) :: chktmp
 	Integer, private :: numfields = 4 ! 6 for hydro
 	Integer,private,Allocatable :: mode_count(:)
-	Integer,private :: nlm_total
+	Integer,private :: nlm_total, checkpoint_tag = 425
 	Integer, Allocatable, Private :: lmstart(:)
 Contains
 
@@ -45,7 +45,9 @@ Contains
 		Endif
 	End Subroutine Initialize_Checkpointing
 
-	Subroutine Write_Spherical_Array(abterms)
+
+
+	Subroutine Write_Checkpoint(abterms)
 		Implicit None
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Integer :: mp, m, nm,nmodes, offset,nl,p,np
@@ -79,6 +81,8 @@ Contains
 
 		If (my_row_rank .ne. 0) Then
 			! Send myarr
+            Write(6,*)'Sending: ', my_row_rank
+            Call Send(myarr, dest = 0, tag = checkpoint_tag, grp = pfi%rcomm)
 			DeAllocate(myarr)
 		Else
 			Allocate( rowstrip(1:nlm_total, 1:tnr*numfields*2))
@@ -95,6 +99,7 @@ Contains
 			Do p = 1, np -1
 					Allocate(myarr(1:mode_count(p),1:dim2))
 					! Receive
+                    Call receive(myarr, source= p,tag=checkpoint_tag,grp = pfi%rcomm)
 					offset = 1
 					Do mp = pfi%all_3s(p)%min, pfi%all_3s(p)%max
 						m = m_values(mp)
@@ -105,9 +110,13 @@ Contains
 					Enddo										
 					DeAllocate(myarr)
 			Enddo
+
+
+
+            DeAllocate(rowstrip)
 		Endif
 
 		
-	End Subroutine Write_Spherical_Array
+	End Subroutine Write_Checkpoint
 
 End Module Checkpointing
