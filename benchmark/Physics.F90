@@ -82,9 +82,9 @@ Contains
 			Call Physical_Space()
 			Call rlm_spaceb()
 			Call AdvanceTime()
-            Write(6,*)iterations, checkpoint_frequency
-			If (Mod(iteration,checkpoint_frequency) .eq. 0) Then
-                Call Write_Checkpoint(wsp%p1b)                    
+            Write(6,*)iteration, check_frequency
+			If (Mod(iteration,check_frequency) .eq. 0) Then
+                Call Write_Checkpoint(wsp%p1b,iteration)                    
             Endif
 		Enddo
 	End Subroutine Main_Loop

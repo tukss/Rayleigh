@@ -32,6 +32,7 @@ Contains
 		!Call Set_Boundary_Conditions()
 		Call Linear_Init() 
 		Call Initialize_Fields()
+		Call Initialize_Checkpointing()
 	End Subroutine Main_Initialization
 
 
