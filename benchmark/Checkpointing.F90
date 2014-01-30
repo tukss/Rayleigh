@@ -2,6 +2,8 @@ Module Checkpointing
 	Use ProblemSize
 	Use Parallel_Framework
 	Use Linear_Solve, Only : get_all_rhs
+	Use SendReceive
+	Use MPI_BASE
 	! Simple Checkpointing Module
 	! Uses MPI-IO to split writing of files amongst rank zero processes from each row
 	Implicit None
@@ -10,6 +12,8 @@ Module Checkpointing
 	Integer,private,Allocatable :: mode_count(:)
 	Integer,private :: nlm_total, checkpoint_tag = 425
 	Integer, Allocatable, Private :: lmstart(:)
+	Integer, Private :: my_check_disp, buffsize
+	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z'
 Contains
 
 	Subroutine Initialize_Checkpointing()
@@ -42,14 +46,23 @@ Contains
 				nl = l_max-m+1
 				lmstart(m+1) = lmstart(m)+nl
 			enddo
+			np = pfi%ccomm%np
+			my_check_disp = 0
+			Do p = 1, my_column_rank
+				my_check_disp = my_check_disp+pfi%all_1p(p-1)%delta
+			enddo
+			my_check_disp = my_check_disp*nlm_total*2
+			buffsize = nlm_total*2*my_r%delta
+			Write(6,*)'nlm_total: ', nlm_total, buffsize
 		Endif
 	End Subroutine Initialize_Checkpointing
 
 
 
-	Subroutine Write_Checkpoint(abterms)
+	Subroutine Write_Checkpoint(abterms,iteration)
 		Implicit None
 		Real*8, Intent(In) :: abterms(:,:,:,:)
+		Integer, Intent(In) :: iteration
 		Integer :: mp, m, nm,nmodes, offset,nl,p,np
 		Integer :: dim2, lstart
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
@@ -110,13 +123,55 @@ Contains
 					Enddo										
 					DeAllocate(myarr)
 			Enddo
+				Call Write_Field(rowstrip,1,wchar, iteration)
+				Call Write_Field(rowstrip,2,pchar, iteration)
+				Call Write_Field(rowstrip,3,tchar, iteration)
+				Call Write_Field(rowstrip,4,zchar, iteration)
 
-
+				Call Write_Field(rowstrip,5,'WAB', iteration)
+				Call Write_Field(rowstrip,6,'PAB', iteration)
+				Call Write_Field(rowstrip,7,'TAB', iteration)
+				Call Write_Field(rowstrip,8,'ZAB', iteration)
 
             DeAllocate(rowstrip)
 		Endif
 
 		
 	End Subroutine Write_Checkpoint
+
+	Subroutine Write_Field(arr,ind,tag,iter)
+				Implicit None
+				Integer, Intent(In) :: ind, iter
+				Real*8, Intent(In) :: arr(1:,1:)
+				Character*8 :: iterstring
+				Character*3, Intent(In) :: tag
+				Character*120 :: cfile
+
+				integer ierr, i, funit , v_offset
+				integer(kind=MPI_OFFSET_KIND) disp 
+				Integer :: mstatus(MPI_STATUS_SIZE)
+	         write(iterstring,'(i8.8)') iter
+            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+				Write(6,*)'cfile is: ', cfile
+
+
+  
+ 				v_offset = (ind-1)*tnr+1
+
+				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
+                       MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                       MPI_INFO_NULL, funit, ierr) 
+				disp = my_check_disp*8
+				call MPI_FILE_SET_VIEW(funit, disp, MPI_DOUBLE_PRECISION, & 
+                           MPI_DOUBLE_PRECISION, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+				call MPI_FILE_WRITE(funit, arr(1,v_offset), buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+				call MPI_FILE_CLOSE(funit, ierr) 
+     
+				Write(6,*)my_check_disp*8, buffsize
+                                      
+                                          
+	End Subroutine Write_Field
 
 End Module Checkpointing

@@ -6,6 +6,6 @@ Module Controls
 	Logical :: magnetism = .false.
 	Logical :: nonlinear = .true.
 	Integer :: max_iterations = 1000000
-    Integer :: checkpoint_frequency = 2
+    Integer :: check_frequency = 2
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, checkpoint_frequency
 End Module Controls
