@@ -58,26 +58,26 @@ Contains
 			Call Begin_Outputting()
 			Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
 
-			If (compute_q(v_r)) Then
+			If (compute_q(v_r) .ne. 0) Then
 				
 				qty(:,:,:) = buffer(:,:,:,vr)
 				!write(6,*)'Computing vr ', maxval(qty)
 				Call Add_Quantity(v_r,qty)
 			Endif		
 
-			If (compute_q(v_theta)) Then
+			If (compute_q(v_theta) .ne. 0) Then
 				
 				qty(:,:,:) = buffer(:,:,:,vtheta)
 				Call Add_Quantity(v_theta,qty)
 			Endif		
 
-			If (compute_q(v_phi)) Then
+			If (compute_q(v_phi) .ne. 0) Then
 				
 				qty(:,:,:) = buffer(:,:,:,tvar)  ! vphi!!!!
 				Call Add_Quantity(v_phi,qty)
 			Endif	
 
-			If (compute_q(temperature)) Then
+			If (compute_q(temperature) .ne. 0) Then
 				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
 				qty(:,:,:) = buffer(:,:,:,pvar)
 				Call Add_Quantity(temperature,qty)
@@ -85,7 +85,7 @@ Contains
 
 
 
-			If (compute_q(diagnostic1)) Then
+			If (compute_q(diagnostic1) .ne. 0) Then
 				mypi = acos(-1.0d0)
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
@@ -98,7 +98,7 @@ Contains
 				Call Add_Quantity(diagnostic1,qty)
 			Endif
 
-			If (compute_q(diagnostic2)) Then
+			If (compute_q(diagnostic2) .ne. 0) Then
 				mypi = acos(-1.0d0)
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max

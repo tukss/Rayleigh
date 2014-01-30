@@ -314,7 +314,8 @@ Subroutine Time_MatMult(sz,ntimes)
 	Real*8, Allocatable :: a(:,:), b(:,:), c(:,:)
 	Integer, Intent(in) :: sz, ntimes
 	Integer :: m, n, k, i,j
-	Real*8 :: alpha, beta, t1, delta
+	Real*8 :: alpha, beta, delta
+    Real*4 :: t1
 
 
 	m = sz

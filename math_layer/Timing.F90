@@ -1,7 +1,8 @@
 Module Timing
 
 Type, Public :: Timer
-	Real*8 :: t1, delta, elapsed
+	Real*8 :: delta, elapsed
+    Real*4 :: t1
 
 	Contains
 	Procedure :: Init  => Initialize_Timer
