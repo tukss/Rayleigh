@@ -1,0 +1,51 @@
+# The name of our project is "VC". CMakeLists files in this project can 
+# refer to the root source directory of the project as ${VC_SOURCE_DIR} and 
+# to the root binary directory of the project as ${VC_BINARY_DIR}. 
+CMAKE_MINIMUM_REQUIRED (VERSION 2.6) 
+PROJECT (Rayleigh) 
+ENABLE_LANGUAGE (Fortran)
+
+# Add the module path so we can use the
+# custom FFTW3 search module
+LIST(APPEND CMAKE_MODULE_PATH
+    ${CMAKE_SOURCE_DIR}/cmake/
+    )
+
+# Enable testing
+#INCLUDE (CTest)
+
+SET(RAYLEIGH_SOURCE_DIR ${CMAKE_SOURCE_DIR}/)
+
+# Find MPI installation
+FIND_PACKAGE(MPI REQUIRED)
+IF(DEFINED MPI_Fortran_FOUND)
+    ADD_DEFINITIONS(${MPI_Fortran_COMPILE_FLAGS})
+    INCLUDE_DIRECTORIES(${MPI_Fortran_INCLUDE_PATH})
+    #LINK_DIRECTORIES(${MPI_Fortran_LIBRARIES})
+ENDIF(DEFINED MPI_Fortran_FOUND)
+
+# Find fortran FFTW3 installation
+FIND_PACKAGE(FFTW3 REQUIRED)
+INCLUDE_DIRECTORIES(${FFTW3_Fortran_INCLUDES})
+
+# Find a library that supports LAPACK functionality
+FIND_PACKAGE(LAPACK REQUIRED)
+
+# Recurse into the "src" subdirectory.
+#ADD_SUBDIRECTORY(src)
+
+FILE(GLOB RAYLEIGH_STRUCTURES "${RAYLEIGH_SOURCE_DIR}/data_structures/*.F90")
+FILE(GLOB RAYLEIGH_BENCH "${RAYLEIGH_SOURCE_DIR}/benchmark/*.F90")
+FILE(GLOB RAYLEIGH_MATH "${RAYLEIGH_SOURCE_DIR}/math_layer/*.F90")
+FILE(GLOB RAYLEIGH_IO "${RAYLEIGH_SOURCE_DIR}/IO/*.F90")
+FILE(GLOB RAYLEIGH_PARALLEL "${RAYLEIGH_SOURCE_DIR}/parallel_framework/*.F90")
+FILE(GLOB RAYLEIGH_TEST "${RAYLEIGH_SOURCE_DIR}/test_suite/*.F90")
+
+LIST(REMOVE_ITEM RAYLEIGH_BENCH "${RAYLEIGH_SOURCE_DIR}/benchmark/Physics_newlayout.F90")
+LIST(REMOVE_ITEM RAYLEIGH_MATH "${RAYLEIGH_SOURCE_DIR}/math_layer/Legendre_Transforms_newlayout.F90")
+
+ADD_EXECUTABLE(pseudo ${RAYLEIGH_STRUCTURES} ${RAYLEIGH_BENCH} ${RAYLEIGH_MATH} ${RAYLEIGH_IO} ${RAYLEIGH_PARALLEL} ${RAYLEIGH_TEST})
+TARGET_LINK_LIBRARIES(pseudo ${MPI_Fortran_LIBRARIES})
+TARGET_LINK_LIBRARIES(pseudo ${FFTW3_LIBRARIES})
+TARGET_LINK_LIBRARIES(pseudo ${LAPACK_LIBRARIES})
+
