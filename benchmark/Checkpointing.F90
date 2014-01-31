@@ -53,7 +53,7 @@ Contains
 			enddo
 			my_check_disp = my_check_disp*nlm_total*2
 			buffsize = nlm_total*2*my_r%delta
-			Write(6,*)'nlm_total: ', nlm_total, buffsize
+
 		Endif
 	End Subroutine Initialize_Checkpointing
 
@@ -64,9 +64,10 @@ Contains
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Integer, Intent(In) :: iteration
 		Integer :: mp, m, nm,nmodes, offset,nl,p,np
-		Integer :: dim2, lstart
+		Integer :: dim2, lstart, grid_type, i
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
-
+		Character*8 :: iterstring
+		Character*120 :: cfile
 		np = pfi%rcomm%np
 
 		Call chktmp%construct('p1a')
@@ -94,7 +95,7 @@ Contains
 
 		If (my_row_rank .ne. 0) Then
 			! Send myarr
-            Write(6,*)'Sending: ', my_row_rank
+
             Call Send(myarr, dest = 0, tag = checkpoint_tag, grp = pfi%rcomm)
 			DeAllocate(myarr)
 		Else
@@ -134,10 +135,46 @@ Contains
 				Call Write_Field(rowstrip,8,'ZAB', iteration)
 
             DeAllocate(rowstrip)
+				If (my_column_rank .eq. 0) Then
+					! row/column 0 writes out a file with the grid, etc.
+					! This file should contain everything that needs to be known
+					grid_type = 0	! uniform grid
+					if (chebyshev) grid_type = 1
+	         	write(iterstring,'(i8.8)') iteration
+            	cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+	            open(unit=15,file=cfile,form='unformatted', status='replace')
+	            Write(15)n_r
+					Write(15)grid_type
+					Write(15)l_max
+	            Write(15)(radius(i),i=1,N_R)
+	            Close(15)
+
+				Endif
 		Endif
 
 		
 	End Subroutine Write_Checkpoint
+
+	Subroutine Read_Checkpoint(abterms,iteration)
+		Implicit None
+		Integer :: n_r_old, l_max_old, grid_type_old
+		Integer :: old_pars(3)
+		Real*8, Allocatable :: old_radius(:)
+		! Rank zero from each row participates in the read
+		If (my_row_rank .eq. 0) Then
+			If (my_column_rank .eq. 0) 
+				!process zero reads all the old info and broadcasts to the other row rank zeros
+            	cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+	            open(unit=15,file=cfile,form='unformatted', status='old')
+	            Read(15)n_r_old
+					Read(15)grid_type_old
+					Read(15)l_max_old
+	            Read(15)(radius(i),i=1,N_R)
+	            Close(15)				
+			Endif
+		Endif
+
+	End Subroutine Read_Checkpoint
 
 	Subroutine Write_Field(arr,ind,tag,iter)
 				Implicit None
@@ -152,7 +189,6 @@ Contains
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
             cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
-				Write(6,*)'cfile is: ', cfile
 
 
   
@@ -169,7 +205,7 @@ Contains
                         mstatus, ierr) 
 				call MPI_FILE_CLOSE(funit, ierr) 
      
-				Write(6,*)my_check_disp*8, buffsize
+
                                       
                                           
 	End Subroutine Write_Field
