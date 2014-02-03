@@ -148,6 +148,7 @@ Contains
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))
 		If (chebyshev) Then
+			grid_type = 2
 			Call Initialize_Chebyshev(radius,rmin,rmax)
 			Delta_r(1) = radius(1)-radius(2)
 			Do r = 2, N_R

@@ -6,14 +6,16 @@ Module Initial_Conditions
 	Use Legendre_Transforms, Only : Legendre_Transform 
 	Use SendReceive
 	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral
+	Use Checkpointing, Only : read_checkpoint
 	Implicit None
 	Integer :: init_type = 1
 	Integer :: init_tag = 8989
+	Integer :: restart_iter = -1
 	Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
 	Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0
 	Logical :: custom_t
 	Character*120 :: custom_t_file
-	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file
+	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter
 Contains
 	
 	Subroutine Initialize_Fields()
@@ -36,6 +38,9 @@ Contains
 		! The equation set RHS's stays allocated throughout - it is effectively how we save the AB terms.
 		Call Allocate_RHS(zero_rhs=.true.)
 
+		If (init_type .eq. -1) Then
+			Call restart_from_checkpoint(restart_iter)
+		Endif
 	
 		If (init_type .eq. 1) Then
 			call benchmark_init_hydro()
@@ -57,6 +62,26 @@ Contains
 		! We are ready to enter the main loop
 
 	End Subroutine Initialize_Fields
+
+	Subroutine Restart_From_Checkpoint(iteration)
+		Implicit None
+		Integer, Intent(In) :: iteration
+		type(SphericalBuffer) :: tempfield
+		Integer :: fcount(3,2)
+		fcount(:,:) = 4
+
+		Call tempfield%init(field_count = fcount, config = 'p1a')
+		Call tempfield%construct('p1a')
+
+		wsp%p1b(:,:,:,:) = 0.0d0
+		tempfield%p1a(:,:,:,:) = 0.0d0
+
+		Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+
+		Call Set_All_RHS(tempfield%p1a)
+		Call tempfield%deconstruct('p1a')
+
+	End Subroutine Restart_From_Checkpoint
 
 	Subroutine Benchmark_Init_Hydro()
 		Implicit None

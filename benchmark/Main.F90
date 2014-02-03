@@ -7,6 +7,7 @@ Program Main
 	Use Physics
 	Use Diagnostics
 	Use TestSuite
+	Use Checkpointing
 	Implicit None
 
 	Call Main_Input()
@@ -31,8 +32,9 @@ Contains
 		!Call Compute_Benchmark_Coefficients()
 		!Call Set_Boundary_Conditions()
 		Call Linear_Init() 
-		Call Initialize_Fields()
 		Call Initialize_Checkpointing()
+		Call Initialize_Fields()
+		
 	End Subroutine Main_Initialization
 
 

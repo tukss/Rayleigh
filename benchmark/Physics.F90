@@ -14,7 +14,8 @@ Module Physics
 	Use BoundaryConditions
 	Use General_MPI, Only : global_max
 	Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
-    Use Checkpointing
+	Use Checkpointing, Only : Write_Checkpoint, checkpoint_iter, checkpoint_dt, checkpoint_newdt
+
 	Implicit None
 
 	Real*8 :: old_ab_factor = 1.0d0, new_ab_factor = 1.0d0
@@ -22,7 +23,7 @@ Module Physics
 
 	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:)
 
-	Logical :: new_timestep = .true., already_at_max
+	Logical :: new_timestep = .true.
 	Real*8  :: new_deltat, deltat, old_deltat
 	Real*8  :: cflmax = 0.1d0, cflmin = 0.05d0, min_dt_change = 0.1d0
 	Real*8  :: max_time_step = 5.0d-4
@@ -31,8 +32,9 @@ Module Physics
 	Character*8 :: t_ofmt = '(ES12.5)'	! For formatted timestep output
 Contains
 
-	Subroutine Initialize_TimeStepping()
+	Subroutine Initialize_TimeStepping(iter)
 		Implicit None
+		Integer, Intent(In) :: iter
 		Real*8 :: dr, tdiff
 
 		dr = radius(1)-radius(2)  ! assume uniform grid for now
@@ -42,13 +44,19 @@ Contains
 		!max_time_step = max_time_step*4.0d0
 		!min_time_step = max_time_step*1.0d-4
 
-
-		new_deltat   = max_time_step
-		    deltat   = 0.0d0
-		old_deltat   = 0.0d0
+		If (iter .eq. 1) Then
+			new_deltat   = max_time_step
+			deltat   = 0.0d0
+			old_deltat   = 0.0d0
+		Else
+			! We have restarted from a checkpoint
+			! Change new_deltat and deltat appropriately
+			new_deltat = checkpoint_newdt
+			deltat = checkpoint_dt
+			old_deltat = 0.0d0
+		Endif
 		new_timestep = .true.
-		already_at_max = .true.	! Used to keep from changing timestep unecessarily
-		! If checkpointing, change new_deltat and deltat appropriately
+
 	End Subroutine Initialize_TimeStepping
 	Subroutine Main_Loop()
 		Implicit None
@@ -62,9 +70,9 @@ Contains
 
 
 
-		first_iteration = 1  ! hard-coded for now
+		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1
-		Call Initialize_TimeStepping()
+		Call Initialize_TimeStepping(first_iteration)
 		If (chebyshev) Then
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
@@ -84,7 +92,7 @@ Contains
 			Call AdvanceTime()
             Write(6,*)iteration, check_frequency
 			If (Mod(iteration,check_frequency) .eq. 0) Then
-                Call Write_Checkpoint(wsp%p1b,iteration)                    
+                Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
             Endif
 		Enddo
 	End Subroutine Main_Loop
