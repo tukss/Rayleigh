@@ -1,6 +1,7 @@
 Module Spherical_IO
 	Use Parallel_Framework
 	Use SendReceive
+
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
 	! 2. Phi-Averages over sphere (f(r,theta))
@@ -11,11 +12,12 @@ Module Spherical_IO
 		Integer, Parameter :: nqmax=300, nshellmax=100
 		Integer :: shellavg_values(1:nqmax)=-1, globalavg_values(1:nqmax)=-1
 		Integer :: shellslice_values(1:nqmax) =-1, shellslice_levels(1:nshellmax)=-1, azavg_values(1:nqmax)=-1
+		Integer :: full3d_values(1:nqmax) = -1
 		Integer :: output_frequency, eng_frequency, checkpoint_frequency
 		Real(8) :: checkpoint_time
       Namelist /output_namelist/shellavg_values, globalavg_values, &
 			& shellslice_values, shellslice_levels, azavg_values, output_frequency, &
-			& checkpoint_frequency, checkpoint_time, eng_frequency 
+			& checkpoint_frequency, checkpoint_time, eng_frequency, full3d_values
 
 		Character*120 :: run_dir
 		Integer :: itmax, restart_checkpoint
@@ -26,14 +28,15 @@ Module Spherical_IO
 		Integer, Allocatable :: compute_q(:)
 		Integer, Allocatable, Private :: compute_azav(:), compute_shellav(:), compute_globav(:)
 		Integer, Allocatable, Private :: compute_shell(:), shell_levels(:)
-		Integer, Allocatable, Private :: step_zero(:), step_one(:), step_two(:), step_three(:)
+		Integer, Allocatable, Private :: step_zero(:), step_one(:), step_two(:), step_three(:), step_five(:)
 		Integer, Allocatable, Private :: qvals_azav(:), qvals_shellav(:), qvals_globav(:), qvals_shell(:)
+		Integer, Allocatable, Private :: qvals_3d(:)
 		Integer, Private :: nq_max, nq_azav, nq_shellav, nq_globav, azav_ind, shellav_ind
 		Integer, Private :: first_azav_q, last_azav_q, first_shellav_q, last_shellav_q
 		Integer, Private :: first_globav_q, last_globav_q, globav_ind, nq_shell, nshell_levels
 		Integer, Private :: first_shell_q, last_shell_q, shell_ind, my_nshells, nshell_r_ids
-		Integer, Private :: shell_data_written
-		Integer, Private :: az_avg_tag = 54, shell_avg_tag = 55, global_avg_tag = 56, shell_slice_tag = 57
+		Integer, Private :: shell_data_written, nq_3d
+		Integer, Private :: az_avg_tag = 54, shell_avg_tag = 55, global_avg_tag = 56, shell_slice_tag = 57, full_3d_tag = 58
 		Integer, Private, Allocatable :: my_shell_levs(:), have_shell(:), shell_r_ids(:), my_shell_ind(:)
 		Integer, Private, Allocatable :: nshells_at_rid(:)
 		Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
@@ -49,17 +52,21 @@ Module Spherical_IO
 
         Integer :: io_node = 0
 
+	Integer, Private :: current_iteration
 	!///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	! We store some redundant information just to keep the IO level as independent of the Physics level as possible
 	! These variables are all private.
 	Real*8, Allocatable,Private :: theta_integration_weights(:), r_integration_weights(:)
 	Integer, Private :: my_theta_min, my_theta_max, my_rmin, my_rmax
 	Integer, Private :: nr, nphi, ntheta
-	Integer, Private :: nproc1, nproc2, myid, nproc
+	Integer, Private :: nproc1, nproc2, myid, nproc, my_row_rank, my_column_rank, my_nr
 	Real*8, Allocatable, Private :: radius(:),sintheta(:),costheta(:) 
 Contains
 
-    Subroutine Begin_Outputting()
+    Subroutine Begin_Outputting(iter)
+		  Implicit None
+		  Integer, Intent(In) :: iter
+		  current_iteration = iter
         start_az_average = .true.
         start_shell_average = .true.
         start_shell_slice = .true.
@@ -79,10 +86,13 @@ Contains
 		my_theta_max = pfi%my_2p%max
 		my_rmin = pfi%my_1p%min
 		my_rmax = pfi%my_1p%max
+		my_nr = pfi%my_1p%delta
         nproc  = pfi%gcomm%np
 		nproc1 = pfi%ccomm%np		! processor's per column (radius split among these)
 		nproc2 = pfi%rcomm%np      ! processor's per row  (theta split among these)
 		myid   = pfi%gcomm%rank
+		my_row_rank = pfi%rcomm%rank
+		my_column_rank = pfi%ccomm%rank
 		nphi = pfi%n3p
 		ntheta = pfi%n2p
 		nr = pfi%n1p
@@ -105,6 +115,7 @@ Contains
 		nq_shellav = 0
 		nq_globav = 0
 		nq_shell = 0
+		nq_3d = 0
 		nshell_levels = 0
 
 		do i = 1, nq_max
@@ -112,6 +123,7 @@ Contains
 			if (azavg_values(i) .gt. 0)       nq_azav = nq_azav+1
 			if (globalavg_values(i) .gt. 0) nq_globav = nq_globav+1
 			if (shellavg_values(i) .gt. 0) nq_shellav = nq_shellav+1
+			if (full3d_values(i) .gt. 0) nq_3d = nq_3d+1
 		enddo
 
 		do i = 1, nshellmax
@@ -123,6 +135,7 @@ Contains
 		Allocate(qvals_shellav(1:nq_shellav))
 		Allocate(qvals_globav(1:nq_globav))
 		Allocate(qvals_shell(1:nq_shell))
+		Allocate(qvals_3d(1:nq_3d))
 		Allocate(shell_levels(1:nshell_levels))
 
 		do i = 1, nq_shell
@@ -139,6 +152,10 @@ Contains
 
 		do i = 1, nq_globav
 			qvals_globav(i) = globalavg_values(i)
+		enddo
+
+		do i = 1, nq_3d
+			qvals_3d(i) = full3d_values(i)
 		enddo
 
 		do i = 1, nshell_levels
@@ -180,16 +197,19 @@ Contains
 		Allocate(step_one(1:nq_max))
 		Allocate(step_two(1:nq_max))
 		Allocate(step_three(1:nq_max))
-
-		
-
+		Allocate(step_five(1:nq_max))
 
 
 		
-		step_zero(1:nq_max) = 0
-		step_one(1:nq_max) = 0
-		step_two(1:nq_max) = 0
+
+
+
+		
+		step_zero(1:nq_max)  = 0
+		step_one(1:nq_max)   = 0
+		step_two(1:nq_max)   = 0
 		step_three(1:nq_max) = 0
+		step_five(1:nq_max)  = 0	! For 3-D Output
 
 		Do i = 1, nq_globav
 			ind = qvals_globav(i)
@@ -217,6 +237,11 @@ Contains
 			compute_q(ind) = 1
 			compute_shell(ind) =1
 			step_zero(ind) = 1
+		Enddo
+
+		Do i = 1, nq_3d
+			ind = qvals_3d(i)
+			step_five(ind) = 1
 		Enddo
 
 		my_nshells = 0
@@ -467,6 +492,12 @@ Contains
 				!call MPI_BARRIER(MPI_COMM_WORLD,oerr)
 			Endif
 
+			! Step 5 is separate from the others.  
+			! For 3-D output, each output quantity is written as it is computed
+			If (step_five(qval) .eq. 1) Then
+				Write(6,*)'Entering 3D output'
+				Call write_full_3d(qty,qval)
+			Endif
 		Endif
 
 
@@ -736,4 +767,110 @@ Contains
             DeAllocate(shellav_outputs)
 		Endif
 	End Subroutine Write_Shell_Average
+
+	Subroutine Write_Full_3D(qty,qtag)
+		Use MPI_BASE ! Doing this here for now.  No other routine above sees MPI_Base, and I may want to keep it that way.
+		Implicit None		
+		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
+		Integer, Intent(In) :: qtag
+		Real*8, Allocatable :: my_shells(:,:,:), buff(:,:,:)
+		Integer :: i, j, k
+		Character*2 :: qstring
+		Character*8 :: iterstring
+		Character*120 :: cfile
+
+		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
+		Integer :: np, jind, buffsize, p
+		Integer(kind=MPI_OFFSET_KIND) :: my_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+		Integer :: funit, ierr
+
+		! qty is dimensioned 1:n_phi, my_rmin:my_rmax, my_theta_min:my_theta_max
+
+
+		If (my_row_rank .eq. 0) Then
+			! Everyone in the row communicates to row-rank zero.
+			! Each row owns a specific rank of radii
+			Allocate(my_shells(1:nphi, 1:ntheta, my_rmin:my_rmax))
+			my_shells(:,:,:) = 0.0d0					
+
+			! First each rank stripes its own data into the new array
+			! Not that striping is not in the "native" order
+			Do j = my_theta_min, my_theta_max
+				Do i = my_rmin, my_rmax
+					my_shells(:,j,i) = qty(:,i,j)
+				Enddo
+			Enddo
+			np = pfi%rcomm%np
+			Do p = 1, np-1	
+				your_theta_min = pfi%all_2p(p)%min
+				your_theta_max = pfi%all_2p(p)%max
+				your_ntheta    = pfi%all_2p(p)%delta
+				Allocate(buff(1:nphi,my_rmin:my_rmax, your_theta_min:your_theta_max))
+				Call receive(buff, source= p,tag=full_3d_tag,grp = pfi%rcomm)
+				Do j = your_theta_min, your_theta_max
+					Do i = my_rmin, my_rmax
+						my_shells(:,j,i) = buff(:,i,j)
+					Enddo
+				Enddo
+				DeAllocate(buff)
+			Enddo
+			! Now do the MPI write
+			np = pfi%ccomm%np
+			my_disp = 0
+			Do p = 1, my_column_rank
+				my_disp = my_disp+pfi%all_1p(p-1)%delta
+			Enddo
+			my_disp = my_disp*ntheta*nphi*8	! Displacment of this rank in the MPI File
+			buffsize = my_nr*nphi*ntheta		! Number of elements to write
+
+
+			write(iterstring,i_ofmt) current_iteration
+			write(qstring,'(i2.2)') qtag
+         cfile = 'Spherical_3D/'//trim(iterstring)//'_'//qstring
+			Write(6,*)cfile
+			call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
+                   MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                   MPI_INFO_NULL, funit, ierr) 
+
+			call MPI_FILE_SET_VIEW(funit, my_disp, MPI_DOUBLE_PRECISION, & 
+                   MPI_DOUBLE_PRECISION, 'native', & 
+                   MPI_INFO_NULL, ierr) 
+			call MPI_FILE_WRITE(funit, my_shells, buffsize, MPI_DOUBLE_PRECISION, & 
+                   mstatus, ierr) 
+
+			call MPI_FILE_CLOSE(funit, ierr) 
+			If (my_column_rank .eq. 0) Then
+				! row/column 0 writes out a file with the grid, etc.
+				! This file should contain everything that needs to be known for processing later
+	         write(iterstring,'(i8.8)') current_iteration
+            cfile = 'Spherical_3D/'//trim(iterstring)//'_'//'grid'
+	         open(unit=15,file=cfile,form='unformatted', status='replace')
+	         Write(15)nr
+				Write(15)ntheta
+				Write(15)nphi
+	         Write(15)(radius(i),i=1,nr)
+				Write(15)(acos(costheta(i)),i = 1, ntheta)
+	         Close(15)
+			Endif
+
+
+		Else
+			! Send an array that's indexed starting at 1.  Shouldn't be necessary, but just in case.
+			!Allocate(buff(1:nphi,1:my_ntheta,1:my_nr))
+			
+			!Do j = my_theta_min, my_theta_max
+			!	jind = j-my_theta_min+1
+			!	Do i = my_rmin, my_rmax
+			!		buff(:,jind,i) = qty(:,i,j)
+			!	Enddo
+			!Enddo
+			Call send(qty, dest= 0,tag=full_3d_tag,grp = pfi%rcomm)
+			!DeAllocate(buff)
+
+		Endif	
+
+
+	End Subroutine Write_Full_3D
+
 End Module Spherical_IO

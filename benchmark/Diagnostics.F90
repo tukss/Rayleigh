@@ -8,6 +8,7 @@ Module Diagnostics
 	!  Quantity Codes (some care must be taken to
 	Integer, Parameter, Private :: V_r = 1,   V_theta = 2, V_phi = 3
   	Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
+	
 
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
@@ -50,12 +51,12 @@ Contains
 	Subroutine PS_Output(buffer,iteration)
 		Implicit None
 		Integer, Intent(In) :: iteration
-		Real*8, Intent(InOut) :: buffer(:,:,:,:)
+		Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
 		Real*8 :: mypi
 		Integer :: p,t,r
 		
 		If (mod(iteration,output_frequency) .eq. 0) Then
-			Call Begin_Outputting()
+			Call Begin_Outputting(iteration)
 			Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
 
 			If (compute_q(v_r) .ne. 0) Then
@@ -73,13 +74,19 @@ Contains
 
 			If (compute_q(v_phi) .ne. 0) Then
 				
-				qty(:,:,:) = buffer(:,:,:,tvar)  ! vphi!!!!
+				qty(:,:,:) = buffer(:,:,:,vphi)
 				Call Add_Quantity(v_phi,qty)
 			Endif	
 
 			If (compute_q(temperature) .ne. 0) Then
 				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
-				qty(:,:,:) = buffer(:,:,:,pvar)
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						qty(p,r,t) = buffer(p,r,t,pvar)*radius(r)
+						Enddo
+					Enddo
+				Enddo
 				Call Add_Quantity(temperature,qty)
 			Endif		
 

@@ -64,7 +64,7 @@ Contains
 	End Subroutine D_Send_4D
 
 	Subroutine D_Send_3D(x, n_elements, dest, tag, grp, indstart)
-    Real*8, Intent(in)  :: x(:,:,:)
+    Real*8, Intent(in)  :: x(1:,1:,1:)
 
     Integer, Optional :: dest, n_elements, tag,indstart(1:3)
 	 Integer :: istart, kstart, jstart,lstart
@@ -244,7 +244,7 @@ Contains
 	End Subroutine D_Receive_4D
 
 	Subroutine D_Receive_3D(x, n_elements, source, tag, grp,indstart)
-		Real*8, Intent(out)  :: x(:,:,:)
+		Real*8, Intent(out)  :: x(1:,1:,1:)
 
     Integer, Optional :: source, n_elements, tag,indstart(1:3)
 	 Integer :: istart,jstart,kstart

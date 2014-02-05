@@ -90,7 +90,7 @@ Contains
 			Call Physical_Space()
 			Call rlm_spaceb()
 			Call AdvanceTime()
-            Write(6,*)iteration, check_frequency
+
 			If (Mod(iteration,check_frequency) .eq. 0) Then
                 Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
             Endif
