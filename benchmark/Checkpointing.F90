@@ -380,7 +380,7 @@ Contains
 
 		Call chktmp%deconstruct('p1b')
 		DeAllocate(old_radius)
-		Write(6,*)'Finished with reading'
+
 	End Subroutine Read_Checkpoint
 
 	Subroutine Write_Field(arr,ind,tag,iter)
