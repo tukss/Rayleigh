@@ -495,7 +495,7 @@ Contains
 			! Step 5 is separate from the others.  
 			! For 3-D output, each output quantity is written as it is computed
 			If (step_five(qval) .eq. 1) Then
-				Write(6,*)'Entering 3D output'
+				!Write(6,*)'Entering 3D output'
 				Call write_full_3d(qty,qval)
 			Endif
 		Endif
