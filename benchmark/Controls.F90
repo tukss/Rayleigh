@@ -5,7 +5,9 @@ Module Controls
 	Logical :: chebyshev = .false.
 	Logical :: magnetism = .false.
 	Logical :: nonlinear = .true.
+	Logical :: Rotation = .false.
 	Integer :: max_iterations = 1000000
-    Integer :: check_frequency = 2
+   Integer :: check_frequency = 2
+	
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, check_frequency
 End Module Controls

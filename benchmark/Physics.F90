@@ -622,6 +622,18 @@ Contains
 			Enddo
 		Enddo	
 
+		! Add Coriolis Terms if so desired
+		If (rotation) Then
+			! [- 2 z_hat cross u ]_r = 2 sintheta u_phi
+			Do t = my_theta%min, my_theta%max
+				Do r = my_r%min, my_r%max			
+					wsp%p3b(:,r,t,wvar) = wsp%p3b(:,r,t,wvar) + &
+						& 2.0d0*sintheta(t)*wsp%p3a(:,r,t,vphi)/ek
+				Enddo
+			Enddo
+		Endif
+
+
 		! Multiply by radius squared so that we have NL RHS U_r * r^2 (= NL RHS W * l(l+1)
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
@@ -666,6 +678,18 @@ Contains
 			Enddo
 		Enddo	
 
+		If (rotation) Then
+			! Add - the coriolis term (part of -RHS of theta)
+			! [2 z_hat cross u]_theta = -2 costheta u_phi
+			Do t = my_theta%min, my_theta%max
+				Do r = my_r%min, my_r%max
+					wsp%p3b(:,r,t,pvar) = wsp%p3b(:,r,t,pvar) - &
+						& 2.0d0*costheta(t)*wsp%p3a(:,r,t,vphi)/ek
+				Enddo
+			Enddo
+		Endif
+
+
 		! At this point, we have [u dot grad u]_theta
 		! Multiply by radius/sintheta so that we have r[u dot grad u]_theta/sintheta (getting ready for Z and dWdr RHS building)
 		Do t = my_theta%min, my_theta%max
@@ -702,6 +726,17 @@ Contains
 					& ( wsp%p3a(:,r,t,dvpdp)/sintheta(t) + wsp%p3a(:,r,t,vr))/radius(r)	
 			Enddo
 		Enddo
+
+		If (rotation) Then
+			! Add - Coriolis term (we are building -RHS of vphi)
+			Do t = my_theta%min, my_theta%max
+				Do r = my_r%min, my_r%max
+					wsp%p3b(:,r,t,zvar) = wsp%p3b(:,r,t,zvar) + &
+						& + 2.0d0*costheta(t)*wsp%p3a(:,r,t,vtheta)/ek + &
+						& + 2.0d0*sintheta(t)*wsp%p3a(:,r,t,vr)/ek
+				Enddo
+			Enddo
+		Endif
 
 		! At this point, we have [u dot grad u]_phi
 		! Multiply by radius/sintheta so that we have r[u dot grad u]_phi/sintheta (getting ready for Z and dWdr RHS building)
@@ -1029,7 +1064,7 @@ Contains
 				! 	 This part of the equation is static (i.e. not time-evolving)
 
 				! 	 t
-				amp = -Ra! *(radius/r_outer)
+				amp = -Ra/ek! *(radius/r_outer)
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
 				amp = 1.0d0
