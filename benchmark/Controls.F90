@@ -9,5 +9,5 @@ Module Controls
 	Integer :: max_iterations = 1000000
    Integer :: check_frequency = 2
 	
-	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, check_frequency
+	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, check_frequency, rotation
 End Module Controls
