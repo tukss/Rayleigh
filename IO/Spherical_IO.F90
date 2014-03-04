@@ -828,7 +828,7 @@ Contains
 			write(iterstring,i_ofmt) current_iteration
 			write(qstring,'(i2.2)') qtag
          cfile = 'Spherical_3D/'//trim(iterstring)//'_'//qstring
-			Write(6,*)cfile
+			!Write(6,*)cfile
 			call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
                    MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
                    MPI_INFO_NULL, funit, ierr) 

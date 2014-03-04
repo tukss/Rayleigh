@@ -11,7 +11,10 @@ Type, Public :: Timer
 	Procedure :: increment
 End Type Timer
 
+
 Contains
+
+
 
 Subroutine Initialize_Timer(self)
 	Implicit None

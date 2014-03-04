@@ -1,3 +1,8 @@
+#define RHSP wsp%p3b
+#define FIELDSP wsp%p3a
+#define DO_IDX Do t = my_theta%min, my_theta%max;	Do r = my_r%min, my_r%max ;Do k = 1, n_phi
+#define END_DO enddo; enddo; enddo
+#define IDX k,r,t
 Module Physics
 	Use Load_Balance, Only : mp_lm_values, l_lm_values, my_num_lm, m_lm_values, my_lm_min, my_nl_lm, my_nm_lm, my_lm_lval, my_lm_max
 	Use Parallel_Framework
@@ -15,8 +20,10 @@ Module Physics
 	Use General_MPI, Only : global_max
 	Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
 	Use Checkpointing, Only : Write_Checkpoint, checkpoint_iter, checkpoint_dt, checkpoint_newdt
-
+	Use Timers
 	Implicit None
+
+	Real*8 :: two_over_ek
 
 	Real*8 :: old_ab_factor = 1.0d0, new_ab_factor = 1.0d0
 	Real*8 :: simulation_time
@@ -60,15 +67,15 @@ Contains
 	End Subroutine Initialize_TimeStepping
 	Subroutine Main_Loop()
 		Implicit None
-		Integer ::  last_iteration, first_iteration
-			
+		Integer ::  last_iteration, first_iteration,i
+		Real*8  :: captured_time			
 		! We enter the main loop assuming that the solve has just been performed
 		! and that the equation set structure's RHS contains our primary fields with 
 		! radial dimension in-processor.
 		! Care needs to be taken at init to ensure fields (W,Z,P,T) are stored
 		! in the RHS (they are copied out upon entry into the loop).
 
-
+		Call Initialize_Timers()
 
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1
@@ -77,6 +84,11 @@ Contains
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
+		If (rotation) Then
+			two_over_ek = 2.0d0/ek
+		Endif
+
+		Call StopWatch(loop_time)%StartClock()
 		Do iteration = first_iteration, last_iteration
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
@@ -95,13 +107,39 @@ Contains
                 Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
             Endif
 		Enddo
+		Call StopWatch(loop_time)%Increment()
+		if (my_rank .eq. 0) Then
+			Write(6,*)' Elapsed time: ', StopWatch(loop_time)%elapsed
+			Write(6,*)'  Column time: ', StopWatch(ctranspose_time)%elapsed
+			Write(6,*)'     Row time: ', StopWatch(rtranspose_time)%elapsed
+			Write(6,*)'Legendre time: ', StopWatch(legendre_time)%elapsed
+			Write(6,*)'     FFT time: ', StopWatch(fft_time)%elapsed
+			Write(6,*)'   Solve time: ', StopWatch(solve_time)%elapsed
+			Write(6,*)'    rlma time: ', StopWatch(rlma_time)%elapsed
+			Write(6,*)'    rlmb time: ', StopWatch(rlmb_time)%elapsed
+			Write(6,*)'  pspace time: ', StopWatch(pspace_time)%elapsed
+			Write(6,*)'  psolve time: ', StopWatch(psolve_time)%elapsed
+			Write(6,*)'    dphi time: ', StopWatch(dphi_time)%elapsed
+			captured_time = 0.0d0
+			Do i = 2, 11
+				captured_time = captured_time + StopWatch(i)%elapsed
+			Enddo
+			Write(6,*)'captured time: ', captured_time
+			Write(6,*)'//////////////////////////'
+			Write(6,*)'         sub times        '
+			Write(6,*)'      nl time: ', StopWatch(nl_time)%elapsed
+			Write(6,*)'    sdiv time: ', StopWatch(sdiv_time)%elapsed
+			Write(6,*)'      ts time: ', StopWatch(ts_time)%elapsed
+			Write(6,*)'      ar time: ', StopWatch(ar_time)%elapsed
+		Endif
+		Call Finalize_Timing(n_r,l_max,max_iterations)
 	End Subroutine Main_Loop
 	Subroutine Post_Solve()	
 		Implicit None
 		Integer :: m, i
 		Character*12 :: tstring, otstring
 		! wsp%p1b is assumed to be allocated
-		
+		Call StopWatch(psolve_time)%startclock()
 		Call wsp%construct('p1a')
 		wsp%config = 'p1a'
 
@@ -193,9 +231,11 @@ Contains
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
 
 		Call wsp%deconstruct('p1b')
+		Call StopWatch(psolve_time)%increment()
 
+		Call StopWatch(ctranspose_time)%startclock()
 		Call wsp%reform()	! move from p1a to s2a
-		
+		Call StopWatch(ctranspose_time)%increment()
 	End Subroutine Post_Solve
 
 	Subroutine Post_Solve_Cheby()	
@@ -206,7 +246,7 @@ Contains
 		! For now, keeping them separate
 
 		! wsp%p1b is assumed to be allocated
-		
+		Call StopWatch(psolve_time)%startclock()
 		Call wsp%construct('p1a')
 		wsp%config = 'p1a'
 
@@ -329,9 +369,11 @@ Contains
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
 
 		Call wsp%deconstruct('p1b')
+		Call StopWatch(psolve_time)%increment()
 
+		Call StopWatch(ctranspose_time)%startclock()
 		Call wsp%reform()	! move from p1a to s2a
-		
+		Call StopWatch(ctranspose_time)%increment()
 	End Subroutine Post_Solve_Cheby
 
 
@@ -342,12 +384,14 @@ Contains
 	Subroutine rlm_spacea()
 		Implicit None
 		Integer :: mp
+		Call StopWatch(rlma_time)%startclock()
+
 				! Zero out l_max mode
 		Do mp = my_mp%min, my_mp%max
 			wsp%s2a(mp)%data(l_max,:) = 0.0d0
 		Enddo
 
-
+		
 		! Allocate two work arrays
 		Call Allocate_rlm_Field(ftemp1)
 		Call Allocate_rlm_Field(ftemp2)
@@ -366,14 +410,19 @@ Contains
 			wsp%s2a(mp)%data(l_max,:) = 0.0d0
 		Enddo
 
+		Call StopWatch(rlma_time)%increment()
 
 		!Legendre Transform and transpose the buffer
 		Call wsp%construct('p2a')
+		Call StopWatch(legendre_time)%startclock()
 		Call Legendre_Transform(wsp%s2a,wsp%p2a)
+		Call StopWatch(legendre_time)%increment()
 		Call wsp%deconstruct('s2a')
 		wsp%config = 'p2a'	
+
+		Call StopWatch(rtranspose_time)%startclock()
 		Call wsp%reform()	! We are now in p3a
-		
+		Call StopWatch(rtranspose_time)%increment()		
 
 	End Subroutine rlm_spacea
 
@@ -385,7 +434,7 @@ Contains
 		Real*8 :: ovt2, ovht2, ovrt2, maxt2, dr
 		Real*8 ::  maxt
 		Integer :: r
-
+		Call StopWatch(ts_time)%startclock()
 		ovt2 = 0.0d0	! "over t squared"
 		dr = radius(1)-radius(2)   ! Hard-coded uniform grid temporarily
 		Do r = my_r%min, my_r%max
@@ -394,9 +443,10 @@ Contains
 			ovrt2 = Maxval(wsp%p3a(:,r,:,vr)**2)/(delta_r(r)**2)	! radial
 			ovt2 = Max(ovt2,ovrt2)
 		Enddo
-
+		Call StopWatch(ts_time)%increment()
+		Call StopWatch(ar_time)%startclock()
 		Call Global_Max(ovt2, maxt2, grp = pfi%gcomm)	! Wrapper to mpi all reduce
-		
+		Call StopWatch(ar_time)%increment()
 		if (maxt2 .gt. 0.0d0) Then
 			maxt = 1.0d0/sqrt(maxt2)
 			!if (iteration .eq. 3) maxt = 0.5*min_time_step !max_time_step = max_time_step/2.0d0
@@ -423,6 +473,7 @@ Contains
 			Call pfi%exit()
 			Stop
 		Endif
+	
 	End Subroutine Compute_TimeStep
 
 
@@ -431,12 +482,18 @@ Contains
 		
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
-
+		Call StopWatch(dphi_time)%startclock()
 		Call Phi_Derivatives()
-		! Next perform the FFT
-		Call fft_to_physical(wsp%p3a,rsc = .true.)
+		Call StopWatch(dphi_time)%increment()
 
+		! Next perform the FFT
+		Call StopWatch(fft_time)%startclock()
+		Call fft_to_physical(wsp%p3a,rsc = .true.)
+		Call StopWatch(fft_time)%increment()
+
+		Call StopWatch(pspace_time)%startclock()
 		! Convert all our terms of the form "sintheta var" to "var"
+		Call StopWatch(sdiv_time)%startclock()
 		Call sintheta_div(vtheta)	! sintheta vtheta to vtheta etc.
 		Call sintheta_div(vphi)
 		Call sintheta_div(dvtdr)
@@ -447,7 +504,8 @@ Contains
 
 		Call sintheta_div(dvpdp)
 		Call sintheta_div(dvtdp)
-		
+
+		Call StopWatch(sdiv_time)%increment()
 
 		!////////////////////////////////////////////////////////////////////////
 		!This is a good spot to do some simple diagnostic output while we debug the code
@@ -463,15 +521,30 @@ Contains
 		Call wsp%construct('p3b')
 		wsp%config = 'p3b'
 
-		Call Temperature_Advection()
+		!................................
+		!Nonlinear Advection
+		Call StopWatch(nl_time)%startclock()
+
+		Call Temperature_Advection()		
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
 		Call Momentum_Advection_Phi()
 
-		Call wsp%deconstruct('p3a')
-		Call fft_to_spectral(wsp%p3b, rsc = .true.)
-		Call wsp%reform()	! Move to p2b
+		Call StopWatch(nl_time)%increment()
+		!...........................
 
+		Call wsp%deconstruct('p3a')
+
+		Call StopWatch(pspace_time)%increment()
+
+
+		Call StopWatch(fft_time)%startclock()
+		Call fft_to_spectral(wsp%p3b, rsc = .true.)
+		Call StopWatch(fft_time)%increment()
+
+		Call StopWatch(rtranspose_time)%startclock()
+		Call wsp%reform()	! Move to p2b
+		Call StopWatch(rtranspose_time)%increment()
 	End Subroutine Physical_Space
 
 
@@ -489,11 +562,14 @@ Contains
 
 		! Transform
 		Call wsp%construct('s2b')
+
+		Call StopWatch(legendre_time)%startclock()
 		Call Legendre_Transform(wsp%p2b,wsp%s2b)	
+		Call StopWatch(legendre_time)%increment()
 
 		Call wsp%deconstruct('p2b')
 		wsp%config = 's2b'
-
+		Call StopWatch(rlmb_time)%startclock()
 
 		
 
@@ -569,12 +645,14 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			wsp%s2b(mp)%data(l_max,:) = 0.0d0
 		Enddo
+		Call StopWatch(rlmb_time)%increment()
 
+		Call StopWatch(ctranspose_time)%startclock()
 		Call wsp%reform() ! move to the solve space
-
+		Call StopWatch(ctranspose_time)%increment()
 	End Subroutine rlm_spaceb
 
-	Subroutine Temperature_Advection()
+	Subroutine Temperature_Advectiono()
 		Implicit None
 		Integer :: t
 		! Build  -u dot grad T
@@ -590,9 +668,26 @@ Contains
 			wsp%p3b(:,:,t,tvar) = wsp%p3b(:,:,t,tvar) - &
 					& wsp%p3a(:,:,t,vphi)*wsp%p3a(:,:,t,dtdp)/sintheta(t)
 		Enddo									
+	End Subroutine Temperature_Advectiono
+
+	Subroutine Temperature_Advection()
+		Integer :: t,r,k
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+				wsp%p3b(k,r,t,tvar) = -wsp%p3a(k,r,t,vr)*wsp%p3a(k,r,t,dtdr) &
+									 - wsp%p3a(k,r,t,dtdt)*wsp%p3a(k,r,t,vtheta) &
+									 - wsp%p3a(k,r,t,vphi)*wsp%p3a(k,r,t,dtdp)*csctheta(t)
+				Enddo
+			Enddo
+		Enddo				
+		!$OMP END PARALLEL DO
+
 	End Subroutine Temperature_Advection
 
-	Subroutine Momentum_Advection_Radial()
+	Subroutine Momentum_Advection_Radialo()
 		Implicit None
 		Integer :: t,r
 
@@ -640,9 +735,39 @@ Contains
 				wsp%p3b(:,r,t,wvar) = wsp%p3b(:,r,t,wvar)*r_squared(r)
 			Enddo
 		Enddo	
+	End Subroutine Momentum_Advection_Radialo
+
+
+	Subroutine Momentum_Advection_Radial()
+		Implicit None
+		Integer :: t,r,k
+
+		! Build -radius^2 [u dot grad u]_r
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+
+		DO_IDX
+			RHSP(IDX,wvar) = -FIELDSP(IDX,vr)*FIELDSP(IDX,dvrdr)*r_squared(r) &
+				- FIELDSP(IDX,vtheta) * ( FIELDSP(IDX,dvrdt)-FIELDSP(IDX,vtheta) )*radius(r)    &
+				- FIELDSP(IDX,vphi)*(FIELDSP(IDX,dvrdp)*csctheta(t)-FIELDSP(IDX,vphi) )*radius(r)  
+		END_DO
+	
+		!$OMP END PARALLEL DO
+
+
+
+		! Add Coriolis Terms if so desired
+		If (rotation) Then
+		!	! [- 2 z_hat cross u ]_r = 2 sintheta u_phi
+			DO_IDX			
+				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
+					& two_over_ek*sintheta(t)*FIELDSP(IDX,vphi)*OneOverRsquared(r)
+			END_DO
+		Endif
+	
 	End Subroutine Momentum_Advection_Radial
 
-	Subroutine Momentum_Advection_Theta()
+	Subroutine Momentum_Advection_Thetao()
 		Implicit None
 		Integer :: t, r
 		! Build (radius/sintheta)[u dot grad u]_theta
@@ -700,9 +825,52 @@ Contains
 
 
 
+	End Subroutine Momentum_Advection_Thetao
+
+	Subroutine Momentum_Advection_Theta()
+		Implicit None
+		Integer :: t, r,k
+		! Build (radius/sintheta)[u dot grad u]_theta
+
+		! First add all the terms that get multiplied by u_theta
+		DO_IDX
+			RHSP(IDX,pvar) = wsp%p3a(IDX,dvrdr)       &	
+				 + ( wsp%p3a(IDX,dvpdp)*csctheta(t)    & ! vphi/sintheta/r dvrdphi		!check this comment...
+				 +   wsp%p3a(IDX,vtheta)*cottheta(t)   & !vtheta cot(theta)/r
+				 +   wsp%p3a(IDX,vr)  ) *one_over_r(r)					 		!ur/r
+		END_DO
+
+		DO_IDX
+			RHSP(IDX,pvar) = -RHSP(IDX,pvar)*wsp%p3a(IDX,vtheta) & ! multiply by -u_theta
+				+ wsp%p3a(IDX,vr  )*wsp%p3a(IDX,dvtdr)					     & ! vr dvthetadr
+				+ wsp%p3a(IDX,vphi)*( wsp%p3a(IDX,dvtdp)*csctheta(t) & ! vphi/sintheta/r dvtheta dphi
+				- wsp%p3a(IDX,vphi )*cottheta(t) )*one_over_r(r)    ! vphi^2 cot(theta)/r
+
+		END_DO
+
+
+		If (rotation) Then
+			! Add - the coriolis term (part of -RHS of theta)
+			! [2 z_hat cross u]_theta = -2 costheta u_phi
+			DO_IDX
+				RHSP(IDX,pvar) = RHSP(IDX,pvar)- two_over_ek*costheta(t)*FIELDSP(IDX,vphi)
+			END_DO
+		Endif
+
+
+		! At this point, we have [u dot grad u]_theta
+		! Multiply by radius/sintheta so that we have r[u dot grad u]_theta/sintheta (getting ready for Z and dWdr RHS building)
+		DO_IDX
+			RHSP(IDX,pvar) = RHSP(IDX,pvar)*radius(r)*csctheta(t)
+		END_DO
+
+
+
 	End Subroutine Momentum_Advection_Theta
 
-	Subroutine Momentum_Advection_Phi()
+
+
+	Subroutine Momentum_Advection_Phio()
 		Implicit None
 		Integer :: t, r
 		! Build (radius/sintheta)[u dot grad u]_phi
@@ -746,27 +914,62 @@ Contains
 			Enddo
 		Enddo	
 
+	End Subroutine Momentum_Advection_Phio
+
+	Subroutine Momentum_Advection_Phi()
+		Implicit None
+		Integer :: t, r, k
+		! Build (radius/sintheta)[u dot grad u]_phi
+
+		! terms multiplied by u_theta
+		
+		DO_IDX
+			RHSP(IDX,zvar) = FIELDSP(IDX,vtheta)*(FIELDSP(IDX,zvar)  & ! terms multiplied by u_theta
+									+FIELDSP(IDX,dvtdp)*csctheta(t)*one_over_r(r)) &
+				+FIELDSP(IDX,vr)*FIELDSP(IDX,dvpdr)	& ! radial advection
+				+ FIELDSP(IDX,vphi) & ! terms multiplied by u_phi
+				* ( FIELDSP(IDX,dvpdp)*csctheta(t) + FIELDSP(IDX,vr))*one_over_r(r)
+		END_DO
+
+		If (rotation) Then
+			! Add - Coriolis term (we are building -RHS of vphi)
+			DO_IDX
+				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
+					 + two_over_ek*costheta(t)*FIELDSP(IDX,vtheta) &
+					 + two_over_ek*sintheta(t)*FIELDSP(IDX,vr)
+			END_DO
+		Endif
+
+		! At this point, we have [u dot grad u]_phi
+		! Multiply by radius/sintheta so that we have r[u dot grad u]_phi/sintheta (getting ready for Z and dWdr RHS building)
+		DO_IDX
+			RHSP(IDX,zvar) = RHSP(IDX,zvar)*radius(r)*csctheta(t)
+		END_DO
+
 	End Subroutine Momentum_Advection_Phi
 
 	Subroutine Phi_Derivatives()
 		Implicit None
-		wsp%p3a(:,:,:,pvar) = wsp%p3a(:,:,:,tvar) ! cluge to keep t
+		Integer :: r,t,k
+		DO_IDX
+			FIELDSP(IDX,pvar) = FIELDSP(IDX,tvar)! cluge to keep t
+		END_DO
 		Call d_by_dphi(wsp%p3a,vr,dvrdp)
 		Call d_by_dphi(wsp%p3a,vtheta,dvtdp)
 		Call d_by_dphi(wsp%p3a,vphi,dvpdp)
 		Call d_by_dphi(wsp%p3a,tvar,dtdp)
 	End Subroutine Phi_Derivatives
 
+
 	Subroutine sintheta_div(ind)
 		Implicit None
 		Integer, Intent(In) :: ind
-		Integer :: t
-		Do t = my_theta%min, my_theta%max
-			wsp%p3a(:,:,t,ind) = wsp%p3a(:,:,t,ind)/sintheta(t)	! may want to do x csctheta (not sure)
-		Enddo
+		Integer :: t,r,k
+		DO_IDX
+			FIELDSP(IDX,ind) = FIELDSP(IDX,ind)*csctheta(t)	! twice as fast as dividing by sintheta...
+		END_DO
 
 	End Subroutine sintheta_div
-
 	Subroutine Velocity_Components()
 		Implicit None
 		Integer :: l, m, mp, rmn,rmx, r, rind
@@ -911,7 +1114,9 @@ Contains
 		endif
 		Call Add_to_All_RHS(wsp%p1b,new_ab_factor)
 		Call Fix_Boundary_Conditions()
+		Call StopWatch(solve_time)%startclock()
 		Call Implicit_Solve()
+		Call StopWatch(solve_time)%increment()
 		simulation_time = simulation_time+deltat
 		! The righthand side of the equation set structure
 		! Now contains the updated fields.
