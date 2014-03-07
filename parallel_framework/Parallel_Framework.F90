@@ -89,6 +89,9 @@ Module Parallel_Framework
 		Logical :: dynamic_transpose_buffers = .true.
 		Logical :: dynamic_config_buffers = .true.
 
+		Real*8, Allocatable :: recv_buff(:), send_buff(:)
+		Integer :: max_recv, max_send
+
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
 		Contains
@@ -96,6 +99,7 @@ Module Parallel_Framework
 		Procedure :: construct => Allocate_Spherical_Buffer
 		Procedure :: deconstruct => DeAllocate_Spherical_Buffer
 		Procedure :: reform => advance_configuration
+		Procedure :: set_buffer_sizes
 		Procedure :: transpose_1a2a
 		Procedure :: transpose_2a3a  ! Move from 2a to 3a
 		Procedure :: transpose_3b2b
@@ -109,6 +113,29 @@ Module Parallel_Framework
 
 
 Contains
+	Subroutine Set_Buffer_Sizes(self)
+			Implicit None
+			Class(SphericalBuffer) :: self
+			Integer :: new_recv, new_send
+
+			! Start with 2a3a sizes
+			self%max_send = sum(self%scount23)*2
+			self%max_recv = sum(self%rcount23)*2
+
+			! Compare against 3b2b
+			new_send = sum(self%scount32v2)
+			new_recv = sum(self%rcount32v2)
+			if (new_send .gt. self%max_send) then
+				self%max_send = new_send
+			endif
+			if (new_recv .gt. self%max_recv) then
+				self%max_recv = new_recv
+			endif
+
+
+			Allocate(self%recv_buff(1:self%max_recv))
+			Allocate(self%send_buff(1:self%max_send))
+	End Subroutine Set_Buffer_Sizes
 	Subroutine Initialize_Spherical_Buffer(self,report, field_count, & 
 														config,dynamic_transpose, dynamic_config)
 		! Buffer initialization
@@ -134,6 +161,7 @@ Contains
 		If (present(dynamic_transpose)) Then
 			self%dynamic_transpose_buffers = dynamic_transpose
 		Endif
+
 		If (present(config)) Then
 			self%config = config
 		Else
@@ -288,8 +316,10 @@ Contains
 			Enddo
 		Endif
 
-
-
+		!//  Allocate the static send/receive buffers if desired
+		If (.not. self%dynamic_transpose_buffers) then
+			Call self%set_buffer_sizes()
+		Endif
 	End Subroutine Initialize_Spherical_Buffer
 
 	Subroutine DeAllocate_Spherical_Buffer(self,config,override)
@@ -608,16 +638,18 @@ Contains
 
 	Subroutine Transpose_2a3a(self)
 		Class(SphericalBuffer) :: self
-		Real*8, Allocatable :: send_buff(:), recv_buff(:)
+		!Real*8, Allocatable :: send_buff(:), recv_buff(:)
 		Integer :: send_size,np, recv_size
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind,delf,delj
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
-		send_size = sum(self%scount23)*2
-		recv_size = sum(self%rcount23)*2
-		Allocate(send_buff(1:send_size))
+		If (self%dynamic_transpose_buffers) Then
 
+			send_size = sum(self%scount23)*2
+			recv_size = sum(self%rcount23)*2
+			Allocate(self%send_buff(1:send_size))
+		Endif
 		!--- Not sure if this is good or bad, but copy out the bounds of the loop for now
 		nf = self%nf2a
 		kmin = pfi%my_3s%min
@@ -644,8 +676,8 @@ Contains
 			Do j = jmin,jmax
 			Do i = imin,imax
 
-				send_buff(ii) = self%p2a(i,j+delf,k)
-				send_buff(ii+1) = self%p2a(i,j+delf+delj,k)
+				self%send_buff(ii) = self%p2a(i,j+delf,k)
+				self%send_buff(ii+1) = self%p2a(i,j+delf+delj,k)
 				ii = ii+2
 			Enddo
 			Enddo
@@ -654,12 +686,16 @@ Contains
 		Enddo
 
 		Call self%deconstruct('p2a')
-		Allocate(recv_buff(1:recv_size))
-		recv_buff(:) = 0.0d0
-		!----- This is where alltoall will be called
-		Call Standard_Transpose(send_buff, recv_buff, self%scount23*2, self%sdisp23*2, self%rcount23*2, self%rdisp23*2, pfi%rcomm)
+		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:recv_size))
+
+		self%recv_buff(:) = 0.0d0
+
+
+		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount23*2, &
+				self%sdisp23*2, self%rcount23*2, self%rdisp23*2, pfi%rcomm)
 		!--------------------------------------------------
-		DeAllocate(send_buff)
+		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
+
 		Call self%construct('p3a')
 		self%p3a(:,:,:,:) = 0.0d0	! This is important because we are going to take an fft later (De-aliasing is implicit here because
 		! we only stripe in data of the de-aliased m's, but we need to make sure the higher m's are zero!
@@ -680,8 +716,8 @@ Contains
 
 				k_ind = pfi%inds_3s(k)*2+1  ! (real) m=0 stored in p3b(1,:,:,:) (img in p3b(2,:,:,:))
 
-				self%p3a(k_ind,j,i,f)=recv_buff(ii) 
-				self%p3a(k_ind+1,j,i,f)=recv_buff(ii+1) 			
+				self%p3a(k_ind,j,i,f)=self%recv_buff(ii) 
+				self%p3a(k_ind+1,j,i,f)=self%recv_buff(ii+1) 			
 
 				ii = ii+2
 
@@ -691,7 +727,7 @@ Contains
 			Enddo
 		Enddo
 		self%config = 'p3a'
-		DeAllocate(recv_buff)
+		If (self%dynamic_transpose_buffers) DeAllocate(self%recv_buff)
 
 
 	End Subroutine Transpose_2a3a
@@ -702,16 +738,18 @@ Contains
 		! p3b was fft'd in place
 		Class(SphericalBuffer) :: self
 !		Complex*16, Allocatable :: send_buff(:), recv_buff(:)
-		Real*8, Allocatable :: send_buff(:), recv_buff(:)
+!		Real*8, Allocatable :: send_buff(:), recv_buff(:)
 		Integer :: send_size,np, recv_size
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind
 		Integer :: delf, delj
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
-		send_size = sum(self%scount32v2)
-		recv_size = sum(self%rcount32v2)
-		Allocate(send_buff(1:send_size))
+		If (self%dynamic_transpose_buffers) Then
+			send_size = sum(self%scount32v2)
+			recv_size = sum(self%rcount32v2)
+			Allocate(self%send_buff(1:send_size))
+		Endif
 		!write(6,*)'executing new transpose'
 		!--- Not sure if this is good or bad, but copy out the bounds of the loop for now
 		nf = self%nf3b
@@ -736,8 +774,8 @@ Contains
 			Do i = imin,imax		! interleave real and imaginary parts
 				k_ind = pfi%inds_3s(k)*2+1  ! (real) m=0 stored in p3b(1,:,:,:) (img in p3b(2,:,:,:))
 
-				send_buff(ii) = self%p3b(k_ind,j,i,f)! real part
-				send_buff(ii+1) = self%p3b(k_ind+1,j,i,f)! complex part				
+				self%send_buff(ii) = self%p3b(k_ind,j,i,f)! real part
+				self%send_buff(ii+1) = self%p3b(k_ind+1,j,i,f)! complex part				
 
 				ii = ii+2
 			Enddo
@@ -748,12 +786,13 @@ Contains
 
 		!/////////////////////////////////////
 		Call self%deconstruct('p3b')
-		Allocate(recv_buff(1:recv_size))
-		recv_buff(:) = 0.0d0
+		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:recv_size))
+		self%recv_buff(:) = 0.0d0
 		!----- This is where alltoall will be called
-		Call Standard_Transpose(send_buff, recv_buff, self%scount32v2, self%sdisp32v2, self%rcount32v2, self%rdisp32v2, pfi%rcomm)
+		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32v2, &
+				self%sdisp32v2, self%rcount32v2, self%rdisp32v2, pfi%rcomm)
 		!--------------------------------------------------
-		DeAllocate(send_buff)
+		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 	
 		Call self%construct('p2b')		! p2a and p2b can share the same buffer space... maybe just call this p2...
 
@@ -780,8 +819,8 @@ Contains
 				!p2b needs to be reshaped
 				!   self%p2b(i,j*2*f,k) -- since dgemm needs a 2D array
 
-				self%p2b(i,j+delf ,k)   = recv_buff(ii)  ! real
-				self%p2b(i,j+delf+delj,k) = recv_buff(ii+1)	! complex
+				self%p2b(i,j+delf ,k)   = self%recv_buff(ii)  ! real
+				self%p2b(i,j+delf+delj,k) = self%recv_buff(ii+1)	! complex
 				ii = ii+2 ! added +2 
 			Enddo
 			Enddo
@@ -792,7 +831,7 @@ Contains
 
 
 		self%config = 'p2b'
-		DeAllocate(recv_buff)
+		If (self%dynamic_transpose_buffers) DeAllocate(self%recv_buff)
 	End Subroutine Transpose_3b2b
 
 
@@ -923,18 +962,14 @@ Contains
       indx = 1
 		np = pfi%ccomm%np
       Do p = 0, np - 1
-         !r_min = 1 + p*n1/np
 			r_min = pfi%all_1p(p)%min
 			r_max = pfi%all_1p(p)%max
-         !r_max = (p+1)*n1/np
          dr = r_max - r_min
          ! Each processor in the radial group will have given me the same number of 
          ! l-m combos in the same (correct) order
          cnt = 1
          Do lp = 1, my_num_lm
 				Do n = 1, nfields
-					!self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-					!self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
 					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,1,cnt,n) ; indx = indx + dr + 1
 					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,2,cnt,n) ; indx = indx + dr + 1
 				Enddo
