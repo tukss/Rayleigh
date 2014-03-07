@@ -7,6 +7,7 @@ Module Initial_Conditions
 	Use SendReceive
 	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral
 	Use Checkpointing, Only : read_checkpoint
+	Use Controls
 	Implicit None
 	Integer :: init_type = 1
 	Integer :: init_tag = 8989
@@ -20,7 +21,7 @@ Contains
 	
 	Subroutine Initialize_Fields()
 		Implicit None
-
+		Logical :: dbtrans, dbconfig
 		! When coming out of this routine, the RHS of the equation set should contain the field values.
 		! This setup is consistent with the program having just completed a time step
 
@@ -29,7 +30,13 @@ Contains
 		! If this init is from restart, wsp%p1b should contain the adams bashforth terms output
 		! as part of the checkpoint.
 
-		Call wsp%init(field_count = wsfcount, config = 'p1b')		
+		! Check control variables to see if we need want static or buffers
+		dbtrans = .not. static_transpose
+		dbconfig = .not. static_config
+
+
+		Call wsp%init(field_count = wsfcount, config = 'p1b', &
+			dynamic_transpose =dbtrans, dynamic_config = dbconfig)		
 		Call wsp%construct('p1b')	! We will always start in p1b - should do wsp%set_config('p1b')
 		wsp%p1b(:,:,:,:) = 0.0d0	! All fields are zero initially
 

@@ -8,6 +8,8 @@ Module Controls
 	Logical :: Rotation = .false.
 	Integer :: max_iterations = 1000000
    Integer :: check_frequency = 2
-	
-	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, alpha_implicit, check_frequency, rotation
+	Logical :: static_transpose = .false.
+	Logical :: static_config = .false.
+	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, &
+			alpha_implicit, check_frequency, rotation, static_transpose, static_config
 End Module Controls

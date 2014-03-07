@@ -82,6 +82,13 @@ Module Parallel_Framework
 		Integer, Allocatable :: scount32v2(:), rcount32v2(:)
 
 		Character*3 :: config
+		! When memory is not a consideration, it may be advantageous
+		! to keep the send/receive and/or the configuration buffers
+		! static in memory.  The default is to allocate/deallocate them
+		! throughout each iteration
+		Logical :: dynamic_transpose_buffers = .true.
+		Logical :: dynamic_config_buffers = .true.
+
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
 		Contains
@@ -102,13 +109,14 @@ Module Parallel_Framework
 
 
 Contains
-	Subroutine Initialize_Spherical_Buffer(self,report, field_count,config)
+	Subroutine Initialize_Spherical_Buffer(self,report, field_count, & 
+														config,dynamic_transpose, dynamic_config)
 		! Buffer initialization
 		! Handles send/receive disp/counts
 		Implicit None
 		Integer :: np, p
 		Integer :: report_unit = 500
-		Logical, Intent(In), Optional :: report
+		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config
 		Integer, Intent(In), Optional :: field_count(3,2)
 		Character*120 :: report_file,report_tag
 		Character*10 :: gtag, rtag, ctag
@@ -119,6 +127,12 @@ Contains
 			Write(rtag,ifmt)pfi%rcomm%rank
 			Write(ctag,ifmt)pfi%ccomm%rank
 			report_tag = 'g'//Trim(gtag)//'_r'//Trim(rtag)//'_c'//Trim(ctag)
+		Endif
+		If (present(dynamic_config)) Then
+			self%dynamic_config_buffers = dynamic_config
+		Endif
+		If (present(dynamic_transpose)) Then
+			self%dynamic_transpose_buffers = dynamic_transpose
 		Endif
 		If (present(config)) Then
 			self%config = config
@@ -278,35 +292,42 @@ Contains
 
 	End Subroutine Initialize_Spherical_Buffer
 
-	Subroutine DeAllocate_Spherical_Buffer(self,config)
+	Subroutine DeAllocate_Spherical_Buffer(self,config,override)
 		Class(SphericalBuffer) :: self
+		Logical, Optional, Intent(In) :: override
+		Logical :: free_config_memory
 		Character*3, Intent(In) :: config
 		Integer :: mn1, mn2, mn3, mn4
 		Integer :: mx1,mx2,mx3,mx4,i
+		
+		free_config_memory = .true.
+		If (.not. self%dynamic_config_buffers ) Then
+			free_config_memory = .false.
+		Endif
+		if (present(override)) then
+			free_config_memory = override
+		endif
+		If (free_config_memory) Then
 		Select Case(config)
 			Case('p1a')
-				!Write(6,*)'De-allocating p1a'
 				If (allocated(self%p1a)) Then
 					DeAllocate(self%p1a)
 				Else
 					Write(6,*)'p1a does not appear to be allocated'
 				Endif
 			Case('p1b')
-				!Write(6,*)'De-allocating p1b'
 				If (allocated(self%p1b)) Then
 					DeAllocate(self%p1b)
 				Else
 					Write(6,*)'p1b does not appear to be allocated'
 				Endif
 			Case('p2a')
-				!Write(6,*)'De-allocating p2a'
 				If (allocated(self%p2a)) Then
 					DeAllocate(self%p2a)
 				Else
 					Write(6,*)'p2a does not appear to be allocated'
 				Endif
 			Case('p2b')
-				!Write(6,*)'De-allocating p2b'
 				If (allocated(self%p2b)) Then
 					DeAllocate(self%p2b)
 				Else
@@ -314,14 +335,12 @@ Contains
 				Endif
 
 			Case('p3a')
-				!Write(6,*)'De-allocating p3a'
 				If (allocated(self%p3a)) Then
 					DeAllocate(self%p3a)
 				Else
 					Write(6,*)'p3a does not appear to be allocated'
 				Endif
 			Case('p3b')
-				!Write(6,*)'De-allocating p3b'
 				If (allocated(self%p3b)) Then
 					DeAllocate(self%p3b)
 				Else
@@ -330,7 +349,6 @@ Contains
 			Case('s2a')
 				! Appropriate for a triangular truncation 
 				If (allocated(self%s2a)) Then
-					!Write(6,*)'De-allocating s2a'
 					mn1 = pfi%my_3s%min
 					mx1 = pfi%my_3s%max
 					Do i = mn1, mx1
@@ -346,7 +364,6 @@ Contains
 			Case('s2b')
 				! Appropriate for a triangular truncation 
 				If (allocated(self%s2b)) Then
-					!Write(6,*)'De-allocating s2b'
 					mn1 = pfi%my_3s%min
 					mx1 = pfi%my_3s%max
 					Do i = mn1, mx1
@@ -360,7 +377,9 @@ Contains
 				Endif
 
 		End Select
+		Endif
 	End Subroutine DeAllocate_Spherical_Buffer
+
 	Subroutine Allocate_Spherical_Buffer(self,config)
 		Class(SphericalBuffer) :: self
 		Character*3, Intent(In) :: config
@@ -369,126 +388,136 @@ Contains
 		Integer :: i
 		Select Case(config)
 			Case('p1a')
-				mn1 = 1
-				mx1 = pfi%n1p
-				mn2 = 1
-				mx2 = 2
-				mn3 = 1
-				mx3 = my_num_lm
-				mn4 = 1
-				mx4 = self%nf1a
-				Allocate(self%p1a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				If (.not. Allocated(self%p1a)) Then
+					mn1 = 1
+					mx1 = pfi%n1p
+					mn2 = 1
+					mx2 = 2
+					mn3 = 1
+					mx3 = my_num_lm
+					mn4 = 1
+					mx4 = self%nf1a
+					Allocate(self%p1a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				Endif
 			Case('p1b')
-				mn1 = 1
-				mx1 = pfi%n1p
-				mn2 = 1
-				mx2 = 2
-				mn3 = 1
-				mx3 = my_num_lm
-				mn4 = 1
-				mx4 = self%nf1b
-				Allocate(self%p1b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
-
+				If (.not. Allocated(self%p1b)) Then
+					mn1 = 1
+					mx1 = pfi%n1p
+					mn2 = 1
+					mx2 = 2
+					mn3 = 1
+					mx3 = my_num_lm
+					mn4 = 1
+					mx4 = self%nf1b
+					Allocate(self%p1b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				Endif
 
 			Case('p2a')
-				 
-				mn1 = 1
-				mx1 = pfi%n2p
-				mn2 = pfi%my_1p%min
-				mx2 = pfi%my_1p%max
-				mn4 = pfi%my_3s%min
-				mx4 = pfi%my_3s%max
+				If (.not. Allocated(self%p2a)) Then				 
+					mn1 = 1
+					mx1 = pfi%n2p
+					mn2 = pfi%my_1p%min
+					mx2 = pfi%my_1p%max
+					mn4 = pfi%my_3s%min
+					mx4 = pfi%my_3s%max
 
-				mx3 = self%nf2a*2*(mx2-mn2+1)
-				Allocate(self%p2a(mn1:mx1, 1:mx3, mn4:mx4))
-				
+					mx3 = self%nf2a*2*(mx2-mn2+1)
+					Allocate(self%p2a(mn1:mx1, 1:mx3, mn4:mx4))
+				Endif				
 			Case('p2b')
-				! 
-				mn1 = 1
-				mx1 = pfi%n2p
-				mn2 = pfi%my_1p%min
-				mx2 = pfi%my_1p%max
-				mn4 = pfi%my_3s%min
-				mx4 = pfi%my_3s%max
+				If (.not. Allocated(self%p2b)) Then 
+					mn1 = 1
+					mx1 = pfi%n2p
+					mn2 = pfi%my_1p%min
+					mx2 = pfi%my_1p%max
+					mn4 = pfi%my_3s%min
+					mx4 = pfi%my_3s%max
 
-				mx3 = self%nf2b*2*(mx2-mn2+1)
-				Allocate(self%p2b(mn1:mx1, 1:mx3, mn4:mx4))		
+					mx3 = self%nf2b*2*(mx2-mn2+1)
+					Allocate(self%p2b(mn1:mx1, 1:mx3, mn4:mx4))		
+				Endif
 			Case('p3a')
-				mn1 = 1
-				mx1 = pfi%n3p+2
-				mn2 = pfi%my_1p%min
-				mx2 = pfi%my_1p%max
-				mn3 = pfi%my_2p%min
-				mx3 = pfi%my_2p%max
-				mn4 = 1
-				mx4 = self%nf3a
-				! might think of calling this p3a rather than rdata 3a
-				Allocate(self%p3a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				If (.not. Allocated(self%p3a)) Then
+					mn1 = 1
+					mx1 = pfi%n3p+2
+					mn2 = pfi%my_1p%min
+					mx2 = pfi%my_1p%max
+					mn3 = pfi%my_2p%min
+					mx3 = pfi%my_2p%max
+					mn4 = 1
+					mx4 = self%nf3a
+					! might think of calling this p3a rather than rdata 3a
+					Allocate(self%p3a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				Endif
 			Case('p3b')
-				mn1 = 1
-				mx1 = pfi%n3p+2 ! necessary for an in place transform
-				mn2 = pfi%my_1p%min
-				mx2 = pfi%my_1p%max
-				mn3 = pfi%my_2p%min
-				mx3 = pfi%my_2p%max
-				mn4 = 1
-				mx4 = self%nf3b
-				!Write(6,*)'Allocating p3b'
-				Allocate(self%p3b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
-
+				If (.not. Allocated(self%p3b)) Then
+					mn1 = 1
+					mx1 = pfi%n3p+2 ! necessary for an in place transform
+					mn2 = pfi%my_1p%min
+					mx2 = pfi%my_1p%max
+					mn3 = pfi%my_2p%min
+					mx3 = pfi%my_2p%max
+					mn4 = 1
+					mx4 = self%nf3b
+					!Write(6,*)'Allocating p3b'
+					Allocate(self%p3b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
+				Endif
 
 			Case('s2a')
-				! We use a real array here instead of a complex array 
-				! Fields are striped rmin-rmax real then rmax+1-2*rmax imaginary in second index
-				! Appropriate for a triangular truncation 
-				! --- partly why spherical and cartesian buffers will be separate
-				mn1 = pfi%my_3s%min
-				mx1 = pfi%my_3s%max
-				mx4  = self%nf2a
-				mn3 = pfi%my_1p%min
-				mx3 = pfi%my_1p%max
+				If (.not. Allocated(self%s2a)) Then
+					! We use a real array here instead of a complex array 
+					! Fields are striped rmin-rmax real then rmax+1-2*rmax imaginary in second index
+					! Appropriate for a triangular truncation 
+					! --- partly why spherical and cartesian buffers will be separate
+					mn1 = pfi%my_3s%min
+					mx1 = pfi%my_3s%max
+					mx4  = self%nf2a
+					mn3 = pfi%my_1p%min
+					mx3 = pfi%my_1p%max
 				
-				Allocate(self%s2a(mn1:mx1))
-				mx2 = maxval(pfi%inds_3s)	! l_max = m_max
+					Allocate(self%s2a(mn1:mx1))
+					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-				!/////////////////////////////////
+					!/////////////////////////////////
 
 
-				mx3 = self%nf2a*2*pfi%my_1p%delta
+					mx3 = self%nf2a*2*pfi%my_1p%delta
 
-				!////////////////////////////////
+					!////////////////////////////////
 
-				Do i = mn1, mx1
-					mn2 = pfi%inds_3s(i)		!l_min = m
-					Allocate(self%s2a(i)%data(mn2:mx2,1:mx3))
-				Enddo
+					Do i = mn1, mx1
+						mn2 = pfi%inds_3s(i)		!l_min = m
+						Allocate(self%s2a(i)%data(mn2:mx2,1:mx3))
+					Enddo
+				Endif
 			Case('s2b')
-				! This is just s2b, but we are no longer complex, and 
-				! have fields, imaginary/real, and radius all in second index
-				! Appropriate for a triangular truncation 
-				! --- partly why spherical and cartesian buffers will be separate
-				mn1 = pfi%my_3s%min
-				mx1 = pfi%my_3s%max
-				mx4  = self%nf2b
-				mn3 = pfi%my_1p%min
-				mx3 = pfi%my_1p%max
+				If (.not. Allocated(self%s2b)) Then
+					! This is just s2b, but we are no longer complex, and 
+					! have fields, imaginary/real, and radius all in second index
+					! Appropriate for a triangular truncation 
+					! --- partly why spherical and cartesian buffers will be separate
+					mn1 = pfi%my_3s%min
+					mx1 = pfi%my_3s%max
+					mx4  = self%nf2b
+					mn3 = pfi%my_1p%min
+					mx3 = pfi%my_1p%max
 				
-				Allocate(self%s2b(mn1:mx1))
-				mx2 = maxval(pfi%inds_3s)	! l_max = m_max
+					Allocate(self%s2b(mn1:mx1))
+					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-				!/////////////////////////////////
-
-
-				mx3 = self%nf2b*2*pfi%my_1p%delta
-
-				!////////////////////////////////
-
-				Do i = mn1, mx1
-					mn2 = pfi%inds_3s(i)		!l_min = m
-					Allocate(self%s2b(i)%data(mn2:mx2,1:mx3))
-				Enddo
+					!/////////////////////////////////
 
 
+					mx3 = self%nf2b*2*pfi%my_1p%delta
+
+					!////////////////////////////////
+
+					Do i = mn1, mx1
+						mn2 = pfi%inds_3s(i)		!l_min = m
+						Allocate(self%s2b(i)%data(mn2:mx2,1:mx3))
+					Enddo
+
+				Endif
 		End Select
 
 	End Subroutine Allocate_Spherical_Buffer

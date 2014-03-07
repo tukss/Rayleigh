@@ -1,8 +1,8 @@
 Module Timing
-
+USE MPI_BASE, Only : MPI_WTIME
 Type, Public :: Timer
 	Real*8 :: delta, elapsed
-    Real*4 :: t1
+    Real*8 :: t1
 
 	Contains
 	Procedure :: Init  => Initialize_Timer
@@ -27,13 +27,15 @@ End Subroutine Initialize_Timer
 Subroutine Startclock(self)
 	Implicit None
 	Class(Timer) :: self
-	self%t1 = secnds(0.0)
+	self%t1 = MPI_WTIME()
 End Subroutine Startclock
 
 Subroutine Stopclock(self)
 	Implicit None
+	Real*8 :: t2
 	Class(Timer) :: self
-	self%delta = secnds(self%t1)
+	t2 = MPI_WTIME()
+	self%delta = t2-self%t1
 End Subroutine Stopclock
 
 Subroutine Increment(self)

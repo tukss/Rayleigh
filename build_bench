@@ -7,6 +7,6 @@ ln -s ../math_layer/*.F90 .
 ln -s ../IO/*.F90 .
 ln -s ../test_suite/*.F90 .
 ln -s ../benchmark/*.F90 .
-ln -s ../benchmark/Makefile .
+ln -s ../benchmark/Makefile_Pleiades Makefile
 make clean
 make pseudo

@@ -6,5 +6,6 @@ Module MPI_Base
 	End Type communicator
   
 	Include 'mpif.h'
-	Private :: mpi_wtime, mpi_wtick, mpi_null_delete_fn, mpi_dup_fn, mpi_null_copy_fn
+	Private :: mpi_wtick, mpi_null_delete_fn, mpi_dup_fn, mpi_null_copy_fn
+	Public :: mpi_wtime
 End Module MPI_Base
