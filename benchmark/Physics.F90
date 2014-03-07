@@ -212,9 +212,10 @@ Contains
 		Call Add_Derivative(weq,tvar,0, wsp%p1b,wsp%p1a,tvar)	! gravity
 
 		! Convert temperature to temperature/r (will take derivatives of this for advection)
+		
 		Do m = 1, my_num_lm
 			Do i = 1, 2
-				wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)/radius(:)
+				wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)*one_over_r(:)
 			Enddo
 		Enddo
 
@@ -760,10 +761,12 @@ Contains
 		! Add Coriolis Terms if so desired
 		If (rotation) Then
 		!	! [- 2 z_hat cross u ]_r = 2 sintheta u_phi
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX			
 				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
 					& two_over_ek*sintheta(t)*FIELDSP(IDX,vphi)*OneOverRsquared(r)
 			END_DO
+			!$OMP END PARALLEL DO
 		Endif
 	
 	End Subroutine Momentum_Advection_Radial
@@ -834,13 +837,16 @@ Contains
 		! Build (radius/sintheta)[u dot grad u]_theta
 
 		! First add all the terms that get multiplied by u_theta
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			RHSP(IDX,pvar) = wsp%p3a(IDX,dvrdr)       &	
 				 + ( wsp%p3a(IDX,dvpdp)*csctheta(t)    & ! vphi/sintheta/r dvrdphi		!check this comment...
 				 +   wsp%p3a(IDX,vtheta)*cottheta(t)   & !vtheta cot(theta)/r
 				 +   wsp%p3a(IDX,vr)  ) *one_over_r(r)					 		!ur/r
 		END_DO
+		!$OMP END PARALLEL DO
 
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			RHSP(IDX,pvar) = -RHSP(IDX,pvar)*wsp%p3a(IDX,vtheta) & ! multiply by -u_theta
 				+ wsp%p3a(IDX,vr  )*wsp%p3a(IDX,dvtdr)					     & ! vr dvthetadr
@@ -848,22 +854,27 @@ Contains
 				- wsp%p3a(IDX,vphi )*cottheta(t) )*one_over_r(r)    ! vphi^2 cot(theta)/r
 
 		END_DO
-
+		!$OMP END PARALLEL DO
 
 		If (rotation) Then
 			! Add - the coriolis term (part of -RHS of theta)
 			! [2 z_hat cross u]_theta = -2 costheta u_phi
+
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,pvar) = RHSP(IDX,pvar)- two_over_ek*costheta(t)*FIELDSP(IDX,vphi)
 			END_DO
+			!$OMP END PARALLEL DO
 		Endif
 
 
 		! At this point, we have [u dot grad u]_theta
 		! Multiply by radius/sintheta so that we have r[u dot grad u]_theta/sintheta (getting ready for Z and dWdr RHS building)
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			RHSP(IDX,pvar) = RHSP(IDX,pvar)*radius(r)*csctheta(t)
 		END_DO
+		!$OMP END PARALLEL DO
 
 
 
@@ -923,7 +934,7 @@ Contains
 		! Build (radius/sintheta)[u dot grad u]_phi
 
 		! terms multiplied by u_theta
-		
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			RHSP(IDX,zvar) = FIELDSP(IDX,vtheta)*(FIELDSP(IDX,zvar)  & ! terms multiplied by u_theta
 									+FIELDSP(IDX,dvtdp)*csctheta(t)*one_over_r(r)) &
@@ -931,30 +942,37 @@ Contains
 				+ FIELDSP(IDX,vphi) & ! terms multiplied by u_phi
 				* ( FIELDSP(IDX,dvpdp)*csctheta(t) + FIELDSP(IDX,vr))*one_over_r(r)
 		END_DO
+		!$OMP END PARALLEL DO
 
 		If (rotation) Then
 			! Add - Coriolis term (we are building -RHS of vphi)
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
 					 + two_over_ek*costheta(t)*FIELDSP(IDX,vtheta) &
 					 + two_over_ek*sintheta(t)*FIELDSP(IDX,vr)
 			END_DO
+			!OMP END PARALLEL DO
 		Endif
 
 		! At this point, we have [u dot grad u]_phi
 		! Multiply by radius/sintheta so that we have r[u dot grad u]_phi/sintheta (getting ready for Z and dWdr RHS building)
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			RHSP(IDX,zvar) = RHSP(IDX,zvar)*radius(r)*csctheta(t)
 		END_DO
-
+		!OMP END PARALLEL DO
 	End Subroutine Momentum_Advection_Phi
 
 	Subroutine Phi_Derivatives()
 		Implicit None
 		Integer :: r,t,k
+		
 		DO_IDX
 			FIELDSP(IDX,pvar) = FIELDSP(IDX,tvar)! cluge to keep t
 		END_DO
+
+
 		Call d_by_dphi(wsp%p3a,vr,dvrdp)
 		Call d_by_dphi(wsp%p3a,vtheta,dvtdp)
 		Call d_by_dphi(wsp%p3a,vphi,dvpdp)
@@ -966,10 +984,11 @@ Contains
 		Implicit None
 		Integer, Intent(In) :: ind
 		Integer :: t,r,k
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
 			FIELDSP(IDX,ind) = FIELDSP(IDX,ind)*csctheta(t)	! twice as fast as dividing by sintheta...
 		END_DO
-
+		!$OMP END PARALLEL DO
 	End Subroutine sintheta_div
 	Subroutine Velocity_Components()
 		Implicit None
