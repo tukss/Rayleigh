@@ -125,6 +125,7 @@ Contains
 				captured_time = captured_time + StopWatch(i)%elapsed
 			Enddo
 			Write(6,*)'captured time: ', captured_time
+			Write(6,*)'iter/sec     : ', max_iterations/StopWatch(loop_time)%elapsed
 			Write(6,*)'//////////////////////////'
 			Write(6,*)'         sub times        '
 			Write(6,*)'      nl time: ', StopWatch(nl_time)%elapsed
