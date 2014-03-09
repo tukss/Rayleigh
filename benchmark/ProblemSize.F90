@@ -3,7 +3,7 @@ Module ProblemSize
 	Use Finite_Difference, Only  : Initialize_Derivatives
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
-	Use Controls, Only : Chebyshev
+	Use Controls, Only : Chebyshev, use_parity
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev
 	Implicit None
 
@@ -87,7 +87,7 @@ Contains
 		allocate(m_vals(1:tmp))
 		m_vals(:) = m_values(my_mp%min:my_mp%max)
 		
-		Call Initialize_Legendre(n_theta,l_max,m_vals)
+		Call Initialize_Legendre(n_theta,l_max,m_vals,use_parity)
 		tmp = my_r%delta
 		Call Initialize_Angular_Derivatives(m_vals,l_max,tmp)
 		DeAllocate(m_vals)

@@ -566,6 +566,16 @@ Subroutine PtS_2d_dgpv2(data_in, data_out)
 	ddims = shape(data_in)
 	n_m = ddims(3)
 	nrhs = ddims(2)
+	alpha = 1.0d0
+	beta = 0.0d0
+	if (.not. parity) then
+		Do m =1, n_m
+			nl = l_max-m_values(m)+1
+			
+			CALL DGEMM('T','N',nl,nrhs,n_theta, alpha, ip_lm(m)%data, &
+				n_theta,data_in(:,:,m) , n_theta, beta,data_out(m)%data,nl)
+		Enddo
+	else
 	!To exploit parity, we first need
 	!to build the even and odd functions
 	Allocate(feven(1:n_theta/2,1:nrhs,1:n_m))
@@ -584,8 +594,7 @@ Subroutine PtS_2d_dgpv2(data_in, data_out)
 	Enddo
 
 
-	alpha = 1.0d0
-	beta = 0.0d0
+
 	Do m = 1, n_m
 
 			If (n_l_even(m) .gt. 0) then
@@ -617,7 +626,7 @@ Subroutine PtS_2d_dgpv2(data_in, data_out)
 
 	DeAllocate(feven)
 	DeAllocate(fodd)
-	
+	endif
 End Subroutine PtS_2d_dgpv2		
 
 
@@ -636,15 +645,23 @@ Subroutine StP_2d_dgp(data_in, data_out)
 	ddims = shape(data_out)
 	n_m = ddims(3)
 	nrhs = ddims(2)
+
+	alpha = 1.0d0
+	beta = 0.0d0
+	if (.not. parity) then
+		
+		Do m = 1, n_m
+			nl = l_max-m_values(m)+1
+			CALL DGEMM('T','N',n_theta,nrhs,nl, alpha, p_lm(m)%data,  &
+				nl,data_in(m)%data , nl, beta,data_out,n_theta)
+		Enddo
+
+	else
+	!////////////////////////////////////
+	! In progress
 	nt1 = n_theta+1
 	nt2 = n_theta/2
 	data_out(:,:,:) = 0.0d0
-
-
-	!////////////////////////////////////
-	! In progress
-	alpha = 1.0d0
-	beta = 0.0d0
 	Allocate(temp(1:nt2,1:nrhs))
 	! Solve for odd and even functions
 	Do m = 1, n_m
@@ -691,7 +708,7 @@ Subroutine StP_2d_dgp(data_in, data_out)
 
 	! Note - not sure if it's faster to make a variable named nt2j1 = nt2-j+1 or just let it compute on the fly
 	DeAllocate(temp)
-
+	Endif
 	
 End Subroutine StP_2d_dgp	
 

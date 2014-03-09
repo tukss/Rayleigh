@@ -87,15 +87,17 @@ Subroutine DeAllocate_Parity_Plms()
 	Endif
 End Subroutine DeAllocate_Parity_Plms
 
-Subroutine Initialize_Legendre(nt,lmax,mval)
+Subroutine Initialize_Legendre(nt,lmax,mval,parity_in)
 	Implicit None
 	Real*16 :: coloc_min,coloc_max, x,tmp,factorial_ratio,amp, renorm
-
+	Logical, Intent(In) :: parity_in
 	Integer :: i, m, l, report_unit, max_l_test, mv
 	Integer, Intent(in) :: nt,lmax, mval(:)
 	
 	Logical :: write_legendre
 	Character*120 :: report_file = 'ylms'
+
+	parity = parity_in
 	! Set up the grid
 	coloc_min = -1
 	coloc_max = 1

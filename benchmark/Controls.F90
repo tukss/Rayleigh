@@ -10,6 +10,8 @@ Module Controls
    Integer :: check_frequency = 2
 	Logical :: static_transpose = .false.
 	Logical :: static_config = .false.
+	Logical :: use_parity = .true.
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, max_iterations, chebyshev, nonlinear, &
-			alpha_implicit, check_frequency, rotation, static_transpose, static_config
+			alpha_implicit, check_frequency, rotation, static_transpose, static_config, &
+			use_parity
 End Module Controls
