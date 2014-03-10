@@ -35,6 +35,8 @@ Module Physics
 	Real*8  :: cflmax = 0.1d0, cflmin = 0.05d0, min_dt_change = 0.1d0
 	Real*8  :: max_time_step = 5.0d-4
 	Real*8  :: min_time_step = 1.0d-13
+
+
 	Integer :: iteration
 	Character*8 :: t_ofmt = '(ES12.5)'	! For formatted timestep output
 Contains
@@ -109,6 +111,7 @@ Contains
 		Enddo
 		Call StopWatch(loop_time)%Increment()
 		if (my_rank .eq. 0) Then
+			Write(6,*)'//////////////////////////////////////////////'
 			Write(6,*)' Elapsed time: ', StopWatch(loop_time)%elapsed
 			Write(6,*)'  Column time: ', StopWatch(ctranspose_time)%elapsed
 			Write(6,*)'     Row time: ', StopWatch(rtranspose_time)%elapsed
@@ -126,7 +129,7 @@ Contains
 			Enddo
 			Write(6,*)'captured time: ', captured_time
 			Write(6,*)'iter/sec     : ', max_iterations/StopWatch(loop_time)%elapsed
-			Write(6,*)'//////////////////////////'
+			Write(6,*)'//////////////////////////////////////////////'
 			Write(6,*)'         sub times        '
 			Write(6,*)'      nl time: ', StopWatch(nl_time)%elapsed
 			Write(6,*)'    sdiv time: ', StopWatch(sdiv_time)%elapsed
@@ -428,8 +431,59 @@ Contains
 
 	End Subroutine rlm_spacea
 
+	Subroutine Find_MyMinDT()
+		Implicit None
+		Real*8 :: ovt2, ovht2, ovrt2, maxt2
+		Real*8 ::  maxt
+		Integer :: r
+		Call StopWatch(ts_time)%startclock()
 
+		ovt2 = 0.0d0	! "over t squared"
+		Do r = my_r%min, my_r%max
+			ovht2 = Maxval(wsp%p3a(:,r,:,vtheta)**2+wsp%p3a(:,r,:,vphi)**2) &
+								*OneOverRSquared(r)*l_l_plus1(l_max) ! horizontal
+			ovt2  = Max(ovt2, ovht2)
+			ovrt2 = Maxval(wsp%p3a(:,r,:,vr)**2)/(delta_r(r)**2)	! radial
+			ovt2  = Max(ovt2,ovrt2)
+		Enddo
+		Call wsp%set_mrv(ovt2)
 
+		Call StopWatch(ts_time)%increment()
+	End Subroutine Find_MyMinDT
+
+	Subroutine Adjust_TimeStep()
+		Implicit None
+		Real*8 :: maxt2, maxt
+		
+
+		Call wsp%get_mrv(maxt2)
+		if (maxt2 .gt. 0.0d0) Then
+			maxt = 1.0d0/sqrt(maxt2)
+
+			if (deltat .lt. maxt*cflmin) then
+				! we can increase our timestep
+				new_deltat = Min(cflmax*maxt,max_time_step)
+
+			elseif (deltat .gt. (maxt*cflmax)) then
+				new_deltat = cflmax*maxt 
+				if (new_deltat .gt. deltat*(1.0d0-min_dt_change)) then
+					! As much as possible, we would like to avoid
+					! changing the timestep (slow process).  When we do change it,
+					! make sure we give it a good bump.
+					new_deltat = deltat*(1.0d0-min_dt_change)
+				endif
+			endif
+		Endif
+		If (new_deltat .ne. deltat) Then
+			new_timestep = .true.
+		Endif
+		If (new_deltat .lt. min_time_step) Then
+			If (my_rank .eq. 0) Write(6,*)'Time step became too small.'
+			Call pfi%exit()
+			Stop
+		Endif
+
+	End Subroutine Adjust_TimeStep
 
 	Subroutine Compute_TimeStep()
 		Implicit None
@@ -445,10 +499,16 @@ Contains
 			ovrt2 = Maxval(wsp%p3a(:,r,:,vr)**2)/(delta_r(r)**2)	! radial
 			ovt2 = Max(ovt2,ovrt2)
 		Enddo
+
 		Call StopWatch(ts_time)%increment()
 		Call StopWatch(ar_time)%startclock()
+
 		Call Global_Max(ovt2, maxt2, grp = pfi%gcomm)	! Wrapper to mpi all reduce
+
 		Call StopWatch(ar_time)%increment()
+
+
+
 		if (maxt2 .gt. 0.0d0) Then
 			maxt = 1.0d0/sqrt(maxt2)
 			!if (iteration .eq. 3) maxt = 0.5*min_time_step !max_time_step = max_time_step/2.0d0
@@ -516,8 +576,11 @@ Contains
 		Call ps_output(wsp%p3a, iteration)
 		!////////////////////////////////////////////////////////////////////////
 
-		Call compute_timestep()
-		
+		If (test_reduce) Then
+			Call Find_MyMinDT()	! Will piggyback on transposes
+		Else
+			Call compute_timestep()	! Will do it all at once
+		Endif		
 
 		! We are now ready to built the nonlinear terms
 		Call wsp%construct('p3b')
@@ -543,6 +606,8 @@ Contains
 		Call StopWatch(fft_time)%startclock()
 		Call fft_to_spectral(wsp%p3b, rsc = .true.)
 		Call StopWatch(fft_time)%increment()
+
+		
 
 		Call StopWatch(rtranspose_time)%startclock()
 		Call wsp%reform()	! Move to p2b
@@ -652,6 +717,10 @@ Contains
 		Call StopWatch(ctranspose_time)%startclock()
 		Call wsp%reform() ! move to the solve space
 		Call StopWatch(ctranspose_time)%increment()
+
+		If (test_reduce) Call Adjust_TimeStep()
+
+
 	End Subroutine rlm_spaceb
 
 	Subroutine Temperature_Advectiono()

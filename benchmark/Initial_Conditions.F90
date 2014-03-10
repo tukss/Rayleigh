@@ -36,7 +36,8 @@ Contains
 
 
 		Call wsp%init(field_count = wsfcount, config = 'p1b', &
-			dynamic_transpose =dbtrans, dynamic_config = dbconfig)		
+			dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
+			piggyback = test_reduce)		
 		Call wsp%construct('p1b')	! We will always start in p1b - should do wsp%set_config('p1b')
 		wsp%p1b(:,:,:,:) = 0.0d0	! All fields are zero initially
 

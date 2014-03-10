@@ -94,7 +94,8 @@ Module Parallel_Framework
 
         !For piggyback values on transposes (max timestep)
         Logical :: do_piggy = .false.
-        Integer, Allocatable :: inext(:)
+		Real*8 :: mrv	! "max reduce value"
+        Integer, Allocatable :: istop(:)
 
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
@@ -109,6 +110,8 @@ Module Parallel_Framework
 		Procedure :: transpose_3b2b
 		Procedure :: transpose_2b1b
 		Procedure :: write_space
+		Procedure :: set_mrv
+		Procedure :: get_mrv
 	End Type SphericalBuffer
 
 
@@ -117,6 +120,18 @@ Module Parallel_Framework
 
 
 Contains
+	Subroutine set_mrv(self,val)
+		Implicit None
+		Real*8, Intent(In) :: val
+		Class(SphericalBuffer) :: self
+		self%mrv = val
+	End Subroutine set_mrv
+	Subroutine get_mrv(self,val)
+		Implicit None
+		Real*8, Intent(InOut) :: val
+		Class(SphericalBuffer) :: self
+		val = self%mrv 
+	End Subroutine get_mrv
 	Subroutine Set_Buffer_Sizes(self)
 			Implicit None
 			Class(SphericalBuffer) :: self
@@ -342,10 +357,11 @@ Contains
                     self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
                 enddo
                 ! Allocate and initialize the inext array
-                Allocate(self%inext(0:np-1))
-                inext(0) = num_lm(0)
+                Allocate(self%istop(0:np))	! goes to np, but only np-1 used
+					 self%istop(np) = -1
+                self%istop(0)  = num_lm(0)
                 Do p = 1, np -1
-                    inext(p) = inext(p-1)+num_lm(p)
+                    self%istop(p) = self%istop(p-1)+num_lm(p)
                 Enddo
             Endif
         Endif
@@ -594,9 +610,13 @@ Contains
 			Case ('p2a')
 				Call self%transpose_2a3a()
 			Case ('p3b')
+
 				Call self%transpose_3b2b()
+
 			Case ('s2b')
+
 				Call self%transpose_2b1b()
+
 			Case ('p1a')
 				Call self%transpose_1a2a
 		End Select
@@ -768,7 +788,7 @@ Contains
 
 	End Subroutine Transpose_2a3a
 
-	Subroutine Transpose_3b2b(self,piggyback_max)		
+	Subroutine Transpose_3b2b(self)		
 		! Version 2
 		! This assumes that s3b and p2b are actually real arrays
 		! p3b was fft'd in place
@@ -779,7 +799,7 @@ Contains
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind
 		Integer :: delf, delj
-        Real*8, Intent(InOut), Optional :: piggyback_max
+
 
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
@@ -820,10 +840,10 @@ Contains
 			Enddo
 			Enddo
 			Enddo
-            if (self%do_piggy) Then
-                self%send_buff(ii) = piggyback_max
-                ii = ii+1
-            Endif
+         if (self%do_piggy) Then
+         	self%send_buff(ii) = self%mrv
+         	ii = ii+1
+         Endif
 		Enddo
 
 		!/////////////////////////////////////
@@ -871,7 +891,7 @@ Contains
 			Enddo
 			Enddo
             if (self%do_piggy) then
-                piggyback_max = max(piggyback_max,self%recv_buff(ii))
+                self%mrv = max(self%mrv,self%recv_buff(ii))
                 ii = ii+1
             endif
 		Enddo
@@ -884,7 +904,7 @@ Contains
 
 
 
-    Subroutine Transpose_2b1b(self,piggyback_max)
+    Subroutine Transpose_2b1b(self)
       ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
       ! Communication is now done entirely within the radial group (processors that 
       ! share a common set of ell-m values).  
@@ -899,7 +919,7 @@ Contains
 
         ! piggyback information
         Integer :: inext, pcurrent
-        Real*8, Intent(InOut), Optional :: piggyback_max
+
 		Class(SphericalBuffer) :: self
 
 		n1 = pfi%n1p
@@ -931,7 +951,7 @@ Contains
 		send_offset = 0
 
       pcurrent = 0
-      inext = self%istop(pcurrent)
+      inext = num_lm(0)
       Do i = 1, lm_count
          mp = mp_lm_values(i)
          l = l_lm_values(i)
@@ -947,9 +967,9 @@ Contains
         If (self%do_piggy) Then
             ! load the piggyback value into the next buffer slot.
             if (i .eq. inext) then
-                send_buff(send_offset+1) = piggyback_max
+                send_buff(send_offset+1) = self%mrv
                 send_offset = send_offset+1            
-                pcurrent = pcurrent+1
+						pcurrent = pcurrent+1
                 inext = self%istop(pcurrent)
             endif
         Endif
@@ -991,7 +1011,7 @@ Contains
 				cnt = cnt+1
 			Enddo
         if (self%do_piggy) then
-            piggyback_max = max(piggyback_max,recv_buff(indx))
+            self%mrv = max(self%mrv,recv_buff(indx))
             indx = indx+1
         endif
       End Do
