@@ -92,6 +92,10 @@ Module Parallel_Framework
 		Real*8, Allocatable :: recv_buff(:), send_buff(:)
 		Integer :: max_recv, max_send
 
+        !For piggyback values on transposes (max timestep)
+        Logical :: do_piggy = .false.
+        Integer, Allocatable :: inext(:)
+
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
 		Contains
@@ -137,13 +141,14 @@ Contains
 			Allocate(self%send_buff(1:self%max_send))
 	End Subroutine Set_Buffer_Sizes
 	Subroutine Initialize_Spherical_Buffer(self,report, field_count, & 
-														config,dynamic_transpose, dynamic_config)
+														config,dynamic_transpose, dynamic_config, &
+                                            piggyback)
 		! Buffer initialization
 		! Handles send/receive disp/counts
 		Implicit None
 		Integer :: np, p
 		Integer :: report_unit = 500
-		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config
+		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, piggyback
 		Integer, Intent(In), Optional :: field_count(3,2)
 		Character*120 :: report_file,report_tag
 		Character*10 :: gtag, rtag, ctag
@@ -315,11 +320,42 @@ Contains
 				self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
 			Enddo
 		Endif
+        If (present(piggyback)) Then
+            If (piggyback) Then
+                self%do_piggy = .true.
+                ! modify the send and receive sizes for 3b2b
+                np = pfi%rcomm%np
+                self%scount32v2 = self%scount32v2+1
+                self%rcount32v2 = self%rcount32v2+1
+                ! Adjust the send and receive displacements
+                Do p = 1, np-1
+                    self%sdisp32v2(p) = self%sdisp32v2(p-1)+self%scount32v2(p-1)
+                    self%rdisp32v2(p) = self%rdisp32v2(p-1)+self%rcount32v2(p-1)
+                Enddo
+
+                !Now do the same for 2b1b transposes
+                np = pfi%ccomm%np
+                self%scount21 = self%scount21+1
+                self%rcount21 = self%rcount21+1
+                Do p = 1, np -1
+                    self%sdisp21(p) = self%sdisp21(p-1)+self%scount21(p-1)
+                    self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
+                enddo
+                ! Allocate and initialize the inext array
+                Allocate(self%inext(0:np-1))
+                inext(0) = num_lm(0)
+                Do p = 1, np -1
+                    inext(p) = inext(p-1)+num_lm(p)
+                Enddo
+            Endif
+        Endif
+
 
 		!//  Allocate the static send/receive buffers if desired
 		If (.not. self%dynamic_transpose_buffers) then
 			Call self%set_buffer_sizes()
 		Endif
+
 	End Subroutine Initialize_Spherical_Buffer
 
 	Subroutine DeAllocate_Spherical_Buffer(self,config,override)
@@ -732,7 +768,7 @@ Contains
 
 	End Subroutine Transpose_2a3a
 
-	Subroutine Transpose_3b2b(self)		
+	Subroutine Transpose_3b2b(self,piggyback_max)		
 		! Version 2
 		! This assumes that s3b and p2b are actually real arrays
 		! p3b was fft'd in place
@@ -743,6 +779,8 @@ Contains
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind
 		Integer :: delf, delj
+        Real*8, Intent(InOut), Optional :: piggyback_max
+
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
@@ -782,6 +820,10 @@ Contains
 			Enddo
 			Enddo
 			Enddo
+            if (self%do_piggy) Then
+                self%send_buff(ii) = piggyback_max
+                ii = ii+1
+            Endif
 		Enddo
 
 		!/////////////////////////////////////
@@ -789,8 +831,10 @@ Contains
 		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:recv_size))
 		self%recv_buff(:) = 0.0d0
 		!----- This is where alltoall will be called
-		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32v2, &
+
+    	Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32v2, &
 				self%sdisp32v2, self%rcount32v2, self%rdisp32v2, pfi%rcomm)
+        
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 	
@@ -826,6 +870,10 @@ Contains
 			Enddo
 			Enddo
 			Enddo
+            if (self%do_piggy) then
+                piggyback_max = max(piggyback_max,self%recv_buff(ii))
+                ii = ii+1
+            endif
 		Enddo
 
 
@@ -836,7 +884,7 @@ Contains
 
 
 
-    Subroutine Transpose_2b1b(self)
+    Subroutine Transpose_2b1b(self,piggyback_max)
       ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
       ! Communication is now done entirely within the radial group (processors that 
       ! share a common set of ell-m values).  
@@ -849,10 +897,13 @@ Contains
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
       Integer :: send_size,recv_size, lmax, tnr, send_offset
 
+        ! piggyback information
+        Integer :: inext, pcurrent
+        Real*8, Intent(InOut), Optional :: piggyback_max
 		Class(SphericalBuffer) :: self
 
 		n1 = pfi%n1p
-
+        np = pfi%ccomm%np
       !Allocate(send(my_r%min:my_r%max, 2, n_fields, N_lm_local))
 		nfields = self%nf2b
 
@@ -875,8 +926,12 @@ Contains
 			n_lm_local = n_lm_local+(lmax-pfi%inds_3s(i)+1)
 		Enddo
 		send_size = (pfi%my_1p%delta)*2*(nfields)*(n_lm_local)
+        if (self%do_piggy) send_size = send_size+np
 		Allocate(send_buff(1:send_size))
 		send_offset = 0
+
+      pcurrent = 0
+      inext = self%istop(pcurrent)
       Do i = 1, lm_count
          mp = mp_lm_values(i)
          l = l_lm_values(i)
@@ -889,6 +944,15 @@ Contains
 				send_offset = send_offset+tnr
 				offset = offset+tnr
 			Enddo
+        If (self%do_piggy) Then
+            ! load the piggyback value into the next buffer slot.
+            if (i .eq. inext) then
+                send_buff(send_offset+1) = piggyback_max
+                send_offset = send_offset+1            
+                pcurrent = pcurrent+1
+                inext = self%istop(pcurrent)
+            endif
+        Endif
       Enddo
 
 
@@ -896,6 +960,7 @@ Contains
 		Call self%deconstruct('s2b')
 
 		recv_size = (pfi%n1p)*2*(nfields)*num_lm(pfi%ccomm%rank)
+        if (self%do_piggy) recv_size = recv_size+np
 		Allocate(recv_buff(1:recv_size))
 
 
@@ -908,7 +973,7 @@ Contains
 		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
 		! We may want to modify this later on to mesh with linear equation structure
       indx = 1
-		np = pfi%ccomm%np
+		
       Do p = 0, np - 1
          !r_min = 1 + p*n1/np
 			r_min = pfi%all_1p(p)%min
@@ -925,6 +990,10 @@ Contains
 				Enddo
 				cnt = cnt+1
 			Enddo
+        if (self%do_piggy) then
+            piggyback_max = max(piggyback_max,recv_buff(indx))
+            indx = indx+1
+        endif
       End Do
 
 		self%config='p1b'
