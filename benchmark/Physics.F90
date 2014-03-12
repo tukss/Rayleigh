@@ -954,7 +954,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX			
 				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
-					& two_over_ek*sintheta(t)*FIELDSP(IDX,vphi)*OneOverRsquared(r)
+					& two_over_ek*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
