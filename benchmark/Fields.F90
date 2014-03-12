@@ -2,6 +2,7 @@ Module Fields
 	Use Linear_Solve
 	Use Parallel_Framework
 	Use ProblemSize
+	Use Controls
 	!///////////////////////////////////////////////////////////
 	! The scalable framework of this program is centered around
 	! a large buffer that holds multiple fields.
@@ -31,13 +32,17 @@ Module Fields
 	Integer :: global_counter = 0
 	!////////////////////////////////////////////////////////////////////////////
 	! Variable locations in the global field meta data buffer
-	Integer :: wvar, pvar, tvar, zvar, btvar, bpvar
+	Integer :: wvar, pvar, tvar, zvar
 	Integer :: dpdr
 	Integer :: dwdr,  d3wdr3, dtdr, dzdr, d2zdr2, d2tdr2, d2wdr2
 	Integer :: vr, vtheta, vphi,dtdt,dvrdt,dvtdr,dvpdr,dvrdr
 	Integer :: dvrdp, dvtdp, dvpdp, dtdp
-	
 
+	Integer :: avar, dadr, d2adr2 ! Toroidal magnetic streamfunction and its radial derivatives
+	Integer :: cvar, dcdr, d2cdr2 !Poloidal magnetic streamfunction and its radial derivatives
+
+	Integer :: br,btheta,bphi, jr,jtheta,jphi	
+	Integer :: emfr,emftheta,emfphi
 	!///////////////////////////////////////////////////////////////////////////
 
 	!///////////////////////////////////////////////////////////////////////////
@@ -50,7 +55,7 @@ Module Fields
 	!				FOR LINEAR Solve
 	!==============================================================================
 	Integer, parameter :: weq = 1,  peq = 2,  teq = 3
-	Integer, parameter :: zeq = 4, bpeq = 5, bteq = 6
+	Integer, parameter :: zeq = 4,  ceq = 5,  aeq = 6
 
 
 	Integer :: wsfcount(3,2)
@@ -130,7 +135,7 @@ Contains
 		! we solve for are added first
 		! Their numbers should be 1 through nfields and it is OK
 		! if they are not used in all configurations.  We want the 
-		! equation numbering and 
+		! equation numbering and the field numbering to agree
 
 
 		!//////////////////////////////////
@@ -143,16 +148,18 @@ Contains
 		arr(4) = 0
 		arr(5) = 0
 		arr(6) = 0
+
+		! Add the primary fields
 		Call Add_Field(Wvar,  arr)
 		Call Add_Field(Pvar,  arr)	! Pressure doesn't really need to be transposed, but doing so now for debugging
 		Call Add_Field(Tvar,  arr)
 		Call Add_Field(Zvar,  arr)
-		!if (magnetism) Then
-		!  Call Add_Field(Bpvar,arr)
-		!  Call Add_field(Btvar,arr)
-		!Endif
+		if (magnetism) Then
+		  Call Add_Field(cvar,arr)
+		  Call Add_field(avar,arr)
+		Endif
+		
 
-		!Add the variables we will store only temporarily in 1a buffer
 		Call Add_Field(d3Wdr3  ,arr)
 		Call Add_Field(dPdr    ,arr)
 		Call Add_Field(d2Tdr2  ,arr, overwrite = dpdr)	! replaces dpdr
@@ -163,9 +170,16 @@ Contains
 		Call Add_Field(dTdr    ,arr, overwrite = dpdr)	!replaces d2tdr2, which replaced dpdr
 		Call Add_Field(dZdr    ,arr, overwrite = d2Zdr2)
 
+		if (magnetism) Then
+		  Call Add_field(dcdr,arr)
+		  Call Add_field(dadr,arr)
+		  Call Add_field(d2adr2,arr)
+		  Call Add_field(d2cdr2,arr,overwrite = d2adr2)
+		Endif
+
 
 		!//////////////////////////////////////////////////////////
-		! Next, we want to account for fields that we build in s2a (d by dtheta fields)
+		! Next, we want to account for fields that we build in s2a (many are d by dtheta fields)
 		arr(1) = 0
 		Call Add_Field(vr,arr,overwrite = wvar) ! We only needed W to create Vr
 		Call Add_Field(vtheta,arr)
@@ -175,10 +189,15 @@ Contains
 		Call Add_Field(dvrdr,arr,overwrite = dwdr)
 		Call Add_Field(dtdt,arr, overwrite = d2wdr2)
 		Call Add_Field(dvrdt,arr, overwrite = dzdr)
+		If (magnetism) Then
+			Call Add_Field(Br     ,arr, overwrite = cvar)
+			Call Add_Field(Btheta ,arr, overwrite = avar)
+			Call Add_Field(Bphi   ,arr, overwrite = dcdr)
 
-
-
-
+			Call Add_Field(Jr     ,arr)			! We need to make an extra slot.  Jr overwrites nothing.
+			Call Add_Field(Jtheta ,arr, overwrite = d2cdr2)
+			Call Add_Field(Jphi   ,arr, overwrite = dadr)
+		Endif
 		!///////////////////////////////////////////////////////
 		!  Finally we have fields of the d_by_dphi variety
 		!  that we add to the p3a buffer
@@ -186,26 +205,24 @@ Contains
 		Call Add_Field(dvrdp,arr)
 		Call Add_field(dvtdp,arr)
 		Call Add_field(dvpdp,arr)
-		Call Add_field(dtdp,arr,overwrite = tvar)
-		
-		t_ps = vars(tvar)%i3a	! example of how to easily reference this
-		! Vr	
-		! Vr will be computed in s2b and will exist through p3a
-		!Call Add_Field(vr,'s2a',overwrite = wvar)	! vr will overwrite w's position
-		!Call Add_Field(vtheta,'s2a')
-		!Call Add_Field(vphi,'s2a')
-		!Call Add_Field(dvr_dtheta,'s2a')	
-		!Call Add_Field(dsdr,'s2a','p3a')
-		!Call Add_Field(dsdtheta,'s2a','p3a')
-		!Call Add_field(dsdphi, 'p3a')
+		Call Add_field(dtdp,arr,overwrite = tvar)		
+
 		wsfcount(1,1) = c1a_counter
 		wsfcount(2,1) = c2a_counter
 		wsfcount(3,1) = c3a_counter
 
-		wsfcount(1,2) = 4		! four RHS's go back for 
-		wsfcount(2,2) = 4
-		wsfcount(3,2) = 4
-
+		if (.not. magnetism) then
+			wsfcount(1,2) = 4		! four RHS's go back for the solve
+			wsfcount(2,2) = 4
+			wsfcount(3,2) = 4
+		else
+			emfr = avar
+			emftheta = cvar
+			emfphi = avar+1
+			wsfcount(1,2) = 7		! seven RHS's go back for the solve (1 field is differentiated and combined at the end)
+			wsfcount(2,2) = 7
+			wsfcount(3,2) = 7
+		endif
 		!Write(6,*)'Fields initialized'
 		!Write(6,*)'c1a_counter is: ', c1a_counter
 		!Write(6,*)'c2a_counter is: ', c2a_counter

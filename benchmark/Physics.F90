@@ -23,7 +23,7 @@ Module Physics
 	Use Timers
 	Implicit None
 
-	Real*8 :: two_over_ek
+	Real*8 :: two_over_ek, ovPm, ovPmek
 
 	Real*8 :: old_ab_factor = 1.0d0, new_ab_factor = 1.0d0
 	Real*8 :: simulation_time
@@ -89,6 +89,11 @@ Contains
 		If (rotation) Then
 			two_over_ek = 2.0d0/ek
 		Endif
+		If (magnetism) Then
+			ovPm = 1.0d0/Pm
+			ovPmek = 1.0d0/(Pm*ek)
+		Endif
+
 
 		Call StopWatch(loop_time)%StartClock()
 		Do iteration = first_iteration, last_iteration
@@ -231,6 +236,25 @@ Contains
 		Call d_by_dx(zvar,dzdr,wsp%p1a,1)	
 
 		Call Add_Derivative(zeq,zvar,0,wsp%p1b,wsp%p1a,zvar)	
+
+
+		If (magnetism) Then
+			!//////////////
+			! A-terms (Toroidal magnetic field)
+			Call d_by_dx(avar,d2adr2,wsp%p1a,2)		! 2nd derivative will be overwritten with dadr
+			Call Add_Derivative(aeq,avar,2,wsp%p1b,wsp%p1a,d2adr2)
+			Call d_by_dx(avar,dadr,wsp%p1a,1)	
+
+			Call Add_Derivative(aeq,avar,0,wsp%p1b,wsp%p1a,avar)
+
+			!///////////////////
+			! C-terms (Poloidal magnetic field)
+			Call d_by_dx(cvar,d2cdr2,wsp%p1a,2)		
+			Call Add_Derivative(ceq,cvar,2,wsp%p1b,wsp%p1a,d2cdr2)
+			Call d_by_dx(cvar,dcdr,wsp%p1a,1)	
+			Call Add_Derivative(ceq,cvar,0,wsp%p1b,wsp%p1a,cvar)
+
+		Endif
 
 		!Load the old ab array into the RHS
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
@@ -405,7 +429,7 @@ Contains
 		Call Velocity_Derivatives()
 		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
 
-		! If magnetism compute B and J
+		If (magnetism) Call compute_BandJ()
 
 		Call DeAllocate_rlm_Field(ftemp1)
 		Call DeAllocate_rlm_Field(ftemp2)
@@ -446,6 +470,17 @@ Contains
 			ovrt2 = Maxval(wsp%p3a(:,r,:,vr)**2)/(delta_r(r)**2)	! radial
 			ovt2  = Max(ovt2,ovrt2)
 		Enddo
+		If (magnetism) Then
+			! Check on alfven speed as well
+			Do r = my_r%min, my_r%max
+				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
+								*OneOverRSquared(r)*l_l_plus1(l_max) ! horizontal
+				ovt2  = Max(ovt2, ovht2)
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)	! radial
+				ovt2  = Max(ovt2,ovrt2)
+			Enddo
+		Endif
+
 		Call wsp%set_mrv(ovt2)
 
 		Call StopWatch(ts_time)%increment()
@@ -500,6 +535,17 @@ Contains
 			ovt2 = Max(ovt2,ovrt2)
 		Enddo
 
+		If (magnetism) Then
+			! Check on the Alfven speed as well
+			Do r = my_r%min, my_r%max
+				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2)*OneOverRSquared(r)*l_l_plus1(l_max) ! horizontal
+				ovt2 = Max(ovt2, ovht2)
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)	! radial
+				ovt2 = Max(ovt2,ovrt2)
+			Enddo
+
+		Endif
+
 		Call StopWatch(ts_time)%increment()
 		Call StopWatch(ar_time)%startclock()
 
@@ -541,7 +587,7 @@ Contains
 
 	Subroutine physical_space()
 		Implicit None
-		
+	
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
 		Call StopWatch(dphi_time)%startclock()
@@ -562,10 +608,15 @@ Contains
 		Call sintheta_div(dvpdr)
 		Call sintheta_div(dtdt)
 		Call sintheta_div(dvrdt)
-
-
 		Call sintheta_div(dvpdp)
 		Call sintheta_div(dvtdp)
+
+		If (magnetism) Then
+			Call rsintheta_div(jtheta)
+			Call rsintheta_div(jphi)
+			Call rsintheta_div(Btheta)
+			Call rsintheta_div(Bphi)
+		Endif
 
 		Call StopWatch(sdiv_time)%increment()
 
@@ -581,7 +632,7 @@ Contains
 		Else
 			Call compute_timestep()	! Will do it all at once
 		Endif		
-
+		
 		! We are now ready to built the nonlinear terms
 		Call wsp%construct('p3b')
 		wsp%config = 'p3b'
@@ -594,6 +645,10 @@ Contains
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
 		Call Momentum_Advection_Phi()
+
+		If (magnetism) Then
+			Call Compute_EMF()
+		Endif
 
 		Call StopWatch(nl_time)%increment()
 		!...........................
@@ -693,8 +748,7 @@ Contains
 			Enddo
 		Enddo		! Z RHS is now loaded
 
-		Call DeAllocate_rlm_Field(ftemp1)
-		Call DeAllocate_rlm_Field(ftemp2)
+
 
 		!The ell =0 w and p and z equations have zero RHS
 		rmn1 = (pvar-1)*tnr+1
@@ -708,10 +762,19 @@ Contains
 				wsp%s2b(mp)%data(0,rmn3:rmn3+tnr-1) = 0.0d0
 			endif
 		Enddo
+
+
+		If (magnetism) Call adjust_emf()
+
+		Call DeAllocate_rlm_Field(ftemp1)
+		Call DeAllocate_rlm_Field(ftemp2)
+
+
 		! Zero out l_max mode
 		Do mp = my_mp%min, my_mp%max
 			wsp%s2b(mp)%data(l_max,:) = 0.0d0
 		Enddo
+
 		Call StopWatch(rlmb_time)%increment()
 
 		Call StopWatch(ctranspose_time)%startclock()
@@ -722,6 +785,56 @@ Contains
 
 
 	End Subroutine rlm_spaceb
+
+	Subroutine Adjust_Emf()
+		Implicit None
+		Integer :: m, mp, r,rmn,rmx,rind1,rind2,rmn1, rmn2, rmn3, roff,rind
+
+
+		! Now for the C RHS, formed from the radial component of the curl of the emf
+
+
+
+		Call d_by_sdtheta(wsp%s2b, emfphi,ftemp1)	
+		Call d_by_dphi(wsp%s2b,emftheta,ftemp2)
+
+		rmn = (cvar-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			do r = rmn, rmx
+				rind = r+roff
+				wsp%s2b(mp)%data(m:l_max,r) = ( ftemp2(mp)%data(m:l_max,rind)- &
+					& ftemp1(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
+			Enddo
+		Enddo		
+
+		rmn = (emfphi-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			do r = rmn, rmx
+				rind = r+roff
+				wsp%s2b(mp)%data(m:l_max,r) = ( ftemp2(mp)%data(m:l_max,rind)+ &
+					& ftemp1(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
+			Enddo
+		Enddo		
+
+		! Ensure there is no ell=0 emf
+		rmn1 = (emfr-1)    *tnr+1
+		rmn2 = (emftheta-1)*tnr+1
+		rmn3 = (emfphi-1)  *tnr+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			if (m .eq. 0) then
+				wsp%s2b(mp)%data(0,rmn1:rmn1+tnr-1) = 0.0d0				
+				wsp%s2b(mp)%data(0,rmn2:rmn2+tnr-1) = 0.0d0
+				wsp%s2b(mp)%data(0,rmn3:rmn3+tnr-1) = 0.0d0
+			endif
+		Enddo
+	End Subroutine Adjust_EMF
 
 	Subroutine Temperature_Advectiono()
 		Implicit None
@@ -825,7 +938,15 @@ Contains
 	
 		!$OMP END PARALLEL DO
 
-
+		If (magnetism) Then
+			! Add r_squared [JxB]_r
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ovPmEk* &
+					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
+			END_DO
+			!$OMP END PARALLEL DO
+		Endif
 
 		! Add Coriolis Terms if so desired
 		If (rotation) Then
@@ -839,6 +960,56 @@ Contains
 		Endif
 	
 	End Subroutine Momentum_Advection_Radial
+
+	Subroutine Compute_EMF()
+		Implicit None
+		Integer :: t,r,k
+
+		! Build the emf
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+
+		DO_IDX	
+			RHSP(IDX,emfr) = &
+				  FIELDSP(IDX,vtheta) *  FIELDSP(IDX,bphi)  &
+				- FIELDSP(IDX,vphi)     *  FIELDSP(IDX,btheta) 
+		END_DO
+	
+		!$OMP END PARALLEL DO
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+
+		DO_IDX	
+			RHSP(IDX,emftheta) = &
+				- FIELDSP(IDX,vr) *  FIELDSP(IDX,bphi)  &
+				+ FIELDSP(IDX,vphi)   *  FIELDSP(IDX,br)
+		END_DO
+	
+		!$OMP END PARALLEL DO
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+
+		DO_IDX	
+			RHSP(IDX,emfphi) = &
+				  FIELDSP(IDX,vr)     *  FIELDSP(IDX,btheta)  &
+				- FIELDSP(IDX,vtheta) *  FIELDSP(IDX,br)
+		END_DO
+	
+		!$OMP END PARALLEL DO
+
+		! We need to divide by r/sintheta before taking the derivatives in the next space
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+
+		DO_IDX	
+			RHSP(IDX,emfphi) = RHSP(IDX,emfphi)*csctheta(t)*radius(r)
+			RHSP(IDX,emftheta) = RHSP(IDX,emftheta)*csctheta(t)*radius(r)
+
+		END_DO
+	
+		!$OMP END PARALLEL DO
+	
+	End Subroutine Compute_EMF
+
 
 	Subroutine Momentum_Advection_Thetao()
 		Implicit None
@@ -924,6 +1095,16 @@ Contains
 
 		END_DO
 		!$OMP END PARALLEL DO
+
+		If (magnetism) Then
+			! Add -[JxB]_theta
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
+					- ovPmEk*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
+			END_DO
+			!$OMP END PARALLEL DO
+		Endif
 
 		If (rotation) Then
 			! Add - the coriolis term (part of -RHS of theta)
@@ -1013,6 +1194,17 @@ Contains
 		END_DO
 		!$OMP END PARALLEL DO
 
+		If (magnetism) Then
+			! Add -[JxB]_phi
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,zvar)= RHSP(IDX,zvar) - &
+					ovPmEk*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
+			END_DO
+			!$OMP END PARALLEL DO
+		Endif
+
+
 		If (rotation) Then
 			! Add - Coriolis term (we are building -RHS of vphi)
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
@@ -1050,15 +1242,29 @@ Contains
 
 
 	Subroutine sintheta_div(ind)
+		! Divide by sintheta
 		Implicit None
 		Integer, Intent(In) :: ind
 		Integer :: t,r,k
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
-			FIELDSP(IDX,ind) = FIELDSP(IDX,ind)*csctheta(t)	! twice as fast as dividing by sintheta...
+			FIELDSP(IDX,ind) = FIELDSP(IDX,ind)*csctheta(t)	
 		END_DO
 		!$OMP END PARALLEL DO
 	End Subroutine sintheta_div
+
+	Subroutine rsintheta_div(ind)
+		Implicit None
+		!divide by rsintheta
+		Integer, Intent(In) :: ind
+		Integer :: t,r,k
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			FIELDSP(IDX,ind) = FIELDSP(IDX,ind)*csctheta(t)*one_over_r(r)	
+		END_DO
+		!$OMP END PARALLEL DO
+	End Subroutine rsintheta_div
+
 	Subroutine Velocity_Components()
 		Implicit None
 		Integer :: l, m, mp, rmn,rmx, r, rind
@@ -1189,8 +1395,174 @@ Contains
 		Enddo
 	End Subroutine Velocity_Derivatives
 
+	Subroutine Compute_BandJ()
+		Implicit None
+		Integer :: l, m, mp, rmn,rmx, r, rind, rmn2,rmx2, roff, rind2, roff2
 
 
+		!/////////////// BR /////////////////////		
+		!First convert C to Br  !! Br overwrites C
+		rmn = (br-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r +roff !-rmn+1
+				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,r)*ovrsq_repeated(rind)
+			Enddo
+		Enddo        
+
+		!////////////////// JR ///////////////////////////
+		!Compute Jr (Jr does not overwrite any existing fields)
+		rmn = (jr-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		rmn2 = (avar-1)*tnr+1       
+		roff2 = -rmn+1+rmn2
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r +roff 
+            rind2 = r+roff2
+				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,rind2)*ovrsq_repeated(rind)
+			Enddo
+		Enddo     
+
+        !Convert d2cdr2 to d2cdr2-Br (br = cl(l+1)/r^2
+        rmn = (d2cdr2-1)*tnr+1
+        rmx = rmn+tnr-1
+        rmn2 = (cvar-1)*tnr+1     
+        roff = -rmn+1+rmn2
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = wsp%s2a(mp)%data(m:l_max,r)-wsp%s2a(mp)%data(m:l_max,rind)
+			Enddo
+		Enddo             
+
+        ! Free up the dAdr space -- get its two angular derivatives
+		Call d_by_dtheta(wsp%s2a,dadr,ftemp1)	 
+		Call d_by_dphi(  wsp%s2a,dadr,ftemp2)
+
+        !////////// J _PHI //////////////////////////
+        ! overwrite d_a_dr with d_d_phi(d_a_dr)
+        rmn = (dadr-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = ftemp2(mp)%data(m:l_max,rind)
+			Enddo
+		Enddo  
+
+        !overwrite ftemp2 with d_d_theta (d2cdr2-br)
+        Call d_by_dtheta(  wsp%s2a,d2cdr2,ftemp2)
+
+        ! Add this term to d_d_phi(d_a_dr) to build rsintheta J_phi (overwrite dadr)
+        rmn = (jphi-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = wsp%s2a(mp)%data(m:l_max,r)+ftemp2(mp)%data(m:l_max,rind)
+			Enddo
+        Enddo
+
+        !/////////////J Theta ///////////////////////
+        Call d_by_dphi(  wsp%s2a,d2cdr2,ftemp2)       !get phi derivative of d2cdr2-Br
+
+        ! Combine with ftemp1 to build J_theta (overwrites d2cdr2)
+        rmn = (jtheta-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = ftemp1(mp)%data(m:l_max,rind)-ftemp2(mp)%data(m:l_max,rind)
+			Enddo
+        Enddo
+
+
+        
+
+        !////////////B Theta
+        ! Free up the A space -- get its two angular derivatives
+		Call d_by_dtheta(wsp%s2a,avar,ftemp1)	 
+		Call d_by_dphi(  wsp%s2a,avar,ftemp2)
+
+
+        ! overwrite A with dA_d_phi
+        rmn = (avar-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = ftemp2(mp)%data(m:l_max,rind)
+			Enddo
+		Enddo  
+
+        !overwrite ftemp2 with d_d_theta (dcdr)
+        Call d_by_dtheta(  wsp%s2a,dcdr,ftemp2)
+
+        ! Add this term to dA_d_phi to build rsintheta B_theta
+        rmn = (avar-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = wsp%s2a(mp)%data(m:l_max,r)+ftemp2(mp)%data(m:l_max,rind)
+			Enddo
+        Enddo
+
+        !///////////// Bphi
+        Call d_by_dphi(  wsp%s2a,dcdr,ftemp2)       !get phi derivative of dcdr
+
+        ! Combine with ftemp1 to build rsintheta B_phi
+        rmn = (dcdr-1)*tnr+1
+        rmx = rmn+tnr-1      
+        roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			Do r = rmn, rmx
+				rind = r+ roff 
+				wsp%s2a(mp)%data(m:l_max,r) = ftemp2(mp)%data(m:l_max,rind)-ftemp1(mp)%data(m:l_max,rind)
+			Enddo
+        Enddo
+
+
+
+	End Subroutine Compute_BandJ
+
+	Subroutine Finalize_EMF()
+		Implicit None
+		Integer m, i
+		! we need to take one last radial derivative and combine terms
+		ctemp%nf1a = 1
+		Call ctemp%construct('p1a')
+		Do m = 1, my_num_lm
+			Do i = 1, 2
+				ctemp%p1a(:,i,m,1) = wsp%p1a(:,i,m,avar)
+			Enddo
+		Enddo
+		Call d_by_dx(emfphi,avar,wsp%p1a,1)
+		Do m = 1, my_num_lm
+			Do i = 1, 2
+				wsp%p1a(:,i,m,avar) = ctemp%p1a(:,i,m,1) + wsp%p1a(:,i,m,avar)
+			Enddo
+		Enddo
+		Call ctemp%deconstruct('p1a')
+	End Subroutine Finalize_EMF
 
 	Subroutine AdvanceTime
 		Implicit None
@@ -1200,6 +1572,9 @@ Contains
 
 		if (.not. nonlinear) then
 			wsp%p1b(:,:,:,:) = 0.0d0
+		endif
+		if (magnetism) then
+			Call Finalize_EMF()
 		endif
 		Call Add_to_All_RHS(wsp%p1b,new_ab_factor)
 		Call Fix_Boundary_Conditions()
@@ -1238,9 +1613,13 @@ Contains
 		Implicit None
 		Integer :: neq, nvar,lp, l, nlinks
 		Integer, Allocatable :: eq_links(:), var_links(:)
-		neq = 4
-		nvar = 4
-
+		If (magnetism) Then
+			neq  = 6
+			nvar = 6
+		Else
+			neq  = 4
+			nvar = 4
+		Endif
 		If (chebyshev) Call Use_Chebyshev()	! Turns chebyshev mode to "on" for the linear solve
 		Call Initialize_Equation_Set(neq,nvar,N_R,my_nl_lm, my_nm_lm)
 
@@ -1288,6 +1667,10 @@ Contains
 			! Z equation
 			Call Initialize_Equation_Coefficients(zeq,zvar, 2,lp) 
 
+			If (magnetism) Then
+				Call Initialize_Equation_Coefficients(ceq,cvar, 2,lp)
+				Call Initialize_Equation_Coefficients(aeq,avar, 2,lp)
+			Endif
 
 			nlinks = 3
 			Allocate(eq_links(1:3))
@@ -1322,8 +1705,10 @@ Contains
 		Call Set_Deriv_Save(pvar,0)
 		Call Set_Deriv_Save(tvar,1)
 		Call Set_Deriv_Save(zvar,1)
-
-
+		If (magnetism) Then
+			Call Set_Deriv_Save(avar,1)
+			Call Set_Deriv_Save(cvar,2)
+		Endif
 	End Subroutine Initialize_Benchmark_Equations
 
 	Subroutine Compute_Benchmark_Coefficients()
@@ -1376,8 +1761,7 @@ Contains
 				!				Radial Momentum Equation
 				
 				! Temperature
-				amp = -(Ra/Ek)*radius/r_outer/H_Laplacian
-				amp = -(Ra/Ek) ! *(radius/r_outer)**(-2)
+				amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
 				amp = amp/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
@@ -1439,17 +1823,21 @@ Contains
 				If (magnetism) Then
 					!=========================================
 					!  Btor Equation
+					amp = 1.0d0
+					Call add_implicit_term(aeq,avar, 0, amp,lp, static = .true.)	! Time-independent piece
 					amp = H_Laplacian/Pm
-					Call add_implicit_term(bteq,btvar, 0, amp,lp)					
+					Call add_implicit_term(aeq,avar, 0, amp,lp)					
 					amp = 1.0d0/Pm
-					Call add_implicit_term(bteq,btvar, 2, amp,lp)	
+					Call add_implicit_term(aeq,avar, 2, amp,lp)	
 
 					!=========================================
 					!  Bpol Equation
+					amp = 1.0d0
+					Call add_implicit_term(ceq,cvar, 0, amp,lp, static = .true.)	! Time-independent piece
 					amp = H_Laplacian/Pm
-					Call add_implicit_term(bteq,btvar, 0, amp,lp)
+					Call add_implicit_term(ceq,cvar, 0, amp,lp)
 					amp = 1.0d0/Pm
-					Call add_implicit_term(bteq,btvar, 2, amp,lp)					
+					Call add_implicit_term(ceq,cvar, 2, amp,lp)					
 				Endif
 			
 				! If band solve, do the redefinition of the matrix here
@@ -1540,30 +1928,30 @@ Contains
 
 				If (Magnetism) Then
 					!  Clear the boundary rows
-					Call Clear_Row(bpeq,lp,1)
-					Call Clear_Row(bpeq,lp,N_R)
-					Call Clear_Row(bteq,lp,1)
-					Call Clear_Row(bteq,lp,N_R)
+					Call Clear_Row(ceq,lp,1)
+					Call Clear_Row(ceq,lp,N_R)
+					Call Clear_Row(aeq,lp,1)
+					Call Clear_Row(aeq,lp,N_R)
 
 
 					! Match to a potential field at top and bottom
 					! Btor = 0 at top and bottom
 					r = 1
-					Call Load_BC(lp,r,bteq,btvar,one,0)
+					Call Load_BC(lp,r,aeq,avar,one,0)
 					r = N_R
-					Call Load_BC(lp,r,bteq,btvar,one,0)
+					Call Load_BC(lp,r,aeq,avar,one,0)
 
 					! dBpol/dr+ell*Bpol/r = 0 at outer boundary
 					r = 1
-					Call Load_BC(lp,r,bpeq,bpvar,one,1)
+					Call Load_BC(lp,r,ceq,cvar,one,1)
 					samp = my_lm_lval(lp)*one_over_r(r)
-					Call Load_BC(lp,r,bpeq,bpvar,samp,0)
+					Call Load_BC(lp,r,ceq,cvar,samp,0)
 
 					! dBpol/dr-ell(ell+1)*Bpol/r = 0 at inner boundary
 					r = N_R
-					Call Load_BC(lp,r,bpeq,bpvar,one,1)	
+					Call Load_BC(lp,r,ceq,cvar,one,1)	
 					samp = - l*(l+1)*One_Over_R(r)
-					Call Load_BC(lp,r,bpeq,bpvar,samp,0)	
+					Call Load_BC(lp,r,ceq,cvar,samp,0)	
 
 				Endif	! Magnetism
 
@@ -1610,11 +1998,11 @@ Contains
 
 
 				If (Magnetism) Then
-					equation_set(1,bpeq)%RHS(1,:,indx:indx+n_m) = Zero
-					equation_set(1,bpeq)%RHS(N_R,:,indx:indx+n_m) = Zero
+					equation_set(1,ceq)%RHS(1,:,indx:indx+n_m) = Zero
+					equation_set(1,ceq)%RHS(N_R,:,indx:indx+n_m) = Zero
  
-					equation_set(1,bteq)%RHS(1,:,indx:indx+n_m) = Zero
-					equation_set(1,bteq)%RHS(N_R,:,indx:indx+n_m) = Zero
+					equation_set(1,aeq)%RHS(1,:,indx:indx+n_m) = Zero
+					equation_set(1,aeq)%RHS(N_R,:,indx:indx+n_m) = Zero
 
           
 				Endif

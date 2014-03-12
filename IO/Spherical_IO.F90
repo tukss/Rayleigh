@@ -14,10 +14,11 @@ Module Spherical_IO
 		Integer :: shellslice_values(1:nqmax) =-1, shellslice_levels(1:nshellmax)=-1, azavg_values(1:nqmax)=-1
 		Integer :: full3d_values(1:nqmax) = -1
 		Integer :: output_frequency, eng_frequency, checkpoint_frequency
+		Integer :: full3d_frequency= 100000
 		Real(8) :: checkpoint_time
       Namelist /output_namelist/shellavg_values, globalavg_values, &
 			& shellslice_values, shellslice_levels, azavg_values, output_frequency, &
-			& checkpoint_frequency, checkpoint_time, eng_frequency, full3d_values
+			& checkpoint_frequency, checkpoint_time, eng_frequency, full3d_values, full3d_frequency
 
 		Character*120 :: run_dir
 		Integer :: itmax, restart_checkpoint
@@ -496,7 +497,9 @@ Contains
 			! For 3-D output, each output quantity is written as it is computed
 			If (step_five(qval) .eq. 1) Then
 				!Write(6,*)'Entering 3D output'
-				Call write_full_3d(qty,qval)
+				If (mod(current_iteration,full3d_frequency) .eq. 0) Then
+					Call write_full_3d(qty,qval)
+				Endif
 			Endif
 		Endif
 

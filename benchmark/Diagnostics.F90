@@ -14,6 +14,10 @@ Module Diagnostics
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
 
+	!/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
+	Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
+	Integer, Parameter, Private :: J_r = 204, J_theta = 205, J_phi = 206
+
 
 	!///////////////////////////////////
 	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
@@ -118,7 +122,40 @@ Contains
 				Call Add_Quantity(diagnostic2,qty)
 			Endif
 
+			If (magnetism) Then
+			!//////////////////// Magnetic Quantities
+			If (compute_q(B_r) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,br)
+				Call Add_Quantity(B_r,qty)
+			Endif		
 
+			If (compute_q(B_theta) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,btheta)
+				Call Add_Quantity(b_theta,qty)
+			Endif		
+
+			If (compute_q(b_phi) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,bphi)
+				Call Add_Quantity(b_phi,qty)
+			Endif	
+
+
+			If (compute_q(J_r) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,jr)
+				Call Add_Quantity(J_r,qty)
+			Endif		
+
+			If (compute_q(J_theta) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,jtheta)
+				Call Add_Quantity(j_theta,qty)
+			Endif		
+
+			If (compute_q(j_phi) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,jphi)
+				Call Add_Quantity(j_phi,qty)
+			Endif	
+
+			Endif
 			DeAllocate(qty)
 			Call Complete_Output(iteration)
 

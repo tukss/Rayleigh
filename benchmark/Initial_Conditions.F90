@@ -10,13 +10,15 @@ Module Initial_Conditions
 	Use Controls
 	Implicit None
 	Integer :: init_type = 1
+	Integer :: magnetic_init_type = 1
 	Integer :: init_tag = 8989
 	Integer :: restart_iter = -1
 	Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
 	Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0
 	Logical :: custom_t
 	Character*120 :: custom_t_file
-	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter
+	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter, &
+			magnetic_init_type
 Contains
 	
 	Subroutine Initialize_Fields()
@@ -66,6 +68,11 @@ Contains
             call random_init()
         Endif
 
+		If (magnetism) Then
+			If (magnetic_init_type .eq. 1) Then
+				call benchmark_insulating_init()
+			Endif
+		Endif
 		! Fields are now initialized and loaded into the RHS. 
 		! We are ready to enter the main loop
 
@@ -475,6 +482,66 @@ Contains
 		Call tempfield%deconstruct('p1b')
 
 	End Subroutine Random_Init
+
+
+	!////////////////////////////////////
+	!  Magnetic Initialization
+	Subroutine Benchmark_Insulating_Init()
+		Implicit None
+		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
+		Real*8 :: x, nrm1, nrm2
+		Integer :: i, r, l, m, mp, roff
+		Integer :: fcount(3,2)
+		type(SphericalBuffer) :: tempfield
+		fcount(:,:) = 2
+
+		Allocate(rfunc1(my_r%min: my_r%max))
+		Allocate(rfunc2(my_r%min: my_r%max))
+
+		nrm2 = sqrt(pi/5.0d0)*(4.0d0/3.0d0)*5.0d0
+		nrm1 = (5.0d0/8.0d0)*sqrt(pi/3.0d0)
+		Do r = my_r%min, my_r%max
+
+			rfunc1(r) = 8.0d0*r_outer-6.0d0*radius(r)		! functional form for c_1_0
+			rfunc1(r) = rfunc1(r)-2.0d0*(r_inner**4)/(radius(r)**3)
+			rfunc1(r) = rfunc1(r)*nrm1*radius(r)**2
+
+			rfunc2(r) = sin(pi*(radius(r)-r_inner))*radius(r)*nrm2  ! function form for a_2_0
+		Enddo
+		!write(6,*)'rf max ', maxval(rfunc1)
+
+		! We put our temporary field in spectral space
+		Call tempfield%init(field_count = fcount, config = 's2b')		
+		Call tempfield%construct('s2b')		
+		roff= 2*my_r%delta
+		! Set the ell = 0 temperature and the real part of Y44		
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			Do l = m, l_max
+				if ( (l .eq. 1) .and. (m .eq. 0) ) Then
+					Do r = my_r%min, my_r%max
+						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)
+					Enddo
+				endif
+
+				if ( (l .eq. 2) .and. (m .eq. 0) ) Then
+					Do r = my_r%min, my_r%max
+						tempfield%s2b(mp)%data(l,r-my_r%min+1+roff) = rfunc2(r)
+					Enddo
+				endif
+			Enddo
+		Enddo
+		DeAllocate(rfunc1,rfunc2)
+
+		Call tempfield%reform() ! goes to p1b
+
+		! Set temperature.  Leave the other fields alone
+		Call Set_RHS(ceq,tempfield%p1b(:,:,:,1))
+		Call Set_RHS(aeq,tempfield%p1b(:,:,:,2))
+
+		Call tempfield%deconstruct('p1b')
+	End Subroutine benchmark_insulating_init
 
 	Subroutine Load_Radial_Profile(profile_file,profile_out)
 		Implicit None
