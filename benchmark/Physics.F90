@@ -82,7 +82,7 @@ Contains
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1
 		Call Initialize_TimeStepping(first_iteration)
-		If (chebyshev) Then
+		If (chebyshev .or. magnetism) Then
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
