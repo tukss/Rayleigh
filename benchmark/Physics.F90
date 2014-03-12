@@ -1555,10 +1555,10 @@ Contains
 				ctemp%p1a(:,i,m,1) = wsp%p1b(:,i,m,avar)
 			Enddo
 		Enddo
-		Call d_by_dx(emfphi,avar,wsp%p1a,1)
+		Call d_by_dx(emfphi,avar,wsp%p1b,1)
 		Do m = 1, my_num_lm
 			Do i = 1, 2
-				wsp%p1a(:,i,m,avar) = ctemp%p1a(:,i,m,1) + wsp%p1b(:,i,m,avar)
+				wsp%p1b(:,i,m,avar) = ctemp%p1a(:,i,m,1) + wsp%p1b(:,i,m,avar)
 			Enddo
 		Enddo
 		Call ctemp%deconstruct('p1a')
