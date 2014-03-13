@@ -1562,6 +1562,11 @@ Contains
 			Enddo
 		Enddo
 		Call ctemp%deconstruct('p1a')
+		Do m = 1, my_num_lm
+			Do i = 1, 2
+				wsp%p1b(:,i,m,cvar) = wsp%p1b(:,i,m,cvar)*radius(:)
+			Enddo
+		Enddo
 	End Subroutine Finalize_EMF
 
 	Subroutine AdvanceTime
