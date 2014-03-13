@@ -938,7 +938,7 @@ Contains
 	
 		!$OMP END PARALLEL DO
 
-		If (magnetism) Then
+		If (magnetism .and. lorentz_forces) Then
 			! Add r_squared [JxB]_r
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
@@ -1096,7 +1096,7 @@ Contains
 		END_DO
 		!$OMP END PARALLEL DO
 
-		If (magnetism) Then
+		If (magnetism .and. lorentz_forces) Then
 			! Add -[JxB]_theta
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
@@ -1194,7 +1194,7 @@ Contains
 		END_DO
 		!$OMP END PARALLEL DO
 
-		If (magnetism) Then
+		If (magnetism .and. lorentz_forces) Then
 			! Add -[JxB]_phi
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX

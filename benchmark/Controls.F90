@@ -13,8 +13,9 @@ Module Controls
 	Logical :: static_config = .false.
 	Logical :: use_parity = .true.
 	Logical :: test_reduce = .false.
+	Logical :: lorentz_forces = .false.
 	Integer :: gpower = 1
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, Pm,max_iterations, chebyshev, nonlinear, &
 			alpha_implicit, check_frequency, rotation, static_transpose, static_config, &
-			use_parity, test_reduce,magnetism, gpower
+			use_parity, test_reduce,magnetism, gpower, lorentz_forces
 End Module Controls
