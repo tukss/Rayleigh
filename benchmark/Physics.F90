@@ -28,7 +28,7 @@ Module Physics
 	Real*8 :: old_ab_factor = 1.0d0, new_ab_factor = 1.0d0
 	Real*8 :: simulation_time
 
-	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:)
+	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 
 	Logical :: new_timestep = .true.
 	Real*8  :: new_deltat, deltat, old_deltat
@@ -791,13 +791,28 @@ Contains
 		Integer :: m, mp, r,rmn,rmx,rind1,rind2,rmn1, rmn2, rmn3, roff,rind
 
 
-		! Now for the C RHS, formed from the radial component of the curl of the emf
+		
 
 
 
 		Call d_by_sdtheta(wsp%s2b, emfphi,ftemp1)	
 		Call d_by_dphi(wsp%s2b,emftheta,ftemp2)
 
+		Call Allocate_Field(ftemp3)
+		! Copy out emf_theta before we overwrite it
+		rmn = (emftheta-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			do r = rmn, rmx
+				rind = r+roff		
+				ftemp3(mp)%data(m:l_max,rind) = wsp%s2b(mp)%data(m:l_max,r)
+			Enddo
+		Enddo
+
+		! Now for the C RHS, formed from the radial component of the curl of the emf
+		! cvar overwrites emftheta
 		rmn = (cvar-1)*tnr+1
 		rmx = rmn+tnr-1
 		roff = -rmn+1
@@ -810,6 +825,21 @@ Contains
 			Enddo
 		Enddo		
 
+			
+		Call d_by_dphi(wsp%s2b,emfphi,ftemp2)
+		! Move ftemp3 (emftheta) into emfphi's old spot
+		rmn = (emfphi-1)*tnr+1
+		rmx = rmn+tnr-1
+		roff = -rmn+1
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			do r = rmn, rmx
+				rind = r+roff		
+				wsp%s2b(mp)%data(m:l_max,r)=ftemp3(mp)%data(m:l_max,rind) 
+			Enddo
+		Enddo
+		Call d_by_sdtheta(wsp%s2b, emfphi,ftemp1)
+
 		rmn = (emfphi-1)*tnr+1
 		rmx = rmn+tnr-1
 		roff = -rmn+1
@@ -821,7 +851,7 @@ Contains
 					& ftemp1(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
 			Enddo
 		Enddo		
-
+		Call DeAllocate_Field(ftemp3)
 		! Ensure there is no ell=0 emf  -- should I do this?
 		!rmn1 = (emfr-1)    *tnr+1
 		!rmn2 = (emftheta-1)*tnr+1
