@@ -798,7 +798,7 @@ Contains
 		Call d_by_sdtheta(wsp%s2b, emfphi,ftemp1)	
 		Call d_by_dphi(wsp%s2b,emftheta,ftemp2)
 
-		Call Allocate_Field(ftemp3)
+		Call Allocate_rlm_Field(ftemp3)
 		! Copy out emf_theta before we overwrite it
 		rmn = (emftheta-1)*tnr+1
 		rmx = rmn+tnr-1
@@ -851,7 +851,7 @@ Contains
 					& ftemp1(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
 			Enddo
 		Enddo		
-		Call DeAllocate_Field(ftemp3)
+		Call DeAllocate_rlm_Field(ftemp3)
 		! Ensure there is no ell=0 emf  -- should I do this?
 		!rmn1 = (emfr-1)    *tnr+1
 		!rmn2 = (emftheta-1)*tnr+1
