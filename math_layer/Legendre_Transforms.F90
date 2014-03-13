@@ -14,6 +14,7 @@ Module Legendre_Transforms
 	!Type, Public :: rmcontainer
 	!	Real*8, Allocatable :: data(:,:)
 	!End Type rmcontainer
+	Implicit None
 	Interface Legendre_Transform
 		Module Procedure PtS_2d_dgpv2, StP_2d_dgp
 	End Interface
@@ -146,7 +147,7 @@ End Subroutine Test_Legendre
 Subroutine Test_Simple_Dgemm
 	Real*8, Allocatable :: a(:,:), b(:,:), c(:,:)
 	Integer :: m, n, k, i, ntimes
-	Real*8 :: alpha
+	Real*8 :: alpha,beta
 
 	! Just to make sure I've done dgemm correctly
 	! a = | 1 2 |  b = |5|  a#b = c = | 17 |
@@ -208,7 +209,7 @@ End Subroutine Test_simple_dgemm
 Subroutine Test_Simple_Dgemm2
 	Real*8, Allocatable :: a(:,:), b(:,:), c(:,:)
 	Integer :: m, n, k, i, ntimes
-	Real*8 :: alpha
+	Real*8 :: alpha, beta
 
 	!//////////////////////////////////////////////
 	! Just to make sure I've done dgemm correctly

@@ -6,7 +6,7 @@ Module Linear_Solve
 	! Currently assumes that implicit time stepping can be done with 1 dimension (only)
 	! in processor.  More general, 2 dimensional version could be added to
 	! (for example) implicitly advance Coriolis terms.
-
+	Implicit None
 	Integer, Save, Private :: n_equations, n_vars, n_modes	! Number of variables and equations to be solved
 	Integer, Save, Private :: n_modes_total
 	Integer, Save, Private, Allocatable :: nsub_modes(:)
@@ -513,7 +513,7 @@ Module Linear_Solve
 		! Copy RHS's from the buffer into the equation structure
 		! Buffer RHS's are assumed to be unlinked.
 		Implicit None
-		Real*8, Intent(InOut) :: buffer(:,:,:,:)
+		Real*8, Intent(InOut) :: buffer(:,:,:,1:)
 		Integer :: i, ind,istart,iend 
 
 			Do i = 1, n_equations
@@ -535,7 +535,7 @@ Module Linear_Solve
 		! buffer is assumed to be in unlinked format
 		! Right now this is just an easy way of adding an AB term
 		Implicit None
-		Real*8, Intent(InOut) :: buffer(:,:,:,:)
+		Real*8, Intent(InOut) :: buffer(:,:,:,1:)
 		Real*8, Intent(In) :: mfactor
 		Integer :: i, ind,istart,iend 
 
@@ -657,7 +657,7 @@ Module Linear_Solve
 	Subroutine LU_Decompose_full(mat, pvt)
 		Real*8, Intent(InOut) :: mat(:,:)
 		Integer, Intent(Inout) :: pvt(:)
-		Integer :: n
+		Integer :: n,info
 
 		n = Size(mat,1)
 		Call Dgetrf(n, n, mat, n, pvt, info)

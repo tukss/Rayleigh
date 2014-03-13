@@ -452,7 +452,7 @@ Contains
 		Call StopWatch(rtranspose_time)%startclock()
 		Call wsp%reform()	! We are now in p3a
 		Call StopWatch(rtranspose_time)%increment()		
-
+		!Write(6,*)'CHECKJ: ', maxval(wsp%p3a(:,:,:,jphi))
 	End Subroutine rlm_spacea
 
 	Subroutine Find_MyMinDT()
@@ -587,7 +587,7 @@ Contains
 
 	Subroutine physical_space()
 		Implicit None
-	
+		!write(6,*)'MAX: ', maxval(wsp%p3a(:,:,:,jphi))
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
 		Call StopWatch(dphi_time)%startclock()
@@ -822,18 +822,18 @@ Contains
 			Enddo
 		Enddo		
 
-		! Ensure there is no ell=0 emf
-		rmn1 = (emfr-1)    *tnr+1
-		rmn2 = (emftheta-1)*tnr+1
-		rmn3 = (emfphi-1)  *tnr+1
-		Do mp = my_mp%min, my_mp%max
-			m = m_values(mp)
-			if (m .eq. 0) then
-				wsp%s2b(mp)%data(0,rmn1:rmn1+tnr-1) = 0.0d0				
-				wsp%s2b(mp)%data(0,rmn2:rmn2+tnr-1) = 0.0d0
-				wsp%s2b(mp)%data(0,rmn3:rmn3+tnr-1) = 0.0d0
-			endif
-		Enddo
+		! Ensure there is no ell=0 emf  -- should I do this?
+		!rmn1 = (emfr-1)    *tnr+1
+		!rmn2 = (emftheta-1)*tnr+1
+		!rmn3 = (emfphi-1)  *tnr+1
+		!Do mp = my_mp%min, my_mp%max
+		!	m = m_values(mp)
+		!	if (m .eq. 0) then
+		!		wsp%s2b(mp)%data(0,rmn1:rmn1+tnr-1) = 0.0d0				
+		!		wsp%s2b(mp)%data(0,rmn2:rmn2+tnr-1) = 0.0d0
+		!		wsp%s2b(mp)%data(0,rmn3:rmn3+tnr-1) = 0.0d0
+		!	endif
+		!Enddo
 	End Subroutine Adjust_EMF
 
 	Subroutine Temperature_Advectiono()
@@ -1399,7 +1399,6 @@ Contains
 		Implicit None
 		Integer :: l, m, mp, rmn,rmx, r, rind, rmn2,rmx2, roff, rind2, roff2
 
-
 		!/////////////// BR /////////////////////		
 		!First convert C to Br  !! Br overwrites C
 		rmn = (br-1)*tnr+1
@@ -1419,7 +1418,7 @@ Contains
 		rmx = rmn+tnr-1
 		roff = -rmn+1
 		rmn2 = (avar-1)*tnr+1       
-		roff2 = -rmn+1+rmn2
+		roff2 = -rmn+rmn2
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
 			Do r = rmn, rmx
@@ -1433,7 +1432,7 @@ Contains
         rmn = (d2cdr2-1)*tnr+1
         rmx = rmn+tnr-1
         rmn2 = (cvar-1)*tnr+1     
-        roff = -rmn+1+rmn2
+        roff = -rmn+rmn2
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
 			Do r = rmn, rmx
@@ -1550,6 +1549,7 @@ Contains
 		! we need to take one last radial derivative and combine terms
 		ctemp%nf1a = 1
 		Call ctemp%construct('p1a')
+		ctemp%p1a(:,:,:,:) = 0.0d0
 		Do m = 1, my_num_lm
 			Do i = 1, 2
 				ctemp%p1a(:,i,m,1) = wsp%p1b(:,i,m,avar)
@@ -2011,7 +2011,10 @@ Contains
 
 				equation_set(1,weq)%RHS(:,2,indx)   = Zero ! no imaginary part for any ell=0 equations
 				equation_set(1,zeq)%RHS(:,:,indx)   = Zero	! no ell = 0 z_equation
-
+				if (magnetism) then
+					equation_set(1,aeq)%RHS(:,:,indx)   = Zero
+					equation_set(1,ceq)%RHS(:,:,indx)   = Zero
+				endif
 				equation_set(1,weq)%rhs(1:N_R,:,indx) = zero				! ell =0 W is zero
 				equation_set(1,weq)%rhs(N_R+1,1,indx) = zero	! Pressure node
 
@@ -2043,6 +2046,7 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
 			Allocate(arr(mp)%data(m:l_max,1:tnr))
+			arr(mp)%data(:,:) = 0.0d0
 		Enddo
 	End Subroutine Allocate_rlm_Field
 
@@ -2061,18 +2065,18 @@ Contains
 		! Simple debugging routine
 		Implicit None
 		Integer, Intent(In) :: mcheck, lcheck,varind
-		Integer :: m, l, mp
+		Integer :: m, l, mp,rmn,rmx
 		Real*8 :: mxv
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
 			If (m .eq. mcheck) Then
-				rmin = (varind-1)*2*n_r+1
-				rmax = rmin+2*n_r-1
+				rmn = (varind-1)*2*my_r%delta+1
+				rmx = rmn+2*my_r%delta-1
 				if (wsp%config .eq. 's2a') then
-					mxv = maxval(abs(wsp%s2a(mp)%data(lcheck,rmin:rmax)))
+					mxv = maxval(abs(wsp%s2a(mp)%data(lcheck,rmn:rmx)))
 					write(6,*)'maxval s2a: ', mxv, lcheck, mcheck,varind
 				else
-					mxv = maxval(wsp%s2b(mp)%data(lcheck,rmin:rmax))
+					mxv = maxval(wsp%s2b(mp)%data(lcheck,rmn:rmx))
 					write(6,*)'maxval s2b: ', mxv, lcheck, mcheck,varind
 				endif				
 			Endif
@@ -2142,17 +2146,17 @@ Contains
 		! Simple debugging routine
 		Implicit None
 		Integer, Intent(In) :: varind
-		Integer :: m, l, mp
+		Integer :: m, l, mp,rmn,rmx
 		Real*8 :: mxv
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			rmin = (varind-1)*2*n_r+1
-			rmax = rmin+2*n_r-1
+			rmn = (varind-1)*tnr+1
+			rmx = rmn+tnr-1
 			Do l = m, l_max
 				if (wsp%config .eq. 's2a') then
-					mxv = maxval(abs(wsp%s2a(mp)%data(l,:)))
+					mxv = maxval(abs(wsp%s2a(mp)%data(l,rmn:rmx)))
 					if (mxv .gt. 0.0d0) then
-						write(6,*)'s2a power at: ', mxv, m, l, varind
+						write(6,*)'s2a power at: ', mxv, m, l, varind,rmn,rmx
 					endif
 				else
 					!mxv = maxval(wsp%s2b(mp)%data(lcheck,rmin:rmax))
@@ -2161,5 +2165,27 @@ Contains
 			Enddo
 		Enddo
 	End Subroutine find_power_rlm
+
+	Subroutine find_power_rlm2(varind,mcheck,lcheck)
+		! Simple debugging routine
+		Implicit None
+		Integer, Intent(In) :: varind,mcheck,lcheck
+		Integer :: m, l, mp,rmn,rmx
+		Real*8 :: mxv
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			if (m .eq. mcheck) then
+			rmn = (varind-1)*2*my_r%delta+1
+			rmx = rmn+2*my_r%delta-1
+				if (wsp%config .eq. 's2a') then
+					mxv = maxval(abs(wsp%s2a(mp)%data(lcheck,rmn:rmx)))
+						write(6,*)'s2a power at: ', mxv, m, l, varind
+				else
+					!mxv = maxval(wsp%s2b(mp)%data(lcheck,rmin:rmax))
+					!write(6,*)'maxval s2b: ', mxv, lcheck, mcheck,varind
+				endif				
+			endif
+		Enddo
+	End Subroutine find_power_rlm2
 
 End Module Physics

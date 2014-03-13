@@ -13,7 +13,7 @@ Module Fields
 	! The field type is meta data that allows us to know where
 	! a field is in the buffer at a particular time, or if it's
 	! even there at all
-
+	Implicit None
 	Type Field
 		Integer :: i1a, i2a, i3a
 		Integer :: i1b, i2b, i3b

@@ -1,5 +1,6 @@
 Module Controls
 	! Things that control how the simulation runs
+	Implicit None
 	Real*8 :: Ra, Ek, Pr, Pm
 	Real*8 :: alpha_implicit = 0.5d0
 	Logical :: chebyshev = .false.
