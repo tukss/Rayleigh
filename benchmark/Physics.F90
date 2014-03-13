@@ -1947,10 +1947,10 @@ Contains
 					samp = my_lm_lval(lp)*one_over_r(r)
 					Call Load_BC(lp,r,ceq,cvar,samp,0)
 
-					! dBpol/dr-ell(ell+1)*Bpol/r = 0 at inner boundary
+					! dBpol/dr-(ell+1)*Bpol/r = 0 at inner boundary
 					r = N_R
 					Call Load_BC(lp,r,ceq,cvar,one,1)	
-					samp = - l*(l+1)*One_Over_R(r)
+					samp = - (l+1)*One_Over_R(r)
 					Call Load_BC(lp,r,ceq,cvar,samp,0)	
 
 				Endif	! Magnetism
