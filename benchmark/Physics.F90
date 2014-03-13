@@ -805,8 +805,8 @@ Contains
 			m = m_values(mp)
 			do r = rmn, rmx
 				rind = r+roff
-				wsp%s2b(mp)%data(m:l_max,r) = ( ftemp2(mp)%data(m:l_max,rind)- &
-					& ftemp1(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
+				wsp%s2b(mp)%data(m:l_max,r) = ( ftemp1(mp)%data(m:l_max,rind)- &
+					& ftemp2(mp)%data(m:l_max,rind) )*over_l_l_plus1(m:l_max)
 			Enddo
 		Enddo		
 
