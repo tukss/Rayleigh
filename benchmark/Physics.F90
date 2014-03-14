@@ -198,8 +198,9 @@ Contains
 		Call Add_Derivative(weq,wvar,0,wsp%p1b,wsp%p1a,wvar)	
 		Call Add_Derivative(weq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
-		Call d_by_dx(dwdr,d2wdr2,wsp%p1a,1)	! cluge like in ASH  --- seems unnecessary though.  take out once all else works
-
+		If (deriv_cluge) Then
+			Call d_by_dx(dwdr,d2wdr2,wsp%p1a,1)	! cluge like in ASH  --- seems unnecessary though.  take out once all else works
+		Endif
 		!//////////////////////////////
 		!  P Terms
 		Call d_by_dx(pvar,dpdr,wsp%p1a,1)	! dpdr will be overwritten by d2tdr2 shortly
