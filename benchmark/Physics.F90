@@ -199,6 +199,7 @@ Contains
 		Call Add_Derivative(weq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
 		If (deriv_cluge) Then
+			Write(6,*)'ARRRRR'
 			Call d_by_dx(dwdr,d2wdr2,wsp%p1a,1)	! cluge like in ASH  --- seems unnecessary though.  take out once all else works
 		Endif
 		!//////////////////////////////

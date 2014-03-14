@@ -689,7 +689,7 @@ Contains
             Allocate(buff(nq_globav))
             Do n = 0, nproc-1
 				If (n .ne. io_node) then		
-                    Call receive(buff, source= n,tag=az_avg_tag,grp = pfi%gcomm)
+                    Call receive(buff, source= n,tag=global_avg_tag,grp = pfi%gcomm)
 				Else
 				    buff(:) = globav_outputs(:)
                     DeAllocate(globav_outputs)
@@ -706,7 +706,7 @@ Contains
             Write(15)(full_avg(i),i=1,nq_globav)
             Close(15)
 		Else
-            Call send(globav_outputs, dest = 0,tag=az_avg_tag, grp=pfi%gcomm)
+            Call send(globav_outputs, dest = 0,tag=global_avg_tag, grp=pfi%gcomm)
             DeAllocate(globav_outputs)
 		Endif
     End Subroutine Write_Global_Average
