@@ -1631,7 +1631,7 @@ Contains
 			Enddo
 
 			Call Cheby_To_Spectral(ctemp%p1a,ctemp%p1b)
-			Call d_by_dr_cp(1,2,wsp%p1b,1)
+			Call d_by_dr_cp(1,2,ctemp%p1b,1)
 			Call Cheby_From_Spectral(ctemp%p1b,ctemp%p1a)
 			Do m = 1, my_num_lm
 				Do i = 1, 2
