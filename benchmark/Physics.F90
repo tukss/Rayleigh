@@ -199,7 +199,6 @@ Contains
 		Call Add_Derivative(weq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
 		If (deriv_cluge) Then
-			Write(6,*)'ARRRRR'
 			Call d_by_dx(dwdr,d2wdr2,wsp%p1a,1)	! cluge like in ASH  --- seems unnecessary though.  take out once all else works
 		Endif
 		!//////////////////////////////
@@ -313,6 +312,10 @@ Contains
 		! Store all the permanent derivatives there - in c space
 		ctemp%nf1a = 4
 		ctemp%nf1b = 4
+		If (magnetism) then
+			ctemp%nf1a = 5
+			ctemp%nf1b = 5
+		Endif
 		Call ctemp%construct('p1a')
 		! W..
 		Call d_by_dr_cp(wvar,d3wdr3,wsp%p1a,3)
@@ -331,6 +334,15 @@ Contains
 		ctemp%p1a(:,:,:,4) = wsp%p1a(:,:,:,d2zdr2)
 		Call d_by_dr_cp(zvar,dzdr,wsp%p1a,1)
 
+		! Magnetism
+		If (magnetism) Then
+			Call d_by_dr_cp(avar,d2adr2,wsp%p1a,2)	
+			ctemp%p1a(:,:,:,5) = wsp%p1a(:,:,:,d2adr2)
+			Call d_by_dr_cp(avar,dadr,wsp%p1a,1)
+			Call d_by_dr_cp(cvar,dcdr,wsp%p1a,1)
+			Call d_by_dr_cp(cvar,d2cdr2,wsp%p1a,2)
+		Endif
+
 		!//////////////////////////////////////////////////////////////////////////
 		! Now everything we need is in the wsp or ctemp buffer
 		! The ctemp terms are those terms that do not leave this configuration
@@ -342,6 +354,9 @@ Contains
 		Call Add_Derivative(weq,pvar,1,wsp%p1b,ctemp%p1b,2)
 		Call Add_Derivative(teq,tvar,2,wsp%p1b,ctemp%p1b,3)
 		Call Add_Derivative(zeq,zvar,2,wsp%p1b,ctemp%p1b,4)
+		If (magnetism) Then
+			Call Add_Derivative(aeq,avar,2,wsp%p1b,ctemp%p1b,5)
+		Endif
 		Call ctemp%deconstruct('p1a')
 		Call ctemp%deconstruct('p1b')
 
@@ -395,6 +410,27 @@ Contains
 
 
 		Call Add_Derivative(zeq,zvar,0,wsp%p1b,wsp%p1a,zvar)	
+
+
+		!///////////////////////////////////////
+		!  Magnetic Terms
+		If (magnetism) Then
+			!//////////////
+			! A-terms (Toroidal magnetic field)
+		
+	
+
+			Call Add_Derivative(aeq,avar,0,wsp%p1b,wsp%p1a,avar)
+
+			!///////////////////
+			! C-terms (Poloidal magnetic field)
+	
+			Call Add_Derivative(ceq,cvar,2,wsp%p1b,wsp%p1a,d2cdr2)
+
+			Call Add_Derivative(ceq,cvar,0,wsp%p1b,wsp%p1a,cvar)
+
+		Endif
+
 
 		!Load the old ab array into the RHS
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
@@ -1579,21 +1615,50 @@ Contains
 		Implicit None
 		Integer m, i
 		! we need to take one last radial derivative and combine terms
-		ctemp%nf1a = 1
-		Call ctemp%construct('p1a')
-		ctemp%p1a(:,:,:,:) = 0.0d0
-		Do m = 1, my_num_lm
-			Do i = 1, 2
-				ctemp%p1a(:,i,m,1) = wsp%p1b(:,i,m,avar)
+
+		If (chebyshev) Then
+			! Again, terribly inefficient, but we are looking to check the MHD right now.
+			! Will optimize this later.
+			ctemp%nf1a = 2
+			ctemp%nf1b = 2
+			Call ctemp%construct('p1a')
+			Call ctemp%construct('p1b')
+			ctemp%p1a(:,:,:,:) = 0.0d0
+			Do m = 1, my_num_lm
+				Do i = 1, 2
+					ctemp%p1a(:,i,m,1) = wsp%p1b(:,i,m,emfphi)
+				Enddo
 			Enddo
-		Enddo
-		Call d_by_dx(emfphi,avar,wsp%p1b,1)
-		Do m = 1, my_num_lm
-			Do i = 1, 2
-				wsp%p1b(:,i,m,avar) = ctemp%p1a(:,i,m,1) + wsp%p1b(:,i,m,avar)
+
+			Call Cheby_To_Spectral(ctemp%p1a,ctemp%p1b)
+			Call d_by_dr_cp(1,2,wsp%p1b,1)
+			Call Cheby_From_Spectral(ctemp%p1b,ctemp%p1a)
+			Do m = 1, my_num_lm
+				Do i = 1, 2
+					wsp%p1b(:,i,m,avar) = wsp%p1b(:,i,m,avar) + ctemp%p1a(:,i,m,2)
+				Enddo
 			Enddo
-		Enddo
-		Call ctemp%deconstruct('p1a')
+			Call ctemp%deconstruct('p1a')
+			Call ctemp%deconstruct('p1b')
+		Else
+			ctemp%nf1a = 1
+			Call ctemp%construct('p1a')
+			ctemp%p1a(:,:,:,:) = 0.0d0
+			Do m = 1, my_num_lm
+				Do i = 1, 2
+					ctemp%p1a(:,i,m,1) = wsp%p1b(:,i,m,avar)
+				Enddo
+			Enddo
+			Call d_by_dx(emfphi,avar,wsp%p1b,1)
+		
+			Do m = 1, my_num_lm
+				Do i = 1, 2
+					wsp%p1b(:,i,m,avar) = ctemp%p1a(:,i,m,1) + wsp%p1b(:,i,m,avar)
+				Enddo
+			Enddo
+			Call ctemp%deconstruct('p1a')
+		Endif
+
 		Do m = 1, my_num_lm
 			Do i = 1, 2
 				wsp%p1b(:,i,m,cvar) = wsp%p1b(:,i,m,cvar)*radius(:)
