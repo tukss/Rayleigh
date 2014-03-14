@@ -338,8 +338,8 @@ Contains
 		If (magnetism) Then
 			Call d_by_dr_cp(avar,d2adr2,wsp%p1a,2)	
 			ctemp%p1a(:,:,:,5) = wsp%p1a(:,:,:,d2adr2)
-			Call d_by_dr_cp(avar,dadr,wsp%p1a,1)
-			Call d_by_dr_cp(cvar,dcdr,wsp%p1a,1)
+			Call d_by_dr_cp(avar,dadr  ,wsp%p1a,1)
+			Call d_by_dr_cp(cvar,dcdr  ,wsp%p1a,1)
 			Call d_by_dr_cp(cvar,d2cdr2,wsp%p1a,2)
 		Endif
 
