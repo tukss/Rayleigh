@@ -1,7 +1,7 @@
 Module Spherical_IO
 	Use Parallel_Framework
 	Use SendReceive
-
+	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
 	! 2. Phi-Averages over sphere (f(r,theta))
@@ -514,6 +514,7 @@ Contains
 	End Subroutine	Add_Quantity
 
 	Subroutine Complete_Output(iter)
+		Integer, Intent(In) :: iter
 		If (maxval(step_zero) .eq. 1) Then
 			 Call Write_Shell_Slices(iter)
 		Endif
