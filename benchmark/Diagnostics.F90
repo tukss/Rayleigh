@@ -9,6 +9,7 @@ Module Diagnostics
 	Integer, Parameter, Private :: V_r = 1,   V_theta = 2, V_phi = 3
   	Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
 	
+	Integer, Parameter, Private :: v_sq = 6
 
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
@@ -17,7 +18,7 @@ Module Diagnostics
 	!/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
 	Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
 	Integer, Parameter, Private :: J_r = 204, J_theta = 205, J_phi = 206
-
+	Integer, Parameter, Private :: B_sq = 207
 
 	!///////////////////////////////////
 	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
@@ -80,6 +81,13 @@ Contains
 				
 				qty(:,:,:) = buffer(:,:,:,vphi)
 				Call Add_Quantity(v_phi,qty)
+			Endif	
+
+			If (compute_q(v_sq) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,vphi)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vr)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vtheta)**2
+				Call Add_Quantity(v_sq,qty)
 			Endif	
 
 			If (compute_q(temperature) .ne. 0) Then
@@ -153,6 +161,13 @@ Contains
 			If (compute_q(j_phi) .ne. 0) Then
 				qty(:,:,:) = buffer(:,:,:,jphi)
 				Call Add_Quantity(j_phi,qty)
+			Endif	
+
+			If (compute_q(b_sq) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,bphi)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,br)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,btheta)**2
+				Call Add_Quantity(b_sq,qty)
 			Endif	
 
 			Endif
