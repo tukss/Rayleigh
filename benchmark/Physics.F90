@@ -2019,7 +2019,7 @@ Contains
 				! No Slip Top and Bottom
 				! Z and dWdr vanish at the boundaries
                 r = 1
-                If (l .eq. 1) .and. (Conserve_L) ) then
+                If ((l .eq. 1) .and. (Conserve_L) ) then
                     write(6,*)'Conserving Angular Momentum'
     				Call Load_BC(lp,r,zeq,zvar,one,0,integral = rweights)
                 Else

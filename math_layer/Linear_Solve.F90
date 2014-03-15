@@ -627,7 +627,7 @@ Module Linear_Solve
 		Integer, Intent(In) :: mode, row, eqind,varind,dorder
 		Integer :: colblock, rowblock
 		real*8, Intent(In) :: amp
-        real*8, Intent(In), Optional :: integral
+        real*8, Intent(In), Optional :: integral(:)
 		real*8, Pointer, Dimension(:,:) :: mpointer
 		mpointer => equation_set(mode,eqind)%mpointer
 		colblock = equation_set(mode,eqind)%colblock(varind)
