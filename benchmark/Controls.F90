@@ -16,7 +16,9 @@ Module Controls
 	Logical :: lorentz_forces = .false.
 	Logical :: deriv_cluge = .false.
 	Integer :: gpower = 1
+    Real*8  :: cflmax = 0.1d0, cflmin = 0.05d0
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, Pm,max_iterations, chebyshev, nonlinear, &
 			alpha_implicit, check_frequency, rotation, static_transpose, static_config, &
-			use_parity, test_reduce,magnetism, gpower, lorentz_forces, deriv_cluge
+			use_parity, test_reduce,magnetism, gpower, lorentz_forces, deriv_cluge, &
+            cflmax, cflmin
 End Module Controls
