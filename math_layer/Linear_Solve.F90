@@ -492,7 +492,7 @@ Module Linear_Solve
 	Subroutine Get_All_RHS(buffer)
 		Implicit None
 		! Copy equation structure RHSs to the buffer (dlink RHSs)
-		Real*8, Intent(InOut) :: buffer(:,:,:,:)
+		Real*8, Intent(InOut) :: buffer(:,:,:,1:)
 		Integer :: i, ind,istart,iend 
 
 			Do i = 1, n_equations
