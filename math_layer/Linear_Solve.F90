@@ -622,22 +622,27 @@ Module Linear_Solve
 	End Subroutine Save_Derivatives
 
 
-	Subroutine Load_BC(mode,row,eqind,varind,amp,dorder)
+	Subroutine Load_BC(mode,row,eqind,varind,amp,dorder,integral)
 		Implicit None
 		Integer, Intent(In) :: mode, row, eqind,varind,dorder
 		Integer :: colblock, rowblock
 		real*8, Intent(In) :: amp
+        real*8, Intent(In), Optional :: integral
 		real*8, Pointer, Dimension(:,:) :: mpointer
 		mpointer => equation_set(mode,eqind)%mpointer
 		colblock = equation_set(mode,eqind)%colblock(varind)
 		rowblock = equation_set(mode,eqind)%rowblock
 
-		If (chebyshev) Then
-			Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
-		Else
-			Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
-		Endif
+        If (present(integral)) Then
+            mpointer(rowblock+row,colblock+1:colblock+ndim1) = integral(1:ndim1)
 
+        Else
+    		If (chebyshev) Then
+	    		Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
+		    Else
+			    Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
+		    Endif
+        Endif
 	End Subroutine Load_BC
 
 

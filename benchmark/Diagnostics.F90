@@ -22,14 +22,14 @@ Module Diagnostics
 
 	!///////////////////////////////////
 	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
-
+    Real*8, Allocatable :: rweights(:)
 Contains
 
 	Subroutine Initialize_Diagnostics()
 		Implicit None
         Integer :: i
         Real*8 :: delr
-        Real*8, Allocatable :: rweights(:), tweights(:)
+        Real*8, Allocatable :: tweights(:)
 
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
@@ -48,7 +48,7 @@ Contains
         rweights = rweights/sum(rweights)
 		  Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta)	
 
-        DeAllocate(rweights)
+
         DeAllocate(tweights)
 		!Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
 	End Subroutine Initialize_Diagnostics
