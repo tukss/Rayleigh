@@ -687,6 +687,7 @@ Contains
 
 
             Allocate(full_avg(nq_globav))
+				full_avg(:) = 0.0d0
             Allocate(buff(nq_globav))
             Do n = 0, nproc-1
 				If (n .ne. io_node) then		
@@ -706,6 +707,7 @@ Contains
             Write(15)(qvals_globav(i),i=1,nq_globav)
             Write(15)(full_avg(i),i=1,nq_globav)
             Close(15)
+				DeAllocate(full_avg)
 		Else
             Call send(globav_outputs, dest = 0,tag=global_avg_tag, grp=pfi%gcomm)
             DeAllocate(globav_outputs)
