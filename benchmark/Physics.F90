@@ -307,6 +307,8 @@ Contains
 		!Copy each variable out of the RHS into the top part of the buffer
 		! These variables are in spectral space radially
 		Call Get_All_RHS(wsp%p1a)
+		wsp%p1a((2*N_r)/3+1:N_r,:,:,:) = 0.0d0	! de-alias
+
 		! This is terribly inefficient, but I just want to test the stability of Chebyshev vs. FD for not..
 		! We'll create a new buffer.  ctemp
 		! Store all the permanent derivatives there - in c space
