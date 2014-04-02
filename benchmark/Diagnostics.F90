@@ -84,12 +84,7 @@ Contains
 				Call Add_Quantity(v_phi,qty)
 			Endif	
 
-			If (compute_q(v_sq) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,vphi)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vr)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vtheta)**2
-				Call Add_Quantity(v_sq,qty)
-			Endif	
+
 
 			If (compute_q(temperature) .ne. 0) Then
 				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
@@ -103,7 +98,12 @@ Contains
 				Call Add_Quantity(temperature,qty)
 			Endif		
 
-
+			If (compute_q(v_sq) .ne. 0) Then
+				qty(:,:,:) = buffer(:,:,:,vphi)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vr)**2
+				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vtheta)**2
+				Call Add_Quantity(v_sq,qty)
+			Endif	
 
 			If (compute_q(diagnostic1) .ne. 0) Then
 				mypi = acos(-1.0d0)
