@@ -57,12 +57,14 @@ Contains
 			new_deltat   = max_time_step
 			deltat   = 0.0d0
 			old_deltat   = 0.0d0
+			simulation_time = 0.0d0
 		Else
 			! We have restarted from a checkpoint
 			! Change new_deltat and deltat appropriately
 			new_deltat = checkpoint_newdt
 			deltat = checkpoint_dt
 			old_deltat = 0.0d0
+			simulation_time = 0.0d0 !////////////// CHANGE THIS to WORK WITH CHECKPOINTING
 		Endif
 		new_timestep = .true.
 
@@ -664,7 +666,7 @@ Contains
 		!This is a good spot to do some simple diagnostic output while we debug the code
 		!since velocity components, Pressure, and Temperature are all 
 		!in memory and in physical space at this point in time.
-		Call ps_output(wsp%p3a, iteration)
+		Call ps_output(wsp%p3a, iteration,simulation_time)
 		!////////////////////////////////////////////////////////////////////////
 
 		If (test_reduce) Then

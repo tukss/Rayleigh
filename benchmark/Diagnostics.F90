@@ -53,10 +53,11 @@ Contains
 		!Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
 	End Subroutine Initialize_Diagnostics
 
-	Subroutine PS_Output(buffer,iteration)
+	Subroutine PS_Output(buffer,iteration, current_time)
 		Implicit None
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
+		Real*8, Intent(In) :: current_time
 		Real*8 :: mypi
 		Integer :: p,t,r
 		
@@ -172,7 +173,7 @@ Contains
 
 			Endif
 			DeAllocate(qty)
-			Call Complete_Output(iteration)
+			Call Complete_Output(iteration, current_time)
 
 		Endif
 	End Subroutine PS_Output

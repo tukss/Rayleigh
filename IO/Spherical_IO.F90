@@ -355,12 +355,14 @@ Contains
 
 	End Subroutine Get_Shell_Slice
 
-	Subroutine Write_Shell_Slices(this_iter)
+	Subroutine Write_Shell_Slices(this_iter,simtime)
 		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
 		Integer :: i, j, k,ii,qq, this_id2, this_id1, i_start, i_end, j_start, j_end, k_total
-		Integer :: this_iter, n, nn, this_id,this_nshell
+		Integer :: n, nn, this_id,this_nshell
 		Character*8 :: iterstring
 		Character*120 :: shell_slice_file
 
@@ -429,7 +431,7 @@ Contains
 	 		Write(15)(sintheta(j),j=1,ntheta)
 			Write(15)((((all_shell_slices(k,j,i,qq),k=1,nphi),j=1,ntheta),i=1,nshell_levels),qq=1,nq_shell)
 			Write(15)(costheta(j),j=1,ntheta)
-
+			Write(15)simtime
 			Close(15)
 
 			DeAllocate(all_shell_slices)
@@ -515,19 +517,20 @@ Contains
 
 	End Subroutine	Add_Quantity
 
-	Subroutine Complete_Output(iter)
+	Subroutine Complete_Output(iter, sim_time)
 		Integer, Intent(In) :: iter
+		Real*8, Intent(In) :: sim_time
 		If (maxval(step_zero) .eq. 1) Then
-			 Call Write_Shell_Slices(iter)
+			 Call Write_Shell_Slices(iter,sim_time)
 		Endif
 		If (maxval(step_one) .eq. 1) Then
-			 Call Write_Azimuthal_Average(iter)
+			 Call Write_Azimuthal_Average(iter,sim_time)
 		Endif
 		If (maxval(step_two) .eq. 1) Then
-			 Call Write_Shell_Average(iter)
+			 Call Write_Shell_Average(iter,sim_time)
 		Endif
 		If (maxval(step_three) .eq. 1) Then
-			 Call Write_Global_Average(iter)
+			 Call Write_Global_Average(iter,sim_time)
 		Endif
         DeAllocate(f_of_r_theta)
         DeAllocate(f_of_r)
@@ -611,13 +614,14 @@ Contains
 
 	END Subroutine Get_Global_Average
 
-	Subroutine Write_Azimuthal_Average(this_iter)
+	Subroutine Write_Azimuthal_Average(this_iter,simtime)
 		Implicit None
 		Real*8, Allocatable :: buff(:,:,:), full_azavg(:,:,:)
 
 		Integer :: responsible
 		Integer :: i, j, k
 		Integer, Intent(In) :: this_iter
+		Real*8, Intent(In) :: simtime
         Integer :: n, nn
 		Character*8 :: iterstring
 		Character*120 :: azfile	
@@ -664,6 +668,7 @@ Contains
             Write(15)(radius(i),i=1,nr)
             Write(15)(sintheta(i),i=1,ntheta)
             Write(15)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
+				Write(15)simtime
             Close(15)
 		Else
             Call send(azav_outputs, dest = 0,tag=az_avg_tag, grp=pfi%gcomm)
@@ -671,13 +676,14 @@ Contains
 		Endif
     End Subroutine Write_Azimuthal_Average
 
-	Subroutine Write_Global_Average(this_iter)
+	Subroutine Write_Global_Average(this_iter,simtime)
 		Implicit None
 		Real*8, Allocatable :: buff(:), full_avg(:)
 
 		Integer :: responsible
 		Integer :: i,n, your_id
 		Integer, Intent(In) :: this_iter
+		Real*8, Intent(In) :: simtime
 		Character*8 :: iterstring
 		Character*120 :: gfile	
 
@@ -708,6 +714,7 @@ Contains
             Write(15)nq_globav
             Write(15)(qvals_globav(i),i=1,nq_globav)
             Write(15)(full_avg(i),i=1,nq_globav)
+				Write(15)simtime
             Close(15)
 				DeAllocate(full_avg)
 		Else
@@ -717,9 +724,10 @@ Contains
     End Subroutine Write_Global_Average
 
 
-	Subroutine Write_Shell_Average(this_iter)
+	Subroutine Write_Shell_Average(this_iter, simtime)
 		Implicit None
         Integer, Intent(In) :: this_iter
+		Real*8, Intent(In) :: simtime
 		Integer :: responsible
 		Integer :: i, j, k, n, nn
 		Character*8 :: iterstring
@@ -767,6 +775,7 @@ Contains
             Write(15)(qvals_shellav(i),i=1,nq_shellav)
             Write(15)(radius(i),i=1,nr)
             Write(15)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
+				Write(15)simtime
             Close(15)
 
 		Else

@@ -1,4 +1,5 @@
 PRO READ_SHELLAVG, file, res
+	time = 0.0d0
 	dims = lonarr(2)
 	CLOSE, 13
 	OPENR, 13, file, /f77_unformatted
@@ -12,6 +13,7 @@ PRO READ_SHELLAVG, file, res
 	readu,13,qvals
 	readu,13,radius
 	readu,13, vals
-	res = {vals:vals, radius:radius, q:qvals}
+	readu,13, time
+	res = {vals:vals, radius:radius, q:qvals, time:time}
 	close, 13
 END

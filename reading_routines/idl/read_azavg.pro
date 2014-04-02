@@ -1,4 +1,5 @@
 PRO READ_AZAVG, file, res
+	time = 0.0d0
 	dims = lonarr(3)
 	CLOSE, 13
 	OPENR, 13, file, /f77_unformatted
@@ -15,6 +16,7 @@ PRO READ_AZAVG, file, res
 	readu,13,radius
 	readu,13, sintheta
 	readu,13, vals
-	res = {vals:vals, radius:radius, sintheta:sintheta, q:qvals}
+	readu,13,time
+	res = {vals:vals, radius:radius, sintheta:sintheta, q:qvals, time:time}
 	close, 13
 END
