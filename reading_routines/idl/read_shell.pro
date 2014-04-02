@@ -8,6 +8,7 @@ PRO READ_SHELL, file, res
 	nr = dims[2]
 	nq = dims[3]
 	radius = dblarr(nr)
+	shell_inds = lonarr(nr)
 	qvals = lonarr(nq)
 	sintheta = dblarr(ntheta)
 	costheta = dblarr(ntheta)
@@ -15,10 +16,11 @@ PRO READ_SHELL, file, res
 
 	readu,13,qvals
 	readu,13,radius
+	readu,13,shell_inds
 	readu,13,sintheta
 	readu,13, vals
 	readu,13,costheta
-	res = {vals:vals, radius:radius, sintheta:sintheta,q:qvals, costheta:costheta}
+	res = {vals:vals, radius:radius, sintheta:sintheta,q:qvals, costheta:costheta, shell_inds:shell_inds}
 
 	close, 13
 END

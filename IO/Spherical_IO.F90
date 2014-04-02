@@ -425,9 +425,11 @@ Contains
          Write(15)nphi,ntheta,nshell_levels,nq_shell
          Write(15)(qvals_shell(i),i=1,nq_shell)
 	 		Write(15)(radius(shell_levels(i)),i=1,nshell_levels)
+	 		Write(15)(shell_levels(i),i=1,nshell_levels)
 	 		Write(15)(sintheta(j),j=1,ntheta)
 			Write(15)((((all_shell_slices(k,j,i,qq),k=1,nphi),j=1,ntheta),i=1,nshell_levels),qq=1,nq_shell)
 			Write(15)(costheta(j),j=1,ntheta)
+
 			Close(15)
 
 			DeAllocate(all_shell_slices)
