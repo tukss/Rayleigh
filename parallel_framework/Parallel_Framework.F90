@@ -78,6 +78,8 @@ Module Parallel_Framework
 		Integer, Allocatable :: sdisp32(:), rdisp32(:)
 		Integer, Allocatable :: scount32(:), rcount32(:)
 
+		Integer :: send_size12, recv_size12, send_size21, recv_size21
+		Integer :: send_size23, recv_size23, send_size32, recv_size32
 
 
 		Character*3 :: config
@@ -157,23 +159,32 @@ Contains
 	End Subroutine Set_Buffer_Sizes
 	Subroutine Initialize_Spherical_Buffer(self,report, field_count, & 
 														config,dynamic_transpose, dynamic_config, &
-                                            piggyback)
+                                            piggyback,padding)
 		! Buffer initialization
 		! Handles send/receive disp/counts
 		Implicit None
 		Integer :: np, p
 		Integer :: report_unit = 500
-		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, piggyback
+		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, piggyback, padding
 		Integer, Intent(In), Optional :: field_count(3,2)
 		Character*120 :: report_file,report_tag
 		Character*10 :: gtag, rtag, ctag
 		Character*3, Intent(In), Optional :: config
+		Integer :: stemp1, rtemp1
+		Logical :: compute_istop = .false.
 		Class(SphericalBuffer) :: self
 		If (present(report)) Then
 			Write(gtag,ifmt)pfi%gcomm%rank
 			Write(rtag,ifmt)pfi%rcomm%rank
 			Write(ctag,ifmt)pfi%ccomm%rank
 			report_tag = 'g'//Trim(gtag)//'_r'//Trim(rtag)//'_c'//Trim(ctag)
+		Endif
+		If (present(padding)) Then
+			If (padding) Then
+				Write(6,*)'padding buffer'
+				self%pad_buffer = .true.
+				compute_istop = .true.
+			Endif
 		Endif
 		If (present(dynamic_config)) Then
 			self%dynamic_config_buffers = dynamic_config
@@ -220,6 +231,13 @@ Contains
 			self%scount23(p) = self%scount23(p)*2	! times 2 for real/complex part
 			self%rcount23(p) = self%rcount23(p)*2
 		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			stemp1 = maxval(self%scount23)
+			rtemp1 = maxval(self%rcount23)
+			self%scount23(:) = max(stemp1,rtemp1)
+			self%rcount23(:) = max(stemp1,rtemp1)
+		Endif
 		self%sdisp23(0) = 0
 		self%rdisp23(0) = 0
 		If (np .gt. 1) Then
@@ -228,16 +246,9 @@ Contains
 				self%rdisp23(p) = self%rdisp23(p-1)+self%rcount23(p-1)
 			Enddo
 		Endif
-		If (present(report)) Then
-			report_file = 'parallel_framework/reports/buff_init/sr23_'//Trim(report_tag)
-			Open(unit=report_unit,file = report_file,form='unformatted',status='replace')
-			Write(report_unit)np
-			Write(report_unit)(self%scount23(p),p=0,np-1)
-			Write(report_unit)(self%sdisp23(p),p=0,np-1)
-			Write(report_unit)(self%rcount23(p),p=0,np-1)
-			Write(report_unit)(self%rdisp23(p),p=0,np-1)
-			Close(report_unit)
-		Endif
+
+		self%send_size23 = sum(self%scount23)
+		self%recv_size23 = sum(self%rcount23)
 
 		!////////////////////////////////////////////////////////////
 		! ------------ Now the reverse-----------------
@@ -253,6 +264,13 @@ Contains
 			self%rcount32(p) = self%rcount32(p)*2	! for real/complex parts
 			self%scount32(p) = self%scount32(p)*2
 		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			stemp1 = maxval(self%scount32)
+			rtemp1 = maxval(self%rcount32)
+			self%scount32(:) = max(stemp1,rtemp1)
+			self%rcount32(:) = max(stemp1,rtemp1)
+		Endif
 		self%sdisp32(0) = 0
 		self%rdisp32(0) = 0
 		If (np .gt. 1) Then
@@ -261,26 +279,8 @@ Contains
 				self%rdisp32(p) = self%rdisp32(p-1)+self%rcount32(p-1)
 			Enddo
 		Endif
-
-
-
-		If (present(report)) Then
-			If (report .eqv. .true.) Then
-			report_file = 'parallel_framework/reports/buff_init/sr32_'//Trim(report_tag)
-			Open(unit=report_unit,file = report_file,form='unformatted',status='replace')
-			Write(report_unit)np
-			Write(report_unit)(self%scount32(p),p=0,np-1)
-			Write(report_unit)(self%sdisp32(p),p=0,np-1)
-			Write(report_unit)(self%rcount32(p),p=0,np-1)
-			Write(report_unit)(self%rdisp32(p),p=0,np-1)
-			Close(report_unit)
-			Endif
-		Endif
-
-
-
-
-
+		self%send_size32 = sum(self%scount32)
+		self%recv_size32 = sum(self%rcount32)
 
 		! Suppose we are going from 3 to 2 (reverse of above)
 		!  The message size I would send to rank r is
@@ -296,6 +296,14 @@ Contains
 			self%scount12(p) = (pfi%all_1p(p)%delta) * (my_num_lm)  * (self%nf1a)*2
 			self%rcount12(p) = (pfi%my_1p%delta)     * (num_lm(p)) * (self%nf1a)*2
 		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			stemp1 = maxval(self%scount12)
+			rtemp1 = maxval(self%rcount12)
+			self%scount12(:) = max(stemp1,rtemp1)
+			self%rcount12(:) = max(stemp1,rtemp1)
+		Endif
+
 		self%sdisp12(0) = 0
 		self%rdisp12(0) = 0
 		If (np .gt. 1) Then
@@ -304,7 +312,8 @@ Contains
 				self%rdisp12(p) = self%rdisp12(p-1)+self%rcount12(p-1)
 			Enddo
 		Endif
-
+		self%send_size12 = sum(self%scount12)
+		self%recv_size12 = sum(self%rcount12)
 
 		! Configuration 2 to 1
 		!  Suppose we are going from 2 to 1 (reverse direction)
@@ -319,6 +328,14 @@ Contains
 			self%rcount21(p) = (pfi%all_1p(p)%delta) * (my_num_lm)  * (self%nf2b)*2	! 2 is because we split the complex into two real pieces
 			self%scount21(p) = (pfi%my_1p%delta)     * (num_lm(p)) * (self%nf2b)*2
 		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			stemp1 = maxval(self%scount21)
+			rtemp1 = maxval(self%rcount21)
+			self%scount21(:) = max(stemp1,rtemp1)
+			self%rcount21(:) = max(stemp1,rtemp1)
+		Endif
+
 		self%sdisp21(0) = 0
 		self%rdisp21(0) = 0
 		If (np .gt. 1) Then
@@ -327,8 +344,13 @@ Contains
 				self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
 			Enddo
 		Endif
+		self%send_size21 = sum(self%scount21)
+		self%recv_size21 = sum(self%rcount21)
+
+
         If (present(piggyback)) Then
             If (piggyback) Then
+					 compute_istop = .true.
                 self%do_piggy = .true.
                 ! modify the send and receive sizes for 3b2b
                 np = pfi%rcomm%np
@@ -339,6 +361,8 @@ Contains
                     self%sdisp32(p) = self%sdisp32(p-1)+self%scount32(p-1)
                     self%rdisp32(p) = self%rdisp32(p-1)+self%rcount32(p-1)
                 Enddo
+					 self%send_size32 = self%send_size32+np
+					 self%recv_size32 = self%recv_size32+np
 
                 !Now do the same for 2b1b transposes
                 np = pfi%ccomm%np
@@ -348,15 +372,22 @@ Contains
                     self%sdisp21(p) = self%sdisp21(p-1)+self%scount21(p-1)
                     self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
                 enddo
-                ! Allocate and initialize the inext array
-                Allocate(self%istop(0:np))	! goes to np, but only np-1 used
-					 self%istop(np) = -1
-                self%istop(0)  = num_lm(0)
-                Do p = 1, np -1
-                    self%istop(p) = self%istop(p-1)+num_lm(p)
-                Enddo
+					 self%send_size21 = self%send_size21+np
+					 self%recv_size21 = self%recv_size21+np
+
+
             Endif
         Endif
+
+
+
+			! Allocate and initialize the inext array
+          Allocate(self%istop(0:np))	! goes to np, but only np-1 used
+			 self%istop(np) = -1
+          self%istop(0)  = num_lm(0)
+          Do p = 1, np -1
+              self%istop(p) = self%istop(p-1)+num_lm(p)
+          Enddo
 
 
 		!//  Allocate the static send/receive buffers if desired
@@ -694,9 +725,8 @@ Contains
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
 
-			send_size = sum(self%scount23)
-			recv_size = sum(self%rcount23)
-			Allocate(self%send_buff(1:send_size))
+
+			Allocate(self%send_buff(1:self%send_size23))
 		Endif
 		!--- Not sure if this is good or bad, but copy out the bounds of the loop for now
 		nf = self%nf2a
@@ -714,9 +744,9 @@ Contains
 		! gets jumped around in
 		delj = pfi%my_1p%delta
 
-		ii = 1
+		
 		Do p = 0, np -1 
-			
+			ii = self%sdisp23(p)+1
 			imin = pfi%all_2p(p)%min
 			imax = pfi%all_2p(p)%max	
 			Do k = kmin, kmax
@@ -735,13 +765,13 @@ Contains
 		Enddo
 
 		Call self%deconstruct('p2a')
-		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:recv_size))
+		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:self%recv_size23))
 
 		self%recv_buff(:) = 0.0d0
 
 
 		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount23, &
-				self%sdisp23, self%rcount23, self%rdisp23, pfi%rcomm)
+				self%sdisp23, self%rcount23, self%rdisp23, pfi%rcomm, self%pad_buffer)
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 
@@ -754,8 +784,8 @@ Contains
 		imax = pfi%my_2p%max	
 		jmin = pfi%my_1p%min
 		jmax = pfi%my_1p%max
-		ii = 1
 		Do p = 0, np -1
+			ii = self%rdisp23(p)+1
 			kmin = pfi%all_3s(p)%min
 			kmax = pfi%all_3s(p)%max	
 			Do k = kmin, kmax
@@ -792,9 +822,7 @@ Contains
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
-			send_size = sum(self%scount32)
-			recv_size = sum(self%rcount32)
-			Allocate(self%send_buff(1:send_size))
+			Allocate(self%send_buff(1:self%send_size32))
 		Endif
 		!write(6,*)'executing new transpose'
 		!--- Not sure if this is good or bad, but copy out the bounds of the loop for now
@@ -810,8 +838,8 @@ Contains
 		!  Again stripe in the natural order of the send buffer
 		imin = pfi%my_2p%min
 		imax = pfi%my_2p%max	
-		ii = 1
 		Do p = 0, np -1
+			ii = self%sdisp32(p)+1
 			kmin = pfi%all_3s(p)%min 
 			kmax = pfi%all_3s(p)%max	
 			Do k = kmin, kmax
@@ -836,12 +864,12 @@ Contains
 
 		!/////////////////////////////////////
 		Call self%deconstruct('p3b')
-		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:recv_size))
+		If (self%dynamic_transpose_buffers) Allocate(self%recv_buff(1:self%recv_size32))
 		self%recv_buff(:) = 0.0d0
 		!----- This is where alltoall will be called
 
     	Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32, &
-				self%sdisp32, self%rcount32, self%rdisp32, pfi%rcomm)
+				self%sdisp32, self%rcount32, self%rdisp32, pfi%rcomm, self%pad_buffer)
         
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
@@ -859,8 +887,8 @@ Contains
 		jmin = 1
 		jmax = pfi%my_1p%delta
 
-		ii = 1
 		Do p = 0, np -1 
+			ii = self%rdisp32(p)+1
 			imin = pfi%all_2p(p)%min
 			imax = pfi%all_2p(p)%max	
 			Do k = kmin, kmax
@@ -928,22 +956,18 @@ Contains
 		rmin = 1
 		rmax = 2*delta_r
 		tnr = 2*delta_r
-		lmax = maxval(pfi%inds_3s)
-		n_lm_local = 0
-		Do i = pfi%my_3s%min, pfi%my_3s%max
-			n_lm_local = n_lm_local+(lmax-pfi%inds_3s(i)+1)
-		Enddo
-		send_size = (pfi%my_1p%delta)*2*(nfields)*(n_lm_local)
-        if (self%do_piggy) send_size = send_size+np
-		Allocate(send_buff(1:send_size))
-		send_offset = 0
+
+		Allocate(send_buff(1:self%send_size21))
+
 
       pcurrent = 0
       inext = num_lm(0)
+		send_offset = 0
       Do i = 1, lm_count
          mp = mp_lm_values(i)
          l = l_lm_values(i)
-			offset = 0
+			offset = 0 
+
 			Do n = 1, nfields
 
          	Do r = rmin,rmax
@@ -952,27 +976,28 @@ Contains
 				send_offset = send_offset+tnr
 				offset = offset+tnr
 			Enddo
-        If (self%do_piggy) Then
+			If (i .eq. inext) Then
+	        If (self%do_piggy) Then
             ! load the piggyback value into the next buffer slot.
-            if (i .eq. inext) then
                 send_buff(send_offset+1) = self%mrv
                 send_offset = send_offset+1            
-						pcurrent = pcurrent+1
-                inext = self%istop(pcurrent)
-            endif
-        Endif
+	        	Endif
+				pcurrent = pcurrent+1
+            inext = self%istop(pcurrent)
+				if (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
+			Endif
       Enddo
 
 
 
 		Call self%deconstruct('s2b')
 
-		recv_size = (pfi%n1p)*2*(nfields)*num_lm(pfi%ccomm%rank)
-        if (self%do_piggy) recv_size = recv_size+np
-		Allocate(recv_buff(1:recv_size))
+
+		Allocate(recv_buff(1:self%recv_size21))
 
 
-		Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, self%rdisp21, pfi%ccomm)
+		Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
+			self%rdisp21, pfi%ccomm, self%pad_buffer)
 		DeAllocate(send_buff)
 
 		Call self%construct('p1b')
@@ -980,9 +1005,10 @@ Contains
 		! WPS are coupled, but Z,Btor, and Bpol are not
 		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
 		! We may want to modify this later on to mesh with linear equation structure
-      indx = 1
+      
 		
       Do p = 0, np - 1
+			indx = self%rdisp21(p)+1
          !r_min = 1 + p*n1/np
 			r_min = pfi%all_1p(p)%min
 			r_max = pfi%all_1p(p)%max
@@ -1020,7 +1046,7 @@ Contains
 		Integer :: recv_offset, tnr
 
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: send_size,recv_size, lmax
+      Integer :: send_size,recv_size, inext, pcurrent
 
 		Class(SphericalBuffer) :: self
 
@@ -1028,17 +1054,18 @@ Contains
 		! This goes at the beginning
 		
 		nfields = self%nf1a
-		send_size = (pfi%n1p)*2*(nfields)*num_lm(pfi%ccomm%rank)
-		Allocate(send_buff(1:send_size))
+
+		Allocate(send_buff(1:self%send_size12))
 
 
 		! Now, the receive striping needs a little mapping
 		! WPS are coupled, but Z,Btor, and Bpol are not
 		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
 		! We may want to modify this later on to mesh with linear equation structure
-      indx = 1
+
 		np = pfi%ccomm%np
       Do p = 0, np - 1
+			indx = self%sdisp12(p)+1
 			r_min = pfi%all_1p(p)%min
 			r_max = pfi%all_1p(p)%max
          dr = r_max - r_min
@@ -1062,7 +1089,7 @@ Contains
 
 		!/////
 		! First loading, should be relatively straight forward
-		! We have nfields (nf2b)  and the data is dimensioned x%(l,r,field_num)
+		! We have nfields (nf1a)  and the data is dimensioned x%(l,r,field_num)
 
       ! Load the send array in the ordering of the l-m values
       indx = 1
@@ -1070,16 +1097,12 @@ Contains
 		delta_r = pfi%my_1p%delta
 		rmin = pfi%my_1p%min
 		rmax = pfi%my_1p%max
-		lmax = maxval(pfi%inds_3s)
-		n_lm_local = 0
-		Do i = pfi%my_3s%min, pfi%my_3s%max
-			n_lm_local = n_lm_local+(lmax-pfi%inds_3s(i)+1)
-		Enddo
-		recv_size = (pfi%my_1p%delta)*2*(nfields)*(n_lm_local)
-		Allocate(recv_buff(1:recv_size))
 
-		!Write(6,*)'maxval sendbuff : ', maxval(abs(send_buff))
-		Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, self%rcount12, self%rdisp12, pfi%ccomm)
+		Allocate(recv_buff(1:self%recv_size12))
+
+
+		Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, &
+			 self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
 		DeAllocate(send_buff)
 
 		Call self%construct('s2a')
@@ -1088,9 +1111,13 @@ Contains
 		rmax = delta_r*2
 		recv_offset = 0
 		tnr = 2*delta_r
+		pcurrent = 0
+		inext = num_lm(0)
+		recv_offset = 0
       Do i = 1, lm_count
          mp = mp_lm_values(i)
          l = l_lm_values(i)
+			
 			offset = 0
 			Do n = 1, nfields
          Do r = rmin,rmax 
@@ -1101,8 +1128,11 @@ Contains
 			offset = offset+tnr
 			recv_offset = recv_offset+tnr
 			Enddo
-
-         indx = indx+1
+			If (i .eq. inext) Then
+				pcurrent = pcurrent+1
+            inext = self%istop(pcurrent)
+				if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
+			Endif
       Enddo
 		!////
 		!Write(6,*)'maxval recv : ', maxval(abs(recv_buff))
