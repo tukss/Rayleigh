@@ -78,7 +78,8 @@ Module Parallel_Framework
 		Integer, Allocatable :: sdisp32(:), rdisp32(:)
 		Integer, Allocatable :: scount32(:), rcount32(:)
 
-
+		Integer, Allocatable :: sdisp32v2(:), rdisp32v2(:)
+		Integer, Allocatable :: scount32v2(:), rcount32v2(:)
 
 		Character*3 :: config
 		! When memory is not a consideration, it may be advantageous
@@ -138,12 +139,12 @@ Contains
 			Integer :: new_recv, new_send
 
 			! Start with 2a3a sizes
-			self%max_send = sum(self%scount23)
-			self%max_recv = sum(self%rcount23)
+			self%max_send = sum(self%scount23)*2
+			self%max_recv = sum(self%rcount23)*2
 
 			! Compare against 3b2b
-			new_send = sum(self%scount32)
-			new_recv = sum(self%rcount32)
+			new_send = sum(self%scount32v2)
+			new_recv = sum(self%rcount32v2)
 			if (new_send .gt. self%max_send) then
 				self%max_send = new_send
 			endif
@@ -217,8 +218,6 @@ Contains
 		Do p = 0, pfi%rcomm%np-1
 			self%scount23(p) = (pfi%my_1p%delta) * (pfi%all_2p(p)%delta) * (pfi%my_3s%delta) * (self%nf2a)
 			self%rcount23(p) = (pfi%my_1p%delta) * (pfi%my_2p%delta) * (pfi%all_3s(p)%delta) * (self%nf2a)
-			self%scount23(p) = self%scount23(p)*2	! times 2 for real/complex part
-			self%rcount23(p) = self%rcount23(p)*2
 		Enddo
 		self%sdisp23(0) = 0
 		self%rdisp23(0) = 0
@@ -250,8 +249,6 @@ Contains
 		Do p = 0, pfi%rcomm%np-1
 			self%rcount32(p) = (pfi%my_1p%delta) * (pfi%all_2p(p)%delta) * (pfi%my_3s%delta) * (self%nf3b)
 			self%scount32(p) = (pfi%my_1p%delta) * (pfi%my_2p%delta) * (pfi%all_3s(p)%delta) * (self%nf3b)
-			self%rcount32(p) = self%rcount32(p)*2	! for real/complex parts
-			self%scount32(p) = self%scount32(p)*2
 		Enddo
 		self%sdisp32(0) = 0
 		self%rdisp32(0) = 0
@@ -262,7 +259,19 @@ Contains
 			Enddo
 		Endif
 
+		!///////////////////////////////////////////////////////
+		!  ----- rcount32 and scount32 were set up as though
+		!			the buffer was complex
+		!        use these instead if it is real
+		Allocate(self%scount32v2(0:np-1))
+		Allocate(self%rcount32v2(0:np-1))
+		Allocate(self%sdisp32v2(0:np-1))
+		Allocate(self%rdisp32v2(0:np-1))
 
+		self%scount32v2 = 2*self%scount32
+		self%rcount32v2 = 2*self%rcount32
+		self%sdisp32v2  = 2*self%sdisp32
+		self%rdisp32v2  = 2*self%rdisp32
 
 		If (present(report)) Then
 			If (report .eqv. .true.) Then
@@ -332,12 +341,12 @@ Contains
                 self%do_piggy = .true.
                 ! modify the send and receive sizes for 3b2b
                 np = pfi%rcomm%np
-                self%scount32 = self%scount32+1
-                self%rcount32 = self%rcount32+1
+                self%scount32v2 = self%scount32v2+1
+                self%rcount32v2 = self%rcount32v2+1
                 ! Adjust the send and receive displacements
                 Do p = 1, np-1
-                    self%sdisp32(p) = self%sdisp32(p-1)+self%scount32(p-1)
-                    self%rdisp32(p) = self%rdisp32(p-1)+self%rcount32(p-1)
+                    self%sdisp32v2(p) = self%sdisp32v2(p-1)+self%scount32v2(p-1)
+                    self%rdisp32v2(p) = self%rdisp32v2(p-1)+self%rcount32v2(p-1)
                 Enddo
 
                 !Now do the same for 2b1b transposes
@@ -694,8 +703,8 @@ Contains
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
 
-			send_size = sum(self%scount23)
-			recv_size = sum(self%rcount23)
+			send_size = sum(self%scount23)*2
+			recv_size = sum(self%rcount23)*2
 			Allocate(self%send_buff(1:send_size))
 		Endif
 		!--- Not sure if this is good or bad, but copy out the bounds of the loop for now
@@ -740,8 +749,8 @@ Contains
 		self%recv_buff(:) = 0.0d0
 
 
-		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount23, &
-				self%sdisp23, self%rcount23, self%rdisp23, pfi%rcomm)
+		Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount23*2, &
+				self%sdisp23*2, self%rcount23*2, self%rdisp23*2, pfi%rcomm)
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 
@@ -782,7 +791,12 @@ Contains
 	End Subroutine Transpose_2a3a
 
 	Subroutine Transpose_3b2b(self)		
+		! Version 2
+		! This assumes that s3b and p2b are actually real arrays
+		! p3b was fft'd in place
 		Class(SphericalBuffer) :: self
+!		Complex*16, Allocatable :: send_buff(:), recv_buff(:)
+!		Real*8, Allocatable :: send_buff(:), recv_buff(:)
 		Integer :: send_size,np, recv_size
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind
@@ -792,8 +806,8 @@ Contains
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
-			send_size = sum(self%scount32)
-			recv_size = sum(self%rcount32)
+			send_size = sum(self%scount32v2)
+			recv_size = sum(self%rcount32v2)
 			Allocate(self%send_buff(1:send_size))
 		Endif
 		!write(6,*)'executing new transpose'
@@ -840,8 +854,8 @@ Contains
 		self%recv_buff(:) = 0.0d0
 		!----- This is where alltoall will be called
 
-    	Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32, &
-				self%sdisp32, self%rcount32, self%rdisp32, pfi%rcomm)
+    	Call Standard_Transpose(self%send_buff, self%recv_buff, self%scount32v2, &
+				self%sdisp32v2, self%rcount32v2, self%rdisp32v2, pfi%rcomm)
         
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
