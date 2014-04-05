@@ -1,5 +1,6 @@
 Module Parallel_Framework
 	Use MPI_LAYER
+	Use General_MPI
 	Use Load_Balance
 	Use Structures
 	Implicit None
@@ -171,7 +172,8 @@ Contains
 		Character*10 :: gtag, rtag, ctag
 		Character*3, Intent(In), Optional :: config
 		Integer :: stemp1, rtemp1
-		Logical :: compute_istop = .false.
+
+		Integer*4 :: gmax, my_max
 		Class(SphericalBuffer) :: self
 		If (present(report)) Then
 			Write(gtag,ifmt)pfi%gcomm%rank
@@ -181,9 +183,7 @@ Contains
 		Endif
 		If (present(padding)) Then
 			If (padding) Then
-				Write(6,*)'padding buffer'
 				self%pad_buffer = .true.
-				compute_istop = .true.
 			Endif
 		Endif
 		If (present(dynamic_config)) Then
@@ -233,10 +233,14 @@ Contains
 		Enddo
 		If (self%pad_buffer) Then
 			! adjustment for using alltoall vs. alltoallv
+			! Everyone in the row or column needs to have the same buffer size
+			! (hence the call to allreduce)
 			stemp1 = maxval(self%scount23)
 			rtemp1 = maxval(self%rcount23)
-			self%scount23(:) = max(stemp1,rtemp1)
-			self%rcount23(:) = max(stemp1,rtemp1)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%rcomm)
+			self%scount23(:) = gmax
+			self%rcount23(:) = gmax
 		Endif
 		self%sdisp23(0) = 0
 		self%rdisp23(0) = 0
@@ -268,8 +272,10 @@ Contains
 			! adjustment for using alltoall vs. alltoallv
 			stemp1 = maxval(self%scount32)
 			rtemp1 = maxval(self%rcount32)
-			self%scount32(:) = max(stemp1,rtemp1)
-			self%rcount32(:) = max(stemp1,rtemp1)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%rcomm)
+			self%scount32(:) = gmax
+			self%rcount32(:) = gmax
 		Endif
 		self%sdisp32(0) = 0
 		self%rdisp32(0) = 0
@@ -300,8 +306,10 @@ Contains
 			! adjustment for using alltoall vs. alltoallv
 			stemp1 = maxval(self%scount12)
 			rtemp1 = maxval(self%rcount12)
-			self%scount12(:) = max(stemp1,rtemp1)
-			self%rcount12(:) = max(stemp1,rtemp1)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%ccomm)
+			self%scount12(:) = gmax
+			self%rcount12(:) = gmax
 		Endif
 
 		self%sdisp12(0) = 0
@@ -332,8 +340,10 @@ Contains
 			! adjustment for using alltoall vs. alltoallv
 			stemp1 = maxval(self%scount21)
 			rtemp1 = maxval(self%rcount21)
-			self%scount21(:) = max(stemp1,rtemp1)
-			self%rcount21(:) = max(stemp1,rtemp1)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%ccomm)
+			self%scount21(:) = gmax
+			self%rcount21(:) = gmax
 		Endif
 
 		self%sdisp21(0) = 0
@@ -350,7 +360,7 @@ Contains
 
         If (present(piggyback)) Then
             If (piggyback) Then
-					 compute_istop = .true.
+
                 self%do_piggy = .true.
                 ! modify the send and receive sizes for 3b2b
                 np = pfi%rcomm%np
