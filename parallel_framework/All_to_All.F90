@@ -53,7 +53,6 @@ Subroutine D_Transpose_choose_1D(send_buf, recv_buf, send_count, send_displ, rec
     Integer :: MPI_err
 	 Logical, Intent(in) :: normal
 	 If (normal) Then
-		Write(6,*)'Normal alltoall'
    	call MPI_ALLTOALL(send_buf, send_count(1), MPI_DOUBLE_PRECISION, recv_buf, &
          & recv_count(1), MPI_DOUBLE_PRECISION, grp%comm, MPI_err)
 	 Else
