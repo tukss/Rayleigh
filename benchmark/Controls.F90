@@ -4,6 +4,7 @@ Module Controls
 	Real*8 :: Ra, Ek, Pr, Pm
 	Real*8 :: alpha_implicit = 0.5d0
 	Logical :: chebyshev = .false.
+	Logical :: bandsolve = .true.
 	Logical :: magnetism = .false.
 	Logical :: nonlinear = .true.
 	Logical :: Rotation = .false.
@@ -22,5 +23,5 @@ Module Controls
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, Pm,max_iterations, chebyshev, nonlinear, &
 			alpha_implicit, check_frequency, rotation, static_transpose, static_config, &
 			use_parity, test_reduce,magnetism, gpower, lorentz_forces, deriv_cluge, &
-            cflmax, cflmin, Conserve_L, pad_alltoall
+            cflmax, cflmin, Conserve_L, pad_alltoall, bandsolve
 End Module Controls

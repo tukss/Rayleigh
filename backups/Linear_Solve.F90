@@ -11,13 +11,13 @@ Module Linear_Solve
 	Integer, Save, Private :: n_modes_total
 	Integer, Save, Private, Allocatable :: nsub_modes(:)
 
-	Integer, Save, Private :: ndim1, ndim2, n_links, maximum_deriv_order		! Variable used to keep track of linked equations (i.e. WPS)
+	Integer, Save, Private :: ndim1, n_links, maximum_deriv_order		! Variable used to keep track of linked equations (i.e. WPS)
 	
 	real*8, Save, Private :: LHS_time_factor, RHS_time_factor	! Forward and Backward time-weighting of the implicit scheme.
 	real*8, Allocatable :: dfield(:,:,:,:)
 	Logical :: band_solve = .false.
 	Logical, Private :: chebyshev = .false.
-	Real*8, Allocatable, Private :: temp_rhs(:,:,:)
+
 	Type Data_arrays		! support structure for the equation structure
 		real*8, Allocatable :: data(:,:,:)	! dimensioned (r, mode, derivative_order)
 	End Type Data_arrays
@@ -86,9 +86,6 @@ Module Linear_Solve
 	Subroutine Use_Chebyshev()
 		chebyshev = .true.
 	End Subroutine Use_Chebyshev
-	Subroutine Use_BandSolve()
-		band_solve = .true.
-	End Subroutine Use_BandSolve
 
 	Subroutine DeAllocate_Derivatives()
 		Implicit None
@@ -133,10 +130,10 @@ Module Linear_Solve
 
 	!=======================================================
 	!				Initialization Routines
-	Subroutine Initialize_Equation_Set(neq,nvar,ndim,nmode, nsub,nphase)
+	Subroutine Initialize_Equation_Set(neq,nvar,ndim,nmode, nsub)
 		Implicit None
 		Integer, Intent(In) :: neq, nvar, nmode, ndim, nsub(:)
-		Integer :: i,j, nphase
+		Integer :: i,j
 		maximum_deriv_order = 0
 		n_modes = nmode
 		n_modes_total = Sum(nsub)
@@ -145,7 +142,6 @@ Module Linear_Solve
 		n_equations = neq
 		n_vars = nvar
 		ndim1 = ndim
-		ndim2 = nphase
 		Allocate(equation_set(1:n_modes,1:n_equations))
 		Allocate(Implicit_RHS(1:n_equations))
 		Do j = 1, n_equations
@@ -204,26 +200,10 @@ Module Linear_Solve
 
 	Subroutine Reset_Equation_Coefficients()
 		Implicit None
-		Integer :: i, j, k, ndim,link
+		Integer :: i, j, k
 		Do k = 1, n_equations
 			Do j = 1, n_modes
 				If (allocated(equation_set(j,k)%lhs)) equation_set(j,k)%lhs(:,:) = 0.0d0 
-				if (band_solve ) then
-					If (allocated(equation_set(j,k)%lhs) .and. equation_set(1,k)%primary) Then
-						DeAllocate(equation_set(j,k)%lhs)
-						ndim = ndim1*equation_set(j,k)%nlinks
-						Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
-						equation_set(j,k)%lhs(:,:) = 0.0d0
-						equation_set(j,k)%mpointer => equation_set(j,k)%lhs
-						if (equation_set(j,k)%nlinks .gt. 1) Then
-							Do i = 1, equation_set(j,k)%nlinks
-								link = equation_set(j,k)%links(i)
-								equation_set(j,link)%mpointer => equation_set(j,k)%lhs
-							Enddo
-						Endif
-
-					Endif
-				endif
 				Do i = 1, n_vars
 					If(allocated(equation_set(j,k)%coefs(i)%data)) Then
 						equation_set(j,k)%coefs(i)%data(:,:) = 0.0d0
@@ -273,7 +253,7 @@ Module Linear_Solve
 			!/// Allocation
 			If (equation_set(1,k)%primary) Then
 				ndim = ndim1*equation_set(1,k)%nlinks
-				Allocate(equation_set(1,k)%rhs(1:ndim,1:ndim2,1:n_modes_total))
+				Allocate(equation_set(1,k)%rhs(1:ndim,1:2,1:n_modes_total))
 				If(present(zero_rhs)) Then
 					If (zero_rhs .eqv. .true.) Then
 						equation_set(1,k)%rhs(:,:,:) = 0.0d0
@@ -319,36 +299,18 @@ Module Linear_Solve
 	!  Matrix Solve Routine
 	Subroutine Implicit_Solve
 		Implicit None
-		Integer :: i, j, k,maxlink
-		If (band_solve) Then
-			maxlink = 1
-			Do k = 1, n_equations
-				maxlink = max(maxlink,equation_set(1,k)%nlinks)
-			Enddo
-			if (maxlink .gt. 1) Allocate(temp_rhs(1:ndim1*maxlink,1:ndim2,1:n_modes_total))
-		Endif
+		Integer :: i, j, k
 		Do k = 1, n_equations
-			If (band_solve .and. (equation_set(1,k)%nlinks .gt. 1) .and. equation_set(1,k)%primary) Then
-				Call Band_Arrange_RHS(k)
-			Endif
 			Do j = 1, n_modes
 				If (equation_set(j,k)%primary .and. equation_set(j,k)%solvefor) Then
-					If (band_solve) Then
-						
-						Call lu_solve_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%rhs_pointer , Equation_Set(j,k)%Pivot)
+					If (band_solve .eqv. .True.) Then
+						!Call lu_solve_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%RHS , Equation_Set(j,k)%Pivot)
 					Else
 						Call lu_solve_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%rhs_pointer , Equation_Set(j,k)%Pivot)
 					Endif
 				Endif
 			Enddo
-			If (band_solve .and. (equation_set(1,k)%nlinks .gt. 1) .and. equation_set(1,k)%primary) Then
-				Call Band_ReArrange_RHS(k)
-			Endif
 		Enddo
-		If (band_solve) Then
-			if (maxlink .gt. 1) DeAllocate(temp_rhs)
-		Endif
-
 	End Subroutine Implicit_Solve
 	Subroutine LU_Decompose_Matrices()
 		Implicit None
@@ -356,12 +318,7 @@ Module Linear_Solve
 		Do k = 1, n_equations
 			Do j = 1, n_modes
 				If (equation_set(j,k)%primary .and. equation_set(j,k)%solvefor) Then
-					if (band_solve) Then
-
-						Call lu_decompose_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%Pivot)
-					else
-						Call lu_decompose_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%Pivot)
-					Endif
+					Call lu_decompose_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%Pivot)
 				Endif
 			Enddo
 		Enddo
@@ -439,13 +396,13 @@ Module Linear_Solve
 		Do j = 1, n_equations
 			! need to allocate somewhere
 			If (.not. Allocated(Implicit_RHS(j)%data)) Then
-				Allocate(Implicit_RHS(j)%data(1:ndim1,1:ndim2,1:n_modes_total))
+				Allocate(Implicit_RHS(j)%data(1:ndim1,1:2,1:n_modes_total))
 			Endif
 			Implicit_RHS(j)%data = 0.0d0
 		Enddo
 
 		! Allocate the array that will hold each variable and its derivatives
-		Allocate(dfield(1:ndim1,1:ndim2,1:n_modes_total,0:maximum_deriv_order))
+		Allocate(dfield(1:ndim1,1:2,1:n_modes_total,0:maximum_deriv_order))
 
 
 		Do k = 1, n_vars	! Iterate over each variable
@@ -468,7 +425,7 @@ Module Linear_Solve
 
 							nsub = nsub_modes(i)-1
 							Do jj = indx, indx+nsub
-								Do ii = 1, ndim2
+								Do ii = 1, 2
 									Implicit_RHS(j)%data(:,ii,jj) = Implicit_RHS(j)%data(:,ii,jj)+dfield(:,ii,jj,d)*coefs
 								Enddo
 							Enddo
@@ -615,7 +572,7 @@ Module Linear_Solve
 			if (allocated(equation_set(i,eqid)%coefs(varid)%data)) then	! have to do this for now - ugly
 			coefs => equation_set(i,eqid)%coefs(varid)%data(:,dorder)	! might want to restructure how this is stored
 			Do jj = indx, indx+nsub
-				Do ii = 1,ndim2
+				Do ii = 1,2
 					addto(:,ii,jj,eqid) = addto(:,ii,jj,eqid)+dfield(:,ii,jj,dind)*coefs
 					! if we didn't want to use the pointer (worth testing), we could just write this...
 					!addto(:,ii,jj) = addto(:,ii,jj)+dfield(:,ii,jj)*equation_set(i,eqid)%coefs(varid)%data(:,dorder)
@@ -654,7 +611,7 @@ Module Linear_Solve
 			If (dmax .gt. 0) Then
 				Do i = 0, dmax
 					If (.not. Allocated(var_set(varind)%derivs(i)%data)) Then
-						Allocate(var_set(varind)%derivs(i)%data(1:ndim1,1:ndim2,1:n_modes_total))
+						Allocate(var_set(varind)%derivs(i)%data(1:ndim1,1:2,1:n_modes_total))
 					Endif
 						var_set(varind)%derivs(i)%data = dfield(:,:,:,i)
 
@@ -712,53 +669,6 @@ Module Linear_Solve
 	!  Write(6,*)'info : ',info,n
 	End Subroutine LU_Decompose_full
 
-Subroutine LU_Decompose_band(mat, pvt)
-  Real*8, Intent(InOut) :: mat(:,:)
-  Integer, Intent(out) :: pvt(:)
-  Integer :: n, info,ku,kl,lda
-
-  n = Size(mat,2)
-
-  lda = Size(mat,1)
-
-  kl = (lda - 1)/3
-  ku = kl
-
-  Call Dgbtrf(n, n, kl, ku, mat, lda, pvt, info)
-
-End Subroutine LU_Decompose_band
-Subroutine LU_Solve_Band(mat, rhs, pvt, na, nb)
-  Real*8,intent(in) :: mat(:,:)
-  Real*8,Intent(inout) :: rhs(:,:,:)
-  Integer, Intent(in) :: pvt(:)
-  Integer, Optional :: na, nb
-  Integer :: ma, mb, lda, ku, kl,info
-
-  If (Present(na)) Then
-     ma = na
-  Else
-     ma = Size(mat,2)
-  End If
-    
-  If (Present(nb)) Then
-     mb = nb
-  Else
-     mb = Size(rhs)/Size(rhs,1)
-!     mb = Size(rhs)/Size(rhs,3)
-
-  End If
-
-  lda = Size(mat,1)
-  
-  kl = (lda - 1)/3
-  ku = kl
-!  Call dgbtrs('N', ma, kl, ku, mb, mat, lda, pvt, rhs, Size(rhs,3), info)
- 
-  Call dgbtrs('N', ma, kl, ku, mb, mat, lda, pvt, rhs, Size(rhs,1), info)
-
-
-End Subroutine LU_Solve_Band
-
 	Subroutine LU_Solve_full(mat, rhs, pvt, na, nb, dinfo)
 		Real*8,intent(in) :: mat(:,:)
 		Real*8,Intent(inout) :: rhs(:,:,:)
@@ -788,130 +698,6 @@ End Subroutine LU_Solve_Band
 		Endif
 
 End Subroutine LU_Solve_full
-
-Subroutine Band_Arrange(equ,mode)
-		Integer, Intent(In) :: equ, mode
-		Integer :: link,i
-		If (equ .eq. 1) Then
-			Call Band_Load_Single(mode,equ,11)
-		Else
-			Call Band_Load_Single(mode,equ,3)
-		Endif
-
-		
-		equation_set(mode,equ)%mpointer => equation_set(mode,equ)%lhs
-		if (equation_set(mode,equ)%nlinks .gt. 1) Then
-			Do i = 1, equation_set(mode,equ)%nlinks
-				link = equation_set(mode,equ)%links(i)
-				equation_set(mode,link)%mpointer => equation_set(mode,equ)%lhs
-			Enddo
-		Endif
-End Subroutine Band_Arrange
-
-
-Subroutine Band_Arrange_RHS(k)
-	Integer, Intent(In) :: k
-	Integer :: nlinks, i, r,j, nrow,rind
-
-	! Take a normal linked RHS and arrange it so the variables are interleaved
-	nlinks = equation_set(1,k)%nlinks
-	nrow = ndim1*nlinks
-	
-	Do j = 1, n_modes_total
-		Do i = 1, ndim2
-			Do r = 1, nrow
-				temp_rhs(r,i,j) = equation_set(1,k)%rhs(r,i,j)
-			Enddo
-		Enddo
-	Enddo
-	Do r = 1, ndim1
-		rind = nlinks*(r-1)+1
-		Do i = 0, nlinks-1
-			equation_set(1,k)%rhs(rind+i,:,:) = temp_rhs(r+i*ndim1,:,:)
-		Enddo
-	Enddo
-
-
-End Subroutine Band_Arrange_RHS
-
-Subroutine Band_ReArrange_RHS(k)
-	Integer, Intent(In) :: k
-	Integer :: nlinks, i, r, j, nrow,rind
-
-	! Take a normal linked RHS and arrange it so the variables are interleaved
-	nlinks = equation_set(1,k)%nlinks
-	nrow = ndim1*nlinks
-	
-	Do j = 1, n_modes_total
-		Do i = 1, ndim2
-			Do r = 1, nrow
-				temp_rhs(r,i,j) = equation_set(1,k)%rhs(r,i,j)
-			Enddo
-		Enddo
-	Enddo
-	Do r = 1, ndim1
-		rind = nlinks*(r-1)+1
-		Do i = 0, nlinks-1
-			equation_set(1,k)%rhs(r+i*ndim1,:,:) = temp_rhs(rind+i,:,:)
-		Enddo
-	Enddo
-
-
-End Subroutine Band_ReArrange_RHS
-
-
-Subroutine Band_Load_Single(j,k,n_upper)
-		!Equation_set(j,k)%LHS  j is equation, k is mode
-      Real*8, Allocatable :: band_matrix(:,:), temp_rows(:,:)
-      Integer :: r, i, row_diag, lp, rput, iput, N_Rows,j,k
-      Integer :: istart, iend, n_upper, n_lower,nlinks,rind
-		nlinks = equation_set(j,k)%nlinks
-
-		N_rows = ndim1*nlinks
-      n_lower = n_upper
-      row_diag = n_lower+n_upper+1
-      Allocate(band_matrix(2*n_lower+n_upper+1, N_Rows))
-      band_matrix(:,:) = 0.D0
-		
-		if (nlinks .gt. 1) Then
-			! If we want to band solve a linked equation, we have to 
-			! intereave the rows and columns to make it banded
-			Allocate(temp_rows(1:N_Rows,1:N_rows))
-
-			Do r = 1, ndim1	! rows
-				rind = nlinks*(r-1)+1
-				Do i = 0, nlinks-1
-					temp_rows(rind+i,:) = equation_set(j,k)%LHS(r+i*ndim1,:)
-				Enddo
-			Enddo
-			Equation_set(j,k)%LHS(:,:) = temp_rows(:,:)
-
-			Do r = 1, ndim1	! columns
-				rind = nlinks*(r-1)+1
-				Do i = 0, nlinks-1
-					temp_rows(:,rind+i) = equation_set(j,k)%LHS(:,r+i*ndim1)
-				Enddo
-			Enddo
-			Equation_set(j,k)%LHS(:,:) = temp_rows(:,:)
-
-			DeAllocate(temp_rows)
-		Endif
-
-      Do r = 1, N_Rows
-         istart = r-n_lower
-         iend = r+n_upper
-         If (istart .lt. 1) istart = 1
-         If (iend .gt. N_Rows) iend = N_Rows
-         Do i = istart, iend
-            rput = row_diag+(r-i)
-            band_matrix(rput ,i ) = Equation_Set(j,k)%LHS(r,i)
-         Enddo
-      Enddo
-      DeAllocate(Equation_Set(j,k)%LHS)
-      Allocate(Equation_Set(j,k)%LHS(2*n_lower+n_upper+1, N_Rows))
-      Equation_Set(j,k)%LHS(:,:) = band_matrix(:,:)
-      DeAllocate(band_matrix)
-End Subroutine Band_Load_Single
 
 End Module Linear_Solve
 

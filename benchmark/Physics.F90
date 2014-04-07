@@ -1728,7 +1728,7 @@ Contains
 			nvar = 4
 		Endif
 		If (chebyshev) Call Use_Chebyshev()	! Turns chebyshev mode to "on" for the linear solve
-		Call Initialize_Equation_Set(neq,nvar,N_R,my_nl_lm, my_nm_lm)
+		Call Initialize_Equation_Set(neq,nvar,N_R,my_nl_lm, my_nm_lm,2)
 
 		Do lp = 1, my_nl_lm
 			l = my_lm_lval(lp)
@@ -1799,7 +1799,7 @@ Contains
 			Endif
 		Enddo
 		Call Finalize_Equations()	
-
+		If (bandsolve) Call Use_BandSolve()
 		!============================================
 		!  Next decide which derivatives need to be saved.
 		!  This can be either for transposition later (i.e. nonlinear terms),
@@ -1808,14 +1808,14 @@ Contains
 		!  by the user.  The Implicit Module simply places them into memory.  It 
 		!  does not deallocate them.
 
-		Call Set_Deriv_Save(wvar,2)
-		Call Set_Deriv_Save(pvar,0)
-		Call Set_Deriv_Save(tvar,1)
-		Call Set_Deriv_Save(zvar,1)
-		If (magnetism) Then
-			Call Set_Deriv_Save(avar,1)
-			Call Set_Deriv_Save(cvar,2)
-		Endif
+		!Call Set_Deriv_Save(wvar,2)
+		!Call Set_Deriv_Save(pvar,0)
+		!Call Set_Deriv_Save(tvar,1)
+		!Call Set_Deriv_Save(zvar,1)
+		!If (magnetism) Then
+		!	Call Set_Deriv_Save(avar,1)
+		!	Call Set_Deriv_Save(cvar,2)
+		!Endif
 	End Subroutine Initialize_Benchmark_Equations
 
 	Subroutine Compute_Benchmark_Coefficients()
@@ -1981,7 +1981,9 @@ Contains
 				! is to enforce a pressure node at the top.
 				r = 1	
 				Call Load_BC(lp,r,peq,pvar,one,0)
-
+				if (bandsolve) Then
+					Call Band_Arrange(weq,lp)
+				Endif
 
 			Else
 
@@ -2033,7 +2035,10 @@ Contains
 				r = N_R
 				Call Load_BC(lp,r,peq,wvar,one,1)
 				Call Load_BC(lp,r,zeq,zvar,one,0)
-
+				if (bandsolve) Then
+					Call Band_Arrange(weq,lp)
+					Call Band_Arrange(zeq,lp)
+				Endif
 
 				!*******************************************************
 				!		Magnetic Boundary Conditions
@@ -2064,7 +2069,10 @@ Contains
 					Call Load_BC(lp,r,ceq,cvar,one,1)	
 					samp = - (l+1)*One_Over_R(r)
 					Call Load_BC(lp,r,ceq,cvar,samp,0)	
-
+					if (bandsolve) Then
+						Call Band_Arrange(aeq,lp)
+						Call Band_Arrange(ceq,lp)
+					Endif
 				Endif	! Magnetism
 
 

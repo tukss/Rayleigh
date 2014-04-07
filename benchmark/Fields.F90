@@ -61,7 +61,7 @@ Module Fields
 	Integer :: wsfcount(3,2)
 	Real*8, Allocatable :: ABsave(:,:,:,:) !  Have to think about where to do this
 	! Type(rmcontainer) :: ABSave(:)			! Might be most natural to keep this in rlm space
-	Type(SphericalBuffer) :: wsp,ctemp  ! workspace
+	Type(SphericalBuffer) :: wsp ! Primary workspace for the entire run
 
 Contains
 

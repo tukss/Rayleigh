@@ -20,7 +20,7 @@ LIBFLAGS = -mkl -I$(MKLROOT)/include/fftw
 
 $LIBFLAGS = -L/home3/feathern/FFTW3/lib/ -lfftw3 -lm -lc 
 F90FLAGS = -r8 -O0 -CB -g -traceback -fpp -FR -check all -I$(FFTWINC)
-F90FLAGS = -r8 -O3 -xSSE4.2 -fpp -FR -I$(FFTWINC)
+##F90FLAGS = -r8 -O3 -xSSE4.2 -fpp -FR -I$(FFTWINC)
 PROG =	pseudo
 
 .SUFFIXES: .o .F90 .f .F
@@ -34,7 +34,9 @@ PFOBJ = MPI_Base.o All_to_All.o SendReceive.o ISendReceive.o General_MPI.o MPI_L
 MOBJ  = Timing.o Finite_Difference.o Chebyshev_Polynomials.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o \
 	Fourier_Transform.o Spectral_Derivatives.o
 IOOBJ = Spherical_IO.o
-POBJ  = Controls.o ProblemSize.o Fields.o Timers.o Checkpointing.o Initial_Conditions.o Diagnostics.o BoundaryConditions.o Physics.o
+POBJ  = Run_Parameters.o Controls.o ProblemSize.o Fields.o Timers.o Checkpointing.o Initial_Conditions.o Diagnostics.o BoundaryConditions.o \
+	ClockInfo.o Linear_Terms_Sphere.o Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
+##Physics.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
 MAINOBJ = Input.o Main.o
 

@@ -4,10 +4,13 @@ Program Main
 	Use Parallel_Framework
 	Use ProblemSize
 	Use Input
-	Use Physics
+	!Use Physics
 	Use Diagnostics
 	Use TestSuite
 	Use Checkpointing
+
+	Use Linear_Terms_Sphere
+	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Implicit None
 
 	Call Main_Input()
@@ -19,7 +22,8 @@ Program Main
 	Else
 		Call Main_Initialization()
 
-	  	Call Main_Loop()
+	  	!Call Main_Loop()
+		Call Main_Loop_Sphere()
 	Endif
 	Call Finalization()
 Contains
