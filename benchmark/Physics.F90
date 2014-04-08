@@ -33,7 +33,7 @@ Module Physics
 	Logical :: new_timestep = .true.
 	Real*8  :: new_deltat, deltat, old_deltat
 	Real*8  :: min_dt_change = 0.1d0
-	Real*8  :: max_time_step = 5.0d-4
+	!Real*8  :: max_time_step = 5.0d-4
 	Real*8  :: min_time_step = 1.0d-13
 
 

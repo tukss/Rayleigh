@@ -20,8 +20,9 @@ Module Controls
     Logical :: Conserve_L = .false.
 	Logical :: pad_alltoall = .false.
     Real*8  :: cflmax = 0.1d0, cflmin = 0.05d0
+	Real*8 :: max_time_step = 5.0d-4
 	Namelist /Controls_Namelist/ Ra, Ek, Pr, Pm,max_iterations, chebyshev, nonlinear, &
 			alpha_implicit, check_frequency, rotation, static_transpose, static_config, &
 			use_parity, test_reduce,magnetism, gpower, lorentz_forces, deriv_cluge, &
-            cflmax, cflmin, Conserve_L, pad_alltoall, bandsolve
+            cflmax, cflmin, Conserve_L, pad_alltoall, bandsolve, max_time_step
 End Module Controls
