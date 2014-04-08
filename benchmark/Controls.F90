@@ -4,7 +4,7 @@ Module Controls
 	Real*8 :: Ra, Ek, Pr, Pm
 	Real*8 :: alpha_implicit = 0.5d0
 	Logical :: chebyshev = .false.
-	Logical :: bandsolve = .true.
+	Logical :: bandsolve = .false.
 	Logical :: magnetism = .false.
 	Logical :: nonlinear = .true.
 	Logical :: Rotation = .false.
