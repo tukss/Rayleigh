@@ -1,6 +1,6 @@
 Module ClockInfo
-	Implicit None
 	Use Controls, Only : max_time_step
+	Implicit None
 	Logical :: new_timestep = .true.
 	Real*8  :: new_deltat, deltat, old_deltat
 	Real*8  :: min_dt_change = 0.1d0
