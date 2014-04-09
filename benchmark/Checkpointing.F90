@@ -3,18 +3,19 @@ Module Checkpointing
 	Use Parallel_Framework
 	Use Linear_Solve, Only : get_all_rhs
 	Use SendReceive
+	Use Controls
 	Use MPI_BASE
 	! Simple Checkpointing Module
 	! Uses MPI-IO to split writing of files amongst rank zero processes from each row
 	Implicit None
 	Type(SphericalBuffer) :: chktmp
-	Integer, private :: numfields = 4 ! 6 for hydro
+	Integer, private :: numfields = 4 ! 6 for MHD
 	Integer,private,Allocatable :: mode_count(:)
 	Integer,private :: nlm_total, checkpoint_tag = 425
 	Integer, Allocatable, Private :: lmstart(:)
 	Integer, Private :: my_check_disp, buffsize, full_disp		! for writing checkpoints
 	Integer, Private :: my_in_disp, buffsize_in, full_in_disp		! for reading checkpoints
-	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z'
+	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z', achar = 'A', cchar = 'C'
 	Integer :: checkpoint_iter = 0
 	Real*8 :: checkpoint_dt, checkpoint_newdt
 Contains
@@ -23,6 +24,9 @@ Contains
 		Implicit None
 		Integer :: nfs(6)
 		Integer :: p, np, nl, m, mp
+		if (magnetism) Then
+			numfields = 6
+		Endif
 		nfs(:) = numfields*2
 		Call chktmp%init(field_count = nfs, config = 'p1a')			! This structure hangs around through the entire run
 
@@ -68,7 +72,7 @@ Contains
 		Real*8, Intent(In) :: dt, new_dt
 		Integer, Intent(In) :: iteration
 		Integer :: mp, m, nm,nmodes, offset,nl,p,np
-		Integer :: dim2, lstart, i
+		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
 		Character*8 :: iterstring
 		Character*120 :: cfile
@@ -132,12 +136,21 @@ Contains
 				Call Write_Field(rowstrip,2,pchar, iteration)
 				Call Write_Field(rowstrip,3,tchar, iteration)
 				Call Write_Field(rowstrip,4,zchar, iteration)
+				offset_index = 4
+				If (magnetism) Then
+					Call Write_Field(rowstrip,5,cchar, iteration)
+					Call Write_Field(rowstrip,6,achar, iteration)
+					offset_index = 6
+				Endif
 
-				Call Write_Field(rowstrip,5,'WAB', iteration)
-				Call Write_Field(rowstrip,6,'PAB', iteration)
-				Call Write_Field(rowstrip,7,'TAB', iteration)
-				Call Write_Field(rowstrip,8,'ZAB', iteration)
-
+				Call Write_Field(rowstrip,offset_index+1,'WAB', iteration)
+				Call Write_Field(rowstrip,offset_index+2,'PAB', iteration)
+				Call Write_Field(rowstrip,offset_index+3,'TAB', iteration)
+				Call Write_Field(rowstrip,offset_index+4,'ZAB', iteration)
+				If (magnetism) Then
+					Call Write_Field(rowstrip,offset_index+5,'CAB', iteration)
+					Call Write_Field(rowstrip,offset_index+6,'AAB', iteration)
+				Endif
             DeAllocate(rowstrip)
 				If (my_column_rank .eq. 0) Then
 					! row/column 0 writes out a file with the grid, etc.
@@ -165,7 +178,7 @@ Contains
 		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
 		Integer :: n_r_old, l_max_old, grid_type_old, nr_read
 		Integer :: i, ierr, nlm_total_old, m, nl,p, np, mxread
-		Integer :: maxl, dim2,offset, nl_load,lstart,mp
+		Integer :: maxl, dim2,offset, nl_load,lstart,mp, offset_index
 		Integer :: old_pars(3)
 		Integer, Allocatable :: lmstart_old(:)
 		Real*8, Allocatable :: old_radius(:)
@@ -279,11 +292,21 @@ Contains
 			Call Read_Field(rowstrip,2,pchar, iteration)
 			Call Read_Field(rowstrip,3,tchar, iteration)
 			Call Read_Field(rowstrip,4,zchar, iteration)
+			offset_index = 4
+			If (magnetism) Then
+				Call Read_Field(rowstrip,5,cchar, iteration)
+				Call Read_Field(rowstrip,6,achar, iteration)
+				offset_index = 6
+			Endif
 
-			Call Read_Field(rowstrip,5,'WAB', iteration)
-			Call Read_Field(rowstrip,6,'PAB', iteration)
-			Call Read_Field(rowstrip,7,'TAB', iteration)
-			Call Read_Field(rowstrip,8,'ZAB', iteration)			
+			Call Read_Field(rowstrip,offset_index+1,'WAB', iteration)
+			Call Read_Field(rowstrip,offset_index+2,'PAB', iteration)
+			Call Read_Field(rowstrip,offset_index+3,'TAB', iteration)
+			Call Read_Field(rowstrip,offset_index+4,'ZAB', iteration)			
+			If (magnetism) Then
+				Call Read_Field(rowstrip,offset_index+5,'CAB', iteration)
+				Call Read_Field(rowstrip,offset_index+6,'AAB', iteration)
+			Endif
 
 			! Now the head of each row owns all modes of each field at the
 			! radii owned by that row.  The different modes now need to be 

@@ -310,67 +310,6 @@ End Subroutine Test_simple_dgemm2
 
 
 
-Subroutine Time_MatMult(sz,ntimes)
-	Implicit None
-	Real*8, Allocatable :: a(:,:), b(:,:), c(:,:)
-	Integer, Intent(in) :: sz, ntimes
-	Integer :: m, n, k, i,j
-	Real*8 :: alpha, beta, delta
-    Real*4 :: t1
-
-
-	m = sz
-	n = sz
-	k = sz
-	Allocate(a(1:sz,1:sz))
-	Allocate(b(1:sz,1:sz))
-	Allocate(c(1:sz,1:sz))
-
-	Do i = 1, sz
-		Do j = 1, sz
-			a(i,j) = i+j
-			b(i,j) = i-j
-		Enddo
-	Enddo
-	c(:,:) = 0.0d0
-
-	alpha = 1.0d0
-	beta = 0.0d0
-	Write(6,*)'Ntimes = ', ntimes
-	t1=secnds(0.0)
-	do i = 1, ntimes
-		CALL DGEMM('T','N',m,n,k, alpha, a, m, b, k, beta,c,m)
-	enddo
-	delta = secnds(t1)
-	Write(6,*)'T N time: ', delta
-
-	t1=secnds(0.0)
-	do i = 1, ntimes
-		CALL DGEMM('T','T',m,n,k, alpha, a, m, b, k, beta,c,m)
-	enddo
-	delta = secnds(t1)
-	Write(6,*)'T T time: ', delta
-
-	t1=secnds(0.0)
-	do i = 1, ntimes
-		CALL DGEMM('N','T',m,n,k, alpha, a, m, b, k, beta,c,m)
-	enddo
-	delta = secnds(t1)
-	Write(6,*)'N T time: ', delta
-
-	t1=secnds(0.0)
-	do i = 1, ntimes
-		CALL DGEMM('N','N',m,n,k, alpha, a, m, b, k, beta,c,m)
-	enddo
-	delta = secnds(t1)
-	Write(6,*)'N N time: ', delta
-
-
-	DeAllocate(a,b,c)
-
-
-
-End Subroutine Time_MatMult
 
 
 

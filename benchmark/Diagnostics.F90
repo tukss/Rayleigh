@@ -67,20 +67,20 @@ Contains
 
 			If (compute_q(v_r) .ne. 0) Then
 				
-				qty(:,:,:) = buffer(:,:,:,vr)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
 				!write(6,*)'Computing vr ', maxval(qty)
 				Call Add_Quantity(v_r,qty)
 			Endif		
 
 			If (compute_q(v_theta) .ne. 0) Then
 				
-				qty(:,:,:) = buffer(:,:,:,vtheta)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)
 				Call Add_Quantity(v_theta,qty)
 			Endif		
 
 			If (compute_q(v_phi) .ne. 0) Then
 				
-				qty(:,:,:) = buffer(:,:,:,vphi)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)
 				Call Add_Quantity(v_phi,qty)
 			Endif	
 
@@ -99,9 +99,9 @@ Contains
 			Endif		
 
 			If (compute_q(v_sq) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,vphi)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vr)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,vtheta)**2
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
 				Call Add_Quantity(v_sq,qty)
 			Endif	
 
@@ -134,40 +134,40 @@ Contains
 			If (magnetism) Then
 			!//////////////////// Magnetic Quantities
 			If (compute_q(B_r) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,br)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)
 				Call Add_Quantity(B_r,qty)
 			Endif		
 
 			If (compute_q(B_theta) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,btheta)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)
 				Call Add_Quantity(b_theta,qty)
 			Endif		
 
 			If (compute_q(b_phi) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,bphi)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)
 				Call Add_Quantity(b_phi,qty)
 			Endif	
 
 
 			If (compute_q(J_r) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,jr)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jr)
 				Call Add_Quantity(J_r,qty)
 			Endif		
 
 			If (compute_q(J_theta) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,jtheta)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jtheta)
 				Call Add_Quantity(j_theta,qty)
 			Endif		
 
 			If (compute_q(j_phi) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,jphi)
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jphi)
 				Call Add_Quantity(j_phi,qty)
 			Endif	
 
 			If (compute_q(b_sq) .ne. 0) Then
-				qty(:,:,:) = buffer(:,:,:,bphi)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,br)**2
-				qty(:,:,:) = qty(:,:,:)+buffer(:,:,:,btheta)**2
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2
 				Call Add_Quantity(b_sq,qty)
 			Endif	
 
