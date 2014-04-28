@@ -3,7 +3,7 @@ Module ProblemSize
 	Use Finite_Difference, Only  : Initialize_Derivatives
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
-	Use Controls, Only : Chebyshev, use_parity
+	Use Controls, Only : Chebyshev, use_parity, read_argv
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev
 	Implicit None
 
@@ -32,16 +32,16 @@ Module ProblemSize
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:)
 	Type(Load_Config)   :: my_r
 
-	Namelist /ProblemSize_Namelist/ n_r,n_theta, ncpu, nprow, npcol,rmin,rmax
+	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax
 Contains
 
 	Subroutine Init_ProblemSize()
 		Implicit None
 		Integer :: ppars(1:10)
-		Integer :: tmp,r, l
+		Integer :: tmp,r, l, i, ii
 		Integer, Allocatable :: m_vals(:)
 		Real*8 :: ell
-		
+		Character*10 :: arg, arg2
 		rmin = (7.0d0)/13.0d0		! benchmark cluge
 		rmax = (20.0d0)/13.0d0
 
@@ -63,7 +63,34 @@ Contains
 			l_l_plus1(l) = ell*(ell+1)
 			if (l .ne. 0) over_l_l_plus1(l) = 1.0d0/l_l_plus1(l)
 		Enddo
+		!///////////////////////////////////////
+		!  Check the command line to see if 
+		!  any processor counts were specified.
+		!  If so, these counts overwrite values
+		!  read in through main input 
 		
+		!If (read_argv) Then
+			i = 1
+			DO
+	      	CALL get_command_argument(i, arg)
+	         IF (LEN_TRIM(arg) == 0) EXIT
+
+				arg2 = TRIM(AdjustL(arg))
+				If (arg .eq. '-nprow') then
+					CALL get_command_argument(i+1, arg)
+					arg2 = TRIM(AdjustL(arg))
+			      Read (arg2,*) nprow
+				Endif
+				If (arg .eq. '-npcol') Then
+					CALL get_command_argument(i+1, arg)
+					arg2 = TRIM(AdjustL(arg))
+			      Read (arg2,*) npcol
+				Endif
+	      	i = i+1
+				
+	      END DO
+		!Endif		
+		ncpu = nprow*npcol
 		!///////////////////////////////////////
 		! Initialize load balancing
 		ppars(1) = Spherical

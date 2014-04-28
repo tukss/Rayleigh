@@ -1176,9 +1176,15 @@ Contains
 		Endif
 		self%gcomm = init_main_group(error)
 		if (self%gcomm%np .ne. self%npe) Then
-			Write(6,*)'Error np does not agree with number of processes.'
-			Write(6,*)'gcomm np : ', self%gcomm%np
-			Write(6,*)'specified np : ', self%npe
+			If (self%gcomm%rank .eq. 0) Then
+				Write(6,*)'Error np does not agree with number of processes.'
+				Write(6,*)'NCPU from MPI   : ', self%gcomm%np
+				Write(6,*)'Specified ncpu  : ', self%npe
+				Write(6,*)'Specified nprow : ', self%nprow
+				Write(6,*)'Specified npcol : ', self%npcol
+				Write(6,*)'Exiting...'
+			Endif
+			Call self%exit()
 		Endif
 
 		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,self%npcol,error)
@@ -1239,7 +1245,7 @@ Contains
 		Class(Parallel_Interface) :: self
 		Integer :: error
 		Call Exit_Comm_Lib(error)	
-		
+		STOP
 	End Subroutine Finalize_Framework
 
 End Module Parallel_Framework
