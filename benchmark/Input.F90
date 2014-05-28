@@ -1,6 +1,6 @@
 Module Input
 	Use ProblemSize,  Only : problemsize_namelist, nprow, npcol, n_r,n_theta
-	Use Controls,     Only : controls_namelist, max_iterations
+	Use Controls,     Only : controls_namelist, max_iterations, pad_alltoall
 	Use Spherical_IO, Only : output_namelist
 	Use BoundaryConditions, Only : boundary_conditions_namelist
 	Use Initial_Conditions, Only : initial_conditions_namelist
@@ -31,7 +31,7 @@ Contains
 			! Specified values overwrite namelist inputs.
 			Implicit None
 			Character*10 :: arg, arg2
-			Integer :: i
+			Integer :: i, itemp
 			i = 1
 			DO
 	      	CALL get_command_argument(i, arg)
@@ -62,6 +62,16 @@ Contains
 					CALL get_command_argument(i+1, arg)
 					arg2 = TRIM(AdjustL(arg))
 			      Read (arg2,*) n_theta
+				Endif
+				If (arg .eq. '-pata') Then
+					CALL get_command_argument(i+1, arg)
+					arg2 = TRIM(AdjustL(arg))
+			      Read (arg2,*) itemp
+					if (itemp .eq. 1) then
+						pad_alltoall = .true.
+					else
+						pad_alltoall = .false.
+					endif
 				Endif
 	      	i = i+1
 				
