@@ -69,27 +69,7 @@ Contains
 		!  If so, these counts overwrite values
 		!  read in through main input 
 		
-		!If (read_argv) Then
-			i = 1
-			DO
-	      	CALL get_command_argument(i, arg)
-	         IF (LEN_TRIM(arg) == 0) EXIT
-
-				arg2 = TRIM(AdjustL(arg))
-				If (arg .eq. '-nprow') then
-					CALL get_command_argument(i+1, arg)
-					arg2 = TRIM(AdjustL(arg))
-			      Read (arg2,*) nprow
-				Endif
-				If (arg .eq. '-npcol') Then
-					CALL get_command_argument(i+1, arg)
-					arg2 = TRIM(AdjustL(arg))
-			      Read (arg2,*) npcol
-				Endif
-	      	i = i+1
-				
-	      END DO
-		!Endif		
+		
 		ncpu = nprow*npcol
 		!///////////////////////////////////////
 		! Initialize load balancing
