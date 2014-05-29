@@ -105,6 +105,26 @@ Contains
          Write(15)(row_ranks,i=1,np)
 			Write(15)((alltimes(i,j),i=1,ntimers),j=1,np)
          Close(15)
+
+			write(nr_string,'(i4.4)') nr_in
+			write(lmax_string,'(i4.4)') lmax_in
+			write(row_string,'(i4.4)') rownp
+			write(col_string,'(i4.4)') colnp
+			timing_file = 'Timings/Slmax'//TRIM(lmax_string)//'_nr'//TRIM(nr_string)//'_ncol'//TRIM(col_string)
+			timing_file = TRIM(timing_file)//'_nrow'//TRIM(row_string)
+         Open(unit=15,file=timing_file,status='replace', ACCESS="STREAM")
+         Write(15)colnp
+			Write(15)rownp
+			Write(15)ntimers
+			Write(15)nr_in
+			Write(15)lmax_in
+			Write(15)niter
+         Write(15)(column_ranks(i),i=1,np)
+         Write(15)(row_ranks,i=1,np)
+			Write(15)((alltimes(i,j),i=1,ntimers),j=1,np)
+         Close(15)
+
+
 			DeAllocate(column_ranks,row_ranks,alltimes)
 		Endif
 
