@@ -1,5 +1,9 @@
-PRO READ_TIME, file, res
-	openu,13,file, /f77_unformatted
+PRO READ_TIME, file, res, swap = swap
+	if (keyword_set(swap)) THEN BEGIN
+		openu,13,file, /swap_if_little_endian
+	ENDIF ELSE BEGIN
+		openu,13,file
+	ENDELSE
 	ncol = 0L
 	nrow = 0L
 	ntimers = 0L
