@@ -24,8 +24,9 @@ Module Legendre_Polynomials
 		Real*16, Allocatable :: data(:,:)
 	End Type p_lm_array_quad
 
-	Type(p_lm_array_quad), Allocatable :: p_lm(:), ip_lm(:)
-	Type(p_lm_array), Allocatable :: p_lm_odd(:), p_lm_even(:), p_lm_eo(:) 
+	Type(p_lm_array_quad), Allocatable :: p_lmq(:) 
+    Type(p_lm_array), Allocatable :: p_lm(:), ip_lm(:)
+	Type(p_lm_array), Allocatable :: p_lm_odd(:), p_lm_even(:)
 	Type(p_lm_array), Allocatable :: ip_lm_odd(:), ip_lm_even(:) ! i means 'integration weights included'
 	Type(even_odd_sep), Allocatable :: lvals(:)
 Contains
@@ -119,22 +120,11 @@ Subroutine Compute_Plms()
 	! And also l_max.  This is sufficient to initialize the legendre polynomials
 	Implicit None
 	Real*16 :: coloc_min,coloc_max, x,tmp,factorial_ratio,amp, renorm
-	Integer :: i, m, l, report_unit, max_l_test, mv, msp(1)
+	Integer :: i, m, l, report_unit, max_l_test, mv, msp(1), ntmax
 	Logical :: write_legendre
 	Character*120 :: report_file = 'ylms'
 
-	!If (.not. present(m_known)) Then
-	!	l_max = n_theta-1
-	!	l_max = 2
-	!	n_m = (l_max+1)/m_mod
-	!	Allocate(m_values(1:n_m))
-	!	Allocate(n_l(1:n_m))
-	!	m_values(1) = 0
-	!	Do i = 2,n_m
-	!		m_values(i) = m_values(i-1)+m_mod
-	!	Enddo
-	!Endif
-	!Colocation points seem to be correct - verified quickly against ASH
+
 	n_m = size(m_values)
 	
 	Allocate(n_l(1:n_m))
@@ -143,105 +133,111 @@ Subroutine Compute_Plms()
 	! Forget about de-aliasing right now
 
 	Allocate(p_lm(1:n_m))
+    Allocate(p_lmq(1:n_m))
 	Allocate(ip_lm(1:n_m))
-	Do i = 1, n_m
-		n_l(i) = l_max-m_values(i)+1
-		Allocate(ip_lm(i)%data(1:n_theta,m_values(i):l_max))
-		Allocate(p_lm(i)%data(m_values(i):l_max,1:n_theta))
-	Enddo
 
-	! Next, fill in the l = m pieces (closed form expression)
-	!  and the l = m+1 pieces
-	factorial_ratio = 1.0q0
+    ntmax = n_theta
+    If (parity) Then
+	    Allocate(p_lm_odd(1:n_m))
+	    Allocate(p_lm_even(1:n_m))
+	    Allocate(ip_lm_odd(1:n_m))
+	    Allocate(ip_lm_even(1:n_m))
+	    Allocate(n_l_even(1:n_m))
+	    Allocate(n_l_odd(1:n_m))
+	    Allocate(lvals(1:n_m))
+        ntmax = n_theta/2
+    Endif
+
+
+    ! Compute P_lm(theta) for all l's at each m
+    ! Calculation is done in quad precision.  Storage is done in double.
+    ! One m at a time to save memory
+
 	Do m = 1, n_m
+		n_l(m) = l_max-m_values(m)+1
+		Allocate(p_lmq(m)%data(1:ntmax,m_values(m):l_max))
+
+
+
+
+	! First, fill in the l = m pieces (closed form expression)
+	! and the l = m+1 pieces
+	factorial_ratio = 1.0q0
+
 		mv = m_values(m)
 		Call compute_factorial_ratio(mv,factorial_ratio)
 		amp = ((mv+0.5q0)/(2.0q0*pi))**0.5q0		
 		amp = amp*factorial_ratio
-		Do i = 1, n_theta
+		Do i = 1, ntmax
 			x = coloc(i)
 			tmp = 1.0q0-x*x
 			
 			If (mod(mv,2) .eq. 1) Then
 				!odd m
-				ip_lm(m)%data(i,mv) = -amp*tmp**(mv/2+0.5q0)
+				p_lmq(m)%data(i,mv) = -amp*tmp**(mv/2+0.5q0)
 			Else
 				!even m
-				ip_lm(m)%data(i,mv) = amp*tmp**(mv/2)
+				p_lmq(m)%data(i,mv) = amp*tmp**(mv/2)
 			Endif
 			If (mv .lt. l_max) then
-				ip_lm(m)%data(i,mv+1) = ip_lm(m)%data(i,mv)*x*(2.0q0*mv+3)**0.5q0
+				p_lmq(m)%data(i,mv+1) = p_lmq(m)%data(i,mv)*x*(2.0q0*mv+3)**0.5q0
 			Endif
 		Enddo
 
-	Enddo
 
-
-
-
-	!General recursion for the rest
-	! Not terribly efficient, but the idea is to do this once at init (for now)
-	!write(6,*)'Computing higher order polynomials'
-	Do m = 1, n_m
-		mv = m_values(m)
-		
+    	!General recursion for l > m+1
+		mv = m_values(m)		
 		Do l = mv+2, l_max		
-			Do i = 1, n_theta
+			Do i = 1, ntmax
 				x = coloc(i)
 				amp = (l-1)**2-mv*mv
 				amp = amp/ (4.0q0*(l-1)**2-1.0q0)
 				amp = amp**0.5q0
-				tmp = ip_lm(m)%data(i,l-1)*x-amp*ip_lm(m)%data(i,l-2)
+				tmp = p_lmq(m)%data(i,l-1)*x-amp*p_lmq(m)%data(i,l-2)
 				amp = (4.0q0*l*l-1.0q0)/(l*l-mv*mv)
-				ip_lm(m)%data(i,l) = tmp*amp**0.5q0
+				p_lmq(m)%data(i,l) = tmp*amp**0.5q0
 			Enddo
 		Enddo
-	Enddo
 
-	!Next, add normalization + fill in non-normalized arrays
-	Do m = 1, n_m
-		mv = m_values(m)
-		Do l = mv, l_max
-			Do i = 1, n_theta
-				renorm = 2.0q0*pi*gl_weights(i)
-				p_lm(m)%data(l,i)  = ip_lm(m)%data(i,l)
-				ip_lm(m)%data(i,l) = ip_lm(m)%data(i,l)*renorm
-			Enddo
-		Enddo
-	Enddo
+	    If (parity) Then
+		    Call parity_resort(m)
+	    Else
+            !Fill in double precision arrays
+            ! Add normalization for integration
+            Allocate(ip_lm(m)%data(1:ntmax,m_values(m):l_max))
+            Allocate(p_lm(m)%data(m_values(m):l_max,1:ntmax))
+		    mv = m_values(m)
+		    Do l = mv, l_max
+			    Do i = 1, ntmax
+				    
+				    p_lm(m)%data(l,i)  = p_lmq(m)%data(i,l)
+                    renorm = 2.0q0*pi*gl_weights(i)
+                    tmp = p_lmq(m)%data(i,l)*renorm
+				    ip_lm(m)%data(i,l) = tmp
+			    Enddo
+		    Enddo
+        Endif
+        DeAllocate(p_lmq(m)%data)
 
-	If (parity) Then
-		Call parity_resort()
-	Endif
+    Enddo 
+    ! DeAllocate data structures that will no longer be used.
+    ! "data" attributes have already been deallocated.
+    DeAllocate(p_lmq)
+    If (parity) Then
+        DeAllocate(p_lm)
+        DeAllocate(ip_lm)
+    Endif    
 
-
-	report_unit = 55
-	max_l_test = 2
-	!Open(unit=report_unit,file = report_file,form='unformatted',status='replace')
-	!Write(report_unit)max_l_test
-	!Write(report_unit)n_theta
-	!Write(report_unit)(acos(coloc(i)),i = 1, n_theta)
-	!Do l = 0, l_max
-	!	Do m = 0, l
-	!		Write(report_unit) (p_lm(m)%data(i,l),i = 1, n_theta)
-	!	Enddo
-	!Enddo
-	!Write(report_unit)(acos(gl_weights(i)),i = 1, n_theta)
-	!Close(report_unit)
 End Subroutine Compute_Plms
 
-Subroutine Parity_Resort()
+Subroutine Parity_Resort(m)
 	Implicit None
-	Integer :: m, l, indeven, indodd,partest
+    Integer, Intent(In) :: m
+	Integer :: l, indeven, indodd,partest, i
+    Real*16 :: renorm, tmp
 	! Resort the p_lms into even and odd arrays
-	Allocate(p_lm_odd(1:n_m))
-	Allocate(p_lm_even(1:n_m))
-	Allocate(ip_lm_odd(1:n_m))
-	Allocate(ip_lm_even(1:n_m))
-	Allocate(n_l_even(1:n_m))
-	Allocate(n_l_odd(1:n_m))
-	Allocate(lvals(1:n_m))
-	Do m = 1, n_m
+
+
 		n_l_even(m) = 0
 		n_l_odd(m) = 0
 		Do l = m_values(m), l_max
@@ -270,19 +266,27 @@ Subroutine Parity_Resort()
 			partest = l-m_values(m)
 			If (Mod(partest,2) .eq. 1) Then
 				lvals(m)%odd(indodd) = l
-				ip_lm_odd(m)%data(1:n_theta/2,indodd) = ip_lm(m)%data(1:n_theta/2,l)
-				p_lm_odd(m)%data(indodd,1:n_theta/2) = p_lm(m)%data(l,1:n_theta/2)
+                Do i = 1, n_theta/2
+                    renorm = 2.0q0*pi*gl_weights(i)
+                    tmp = p_lmq(m)%data(i,l)*renorm
+				    ip_lm_odd(m)%data(i,indodd) = tmp
+				    p_lm_odd(m)%data(indodd,i) = p_lmq(m)%data(i,l)
+                Enddo
 				indodd = indodd +1
-
+                
 			Else
 				lvals(m)%even(indeven) = l
-				ip_lm_even(m)%data(1:n_theta/2,indeven) = ip_lm(m)%data(1:n_theta/2,l)
-				p_lm_even(m)%data(indeven,1:n_theta/2) =   p_lm(m)%data(l,1:n_theta/2)
+                Do i = 1, n_theta/2
+                    renorm = 2.0q0*pi*gl_weights(i)
+                    tmp = p_lmq(m)%data(i,l)*renorm
+    				ip_lm_even(m)%data(i,indeven) = tmp
+    				p_lm_even(m)%data(indeven,i) =   p_lmq(m)%data(i,l)
+                Enddo
 				indeven = indeven+1
 			Endif
 		Enddo
 
-	Enddo
+
 
 End Subroutine Parity_Resort
 Subroutine Find_Colocation(x1,x2,abscissas, weights, order_n)

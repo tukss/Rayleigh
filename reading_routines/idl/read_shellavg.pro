@@ -1,8 +1,13 @@
-PRO READ_SHELLAVG, file, res
+PRO READ_SHELLAVG, file, res, SWAP = swap
 	time = 0.0d0
 	dims = lonarr(2)
 	CLOSE, 13
-	OPENR, 13, file, /f77_unformatted
+	IF (KEYWORD_SET(SWAP)) THEN BEGIN
+		OPENR, 13, file, /f77_unformatted, /swap_if_little_endian
+	ENDIF ELSE BEGIN
+		OPENR, 13, file, /f77_unformatted
+	ENDELSE
+
 	READU,13, dims
 	nr = dims[0]
 	nq = dims[1]
