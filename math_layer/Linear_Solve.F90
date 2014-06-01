@@ -212,15 +212,15 @@ Module Linear_Solve
 					If (allocated(equation_set(j,k)%lhs) .and. equation_set(1,k)%primary) Then
 						DeAllocate(equation_set(j,k)%lhs)
 						ndim = ndim1*equation_set(j,k)%nlinks
-						Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
-						equation_set(j,k)%lhs(:,:) = 0.0d0
-						equation_set(j,k)%mpointer => equation_set(j,k)%lhs
-						if (equation_set(j,k)%nlinks .gt. 1) Then
-							Do i = 1, equation_set(j,k)%nlinks
-								link = equation_set(j,k)%links(i)
-								equation_set(j,link)%mpointer => equation_set(j,k)%lhs
-							Enddo
-						Endif
+						!Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
+						!equation_set(j,k)%lhs(:,:) = 0.0d0
+						!equation_set(j,k)%mpointer => equation_set(j,k)%lhs
+						!if (equation_set(j,k)%nlinks .gt. 1) Then
+						!	Do i = 1, equation_set(j,k)%nlinks
+						!		link = equation_set(j,k)%links(i)
+						!		equation_set(j,link)%mpointer => equation_set(j,k)%lhs
+						!	Enddo
+						!Endif
 
 					Endif
 				endif
@@ -239,26 +239,54 @@ Module Linear_Solve
 	
 		! Check to see if each equation's matrix has already been allocated.
 		! If not, allocate it.  Account for linked equations.
-		Do k = 1, n_equations
 
-			Do j = 1, n_modes
-				If (equation_set(j,k)%primary) Then
-					ndim = ndim1*equation_set(j,k)%nlinks
-					Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
-					Allocate(equation_set(j,k)%pivot(1:ndim))
-					equation_set(j,k)%mpointer => equation_set(j,k)%lhs
-				Else
-					ind = equation_set(j,k)%links(1)
-					equation_set(j,k)%mpointer => equation_set(j,ind)%lhs
-				Endif
-			Enddo
-		Enddo
+		!Do k = 1, n_equations
+
+		!	Do j = 1, n_modes
+		!		If (equation_set(j,k)%primary) Then
+		!			ndim = ndim1*equation_set(j,k)%nlinks
+		!			Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
+		!			Allocate(equation_set(j,k)%pivot(1:ndim))
+		!			equation_set(j,k)%mpointer => equation_set(j,k)%lhs
+		!		Else
+		!			ind = equation_set(j,k)%links(1)
+		!			equation_set(j,k)%mpointer => equation_set(j,ind)%lhs
+		!		Endif
+		!	Enddo
+		!Enddo
 		Do k = 1, n_vars
 			j = var_set(k)%max_dorder
 			Allocate(var_set(k)%in_equation(1:n_modes,1:n_equations,0:j))
 			var_set(k)%in_equation(:,:,:) = .false.
 		Enddo
 	End Subroutine Finalize_Equations
+
+	Subroutine Allocate_LHS(mode_ind)
+		Implicit None
+        Integer, Intent(In) :: mode_ind
+		Integer :: k,j, ndim, ind
+	
+		! Check to see if each equation's matrix has already been allocated.
+		! If not, allocate it.  Account for linked equations.
+        j = mode_ind
+		Do k = 1, n_equations
+            If (equation_set(j,k)%solvefor) Then        ! Only Allocate matrix information for modes we actually solve for
+				If (equation_set(j,k)%primary) Then
+					ndim = ndim1*equation_set(j,k)%nlinks
+					Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
+                    equation_set(j,k)%lhs(1:ndim,1:ndim) = 0.0d0
+					If (.not. allocated(equation_set(j,k)%pivot)) Then
+                        Allocate(equation_set(j,k)%pivot(1:ndim))
+                    Endif
+					equation_set(j,k)%mpointer => equation_set(j,k)%lhs
+				Else
+					ind = equation_set(j,k)%links(1)
+					equation_set(j,k)%mpointer => equation_set(j,ind)%lhs
+				Endif
+            Endif
+		Enddo
+
+	End Subroutine Allocate_LHS
 
 	Subroutine Allocate_RHS(zero_rhs)
 		Implicit None
@@ -792,12 +820,13 @@ End Subroutine LU_Solve_full
 Subroutine Band_Arrange(equ,mode)
 		Integer, Intent(In) :: equ, mode
 		Integer :: link,i
-		If (equ .eq. 1) Then
-			Call Band_Load_Single(mode,equ,11)
-		Else
-			Call Band_Load_Single(mode,equ,3)
-		Endif
-
+        If (equation_set(mode,equ)%solvefor) Then
+		    If (equ .eq. 1) Then
+			    Call Band_Load_Single(mode,equ,11)
+		    Else
+	    		Call Band_Load_Single(mode,equ,3)
+    		Endif
+        
 		
 		equation_set(mode,equ)%mpointer => equation_set(mode,equ)%lhs
 		if (equation_set(mode,equ)%nlinks .gt. 1) Then
@@ -806,6 +835,8 @@ Subroutine Band_Arrange(equ,mode)
 				equation_set(mode,link)%mpointer => equation_set(mode,equ)%lhs
 			Enddo
 		Endif
+
+        Endif
 End Subroutine Band_Arrange
 
 

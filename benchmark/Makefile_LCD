@@ -7,7 +7,7 @@ LIBFLAGS = -mkl -I$(MKLROOT)/include/fftw
 
 #use the first of these for debugging (comment out second line to debug)
 F90FLAGS = -r8 -O0 -CB -g -traceback -fpp -FR -check all -I$(MKLROOT)/include/fftw
-F90FLAGS = -r8 -O3 -xSSE4.2 -fpp -FR -I$(MKLROOT)/include/fftw
+##F90FLAGS = -r8 -O3 -xSSE4.2 -fpp -FR -I$(MKLROOT)/include/fftw
 PROG =	pseudo
 
 .SUFFIXES: .o .F90 .f .F

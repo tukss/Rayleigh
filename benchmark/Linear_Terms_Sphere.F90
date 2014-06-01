@@ -25,7 +25,7 @@ Contains
 		rhs_factor = deltat*(1.0d0-alpha_implicit)
 		Call Set_Time_Factors(lhs_factor,rhs_factor)
 		Call Compute_Benchmark_Coefficients()
-		Call Set_Boundary_Conditions()
+		!Call Set_Boundary_Conditions()
 		Call LU_Decompose_Matrices()	! Last step after all matrices have been loaded
 	End Subroutine Reset_Linear_Equations
 
@@ -142,7 +142,7 @@ Contains
 		Allocate(amp(1:N_R))
 		Allocate(H_Laplacian(1:N_R))
 		Do lp = 1, my_nl_lm
-
+            Call Allocate_LHS(lp)
 			l = my_lm_lval(lp)		
 
 			H_Laplacian = - l_l_plus1(l) * OneOverRSquared
@@ -264,10 +264,144 @@ Contains
 				! If band solve, do the redefinition of the matrix here
 
 			Endif
+            Call Set_Boundary_Conditions2(lp)
+            If (bandsolve) Then
+                Call Band_Arrange(weq,lp)
+				Call Band_Arrange(zeq,lp)
+                If (magnetism) Then
+				    Call Band_Arrange(aeq,lp)
+					Call Band_Arrange(ceq,lp)
+                Endif
+            Endif
 		Enddo
 		DeAllocate(amp)
 		DeAllocate(H_Laplacian)
 	End Subroutine Compute_Benchmark_Coefficients
+
+	Subroutine Set_Boundary_Conditions2(mode_ind)
+        ! Modified version of set_boundary_conditions
+        ! Designed to work with more memory friendly logic
+        ! Sets boundary condition of indicated l-value (index lp)
+        ! only.  Does not loop over lp.
+		Implicit None
+		Real*8 :: samp,one
+        Integer, Intent(In) :: mode_ind
+		Integer :: l, r,lp,  dorder
+		one = 1.0d0
+        lp = mode_ind
+		!Do lp = 1, my_nl_lm
+			l = my_lm_lval(lp)
+
+			If (l .eq. 0) Then
+				Call Clear_Row(peq,lp,1)			! Pressure only has one boundary condition
+				Call Clear_Row(teq,lp,1)
+				Call Clear_Row(teq,lp,N_R)
+
+				! Temperature Boundary Conditions (T fixed bottom and top)
+				r = 1
+				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+				r = N_R
+				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
+
+
+				! The ell=0 pressure is really a diagnostic of the system.
+				! It doesn't drive anything.  The simplist boundary condition
+				! is to enforce a pressure node at the top.
+				r = 1	
+				Call Load_BC(lp,r,peq,pvar,one,0)
+
+
+			Else
+
+				!*******************************************************
+				!		Clear the boundary rows
+				Call Clear_Row(weq,lp,1)
+				Call Clear_Row(weq,lp,N_R)
+				Call Clear_Row(peq,lp,1)
+				Call Clear_Row(peq,lp,N_R)			
+				Call Clear_Row(teq,lp,1)
+				Call Clear_Row(teq,lp,N_R)
+				Call Clear_Row(zeq,lp,1)
+				Call Clear_Row(zeq,lp,N_R)
+
+
+				!*******************************************************
+				! Entropy Boundary Conditions
+
+				! Temperature Boundary Conditions (T fixed bottom and top)
+				r = 1
+				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+				r = N_R
+				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
+				
+
+
+
+				!************************************************************
+				! Velocity Boundary Conditions
+		
+				! Impenetrable top and bottom
+				! W vanishes at the boundaries
+				r = 1
+				Call Load_BC(lp,r,weq,wvar,one,0)
+				r = N_R
+				Call Load_BC(lp,r,weq,wvar,one,0)
+
+		
+				! No Slip Top and Bottom
+				! Z and dWdr vanish at the boundaries
+                r = 1
+                !If ((l .eq. 1) .and. (Conserve_L) ) then
+                !    write(6,*)'Conserving Angular Momentum'
+    				!Call Load_BC(lp,r,zeq,zvar,one,0,integral = rweights)
+                !Else
+                    Call Load_BC(lp,r,zeq,zvar,one,0)
+                !Endif
+				Call Load_BC(lp,r,peq,wvar,one,1)
+				r = N_R
+				Call Load_BC(lp,r,peq,wvar,one,1)
+				Call Load_BC(lp,r,zeq,zvar,one,0)
+
+
+				!*******************************************************
+				!		Magnetic Boundary Conditions
+
+				If (Magnetism) Then
+					!  Clear the boundary rows
+					Call Clear_Row(ceq,lp,1)
+					Call Clear_Row(ceq,lp,N_R)
+					Call Clear_Row(aeq,lp,1)
+					Call Clear_Row(aeq,lp,N_R)
+
+
+					! Match to a potential field at top and bottom
+					! Btor = 0 at top and bottom
+					r = 1
+					Call Load_BC(lp,r,aeq,avar,one,0)
+					r = N_R
+					Call Load_BC(lp,r,aeq,avar,one,0)
+
+					! dBpol/dr+ell*Bpol/r = 0 at outer boundary
+					r = 1
+					Call Load_BC(lp,r,ceq,cvar,one,1)
+					samp = my_lm_lval(lp)*one_over_r(r)
+					Call Load_BC(lp,r,ceq,cvar,samp,0)
+
+					! dBpol/dr-(ell+1)*Bpol/r = 0 at inner boundary
+					r = N_R
+					Call Load_BC(lp,r,ceq,cvar,one,1)	
+					samp = - (l+1)*One_Over_R(r)
+					Call Load_BC(lp,r,ceq,cvar,samp,0)	
+
+				Endif	! Magnetism
+
+
+			Endif ! l = 0 or not
+		!Enddo
+
+
+	End Subroutine Set_Boundary_Conditions2
+
 
 	Subroutine Set_Boundary_Conditions
 		Implicit None
