@@ -32,6 +32,7 @@ Contains
 		Call Init_ProblemSize()
 		Call Initialize_Diagnostics()
 		Call Initialize_Field_Structure()	! organization
+		Call Full_Barrier()
 		!Call Initialize_Benchmark_Equations()
 		!Call Compute_Benchmark_Coefficients()
 		!Call Set_Boundary_Conditions()

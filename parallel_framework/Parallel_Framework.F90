@@ -10,7 +10,7 @@ Module Parallel_Framework
 	!  
 	Integer, Parameter, Public :: Cartesian = 1, Cylindrical = 2, Spherical = 3
 	Integer, Parameter, Public :: p1 =1 ,s1 = 2, p2 = 3,s2a =4, p3a=5,p3b=6
-	Public :: Load_Config
+	Public :: Load_Config, Full_Barrier
 	Character*6 :: ifmt = '(i4.4)' ! Integer format for indicating processor tag numbers in output
 	Type, Public :: Parallel_Interface
 		Type(Load_Config) :: my_1p, my_2p, my_3p	!  like my_r, my_theta in ASH 
@@ -123,6 +123,9 @@ Module Parallel_Framework
 
 
 Contains
+    Subroutine Full_Barrier()
+        Call Barrier(pfi%gcomm)
+    End Subroutine Full_Barrier
 	Subroutine set_mrv(self,val)
 		Implicit None
 		Real*8, Intent(In) :: val

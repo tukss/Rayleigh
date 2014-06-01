@@ -51,4 +51,11 @@ Contains
 
 	End Subroutine Exit_Comm_Lib
 
+    Subroutine Barrier(grp)
+        Implicit None
+        Type(communicator) :: grp
+        Integer :: ierr
+        Call MPI_Barrier(grp%comm,ierr)
+    End Subroutine Barrier
+
 End Module MPI_LAYER
