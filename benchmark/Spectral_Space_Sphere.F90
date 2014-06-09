@@ -33,8 +33,9 @@ Contains
 				Write(tstring,t_ofmt)deltat
 				Write(6,*)'Timestep has changed from '//Trim(otstring)//' to '//Trim(tstring)//'.'
 			Endif
-
+			Call StopWatch(seteq_time)%startclock()
 			Call Reset_Linear_Equations()
+			Call StopWatch(seteq_time)%increment()
 		Endif
 		if (iteration .eq. 1) then
 				!Euler Step

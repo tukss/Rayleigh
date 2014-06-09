@@ -11,6 +11,7 @@ Program Main
 
 	Use Linear_Terms_Sphere
 	Use Drive_Sphere, Only : Main_Loop_Sphere
+	Use Timers
 	Implicit None
 
 	Call Main_Input()
@@ -39,7 +40,7 @@ Contains
 		Call Linear_Init() 
 		Call Initialize_Checkpointing()
 		Call Initialize_Fields()
-		
+		Call StopWatch(init_time)%increment() ! started in Init_Problemsize just after MPI is started up
 	End Subroutine Main_Initialization
 
 

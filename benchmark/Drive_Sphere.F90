@@ -49,7 +49,7 @@ Contains
 		! Care needs to be taken at init to ensure fields (W,Z,P,T) are stored
 		! in the RHS (they are copied out upon entry into the loop).
 
-		Call Initialize_Timers()
+		!Call Initialize_Timers()
 
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1

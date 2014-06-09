@@ -5,6 +5,7 @@ Module ProblemSize
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, read_argv
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev
+	Use Timers
 	Implicit None
 
 	!//////////////////////////////////////////////////////////////
@@ -84,6 +85,8 @@ Contains
 		ppars(9) = nprow
 		ppars(10) = npcol
 		Call pfi%init(ppars)
+		Call Initialize_Timers()
+		Call StopWatch(init_time)%startclock()
 		Call Map_Indices()
 		my_rank = pfi%gcomm%rank
 		my_row_rank = pfi%rcomm%rank
