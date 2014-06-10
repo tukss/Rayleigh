@@ -7,7 +7,7 @@ Module Timers
 	Integer, Parameter :: rtranspose_time = 5, ctranspose_time = 6
 	Integer, Parameter :: rlmb_time = 7, rlma_time = 8, pspace_time = 9,psolve_time = 10
 	Integer, Parameter :: dphi_time = 11, nl_time = 12, sdiv_time = 13, ts_time = 14
-	Integer, Parameter :: ar_time = 15, seteq_time = 16, init_time = 17
+	Integer, Parameter :: ar_time = 15, seteq_time = 16, init_time = 17, cread_time = 18, cwrite_time = 19
 
 	Integer, Parameter :: ntimers = 20
 	Type(Timer), Allocatable :: StopWatch(:)

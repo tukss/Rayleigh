@@ -8,6 +8,7 @@ Module Initial_Conditions
 	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
+	Use Timers
 	Implicit None
 	Logical :: alt_check = .false.
 	Integer :: init_type = 1
@@ -96,7 +97,9 @@ Contains
 		tempfield%p1a(:,:,:,:) = 0.0d0
 		!If (alt_check) Then
 			!Write(6,*)'Using New Checkpoint Read..'
+			Call StopWatch(cread_time)%StartClock()
 			Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
+			Call StopWatch(cread_time)%Increment()
 		!Else
 			!Write(6,*)'Using Standard Checkpoint Read.'
 		!	Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
