@@ -1,9 +1,9 @@
 Module Input
-	Use ProblemSize,  Only : problemsize_namelist, nprow, npcol, n_r,n_theta
+	Use ProblemSize,  Only : problemsize_namelist, nprow, npcol, n_r,n_theta, npout
 	Use Controls,     Only : controls_namelist, max_iterations, pad_alltoall
 	Use Spherical_IO, Only : output_namelist
 	Use BoundaryConditions, Only : boundary_conditions_namelist
-	Use Initial_Conditions, Only : initial_conditions_namelist
+	Use Initial_Conditions, Only : initial_conditions_namelist, alt_check
 	Use TestSuite, Only : test_namelist
 	!Use ArgCheck, Only : CheckArgs
 	Implicit None
@@ -48,6 +48,11 @@ Contains
 					arg2 = TRIM(AdjustL(arg))
 			      Read (arg2,*) npcol
 				Endif
+				If (arg .eq. '-npout') Then
+					CALL get_command_argument(i+1, arg)
+					arg2 = TRIM(AdjustL(arg))
+			      Read (arg2,*) npout
+				Endif
 				If (arg .eq. '-niter') Then
 					CALL get_command_argument(i+1, arg)
 					arg2 = TRIM(AdjustL(arg))
@@ -71,6 +76,16 @@ Contains
 						pad_alltoall = .true.
 					else
 						pad_alltoall = .false.
+					endif
+				Endif
+				If (arg .eq. '-altc') Then
+					CALL get_command_argument(i+1, arg)
+					arg2 = TRIM(AdjustL(arg))
+			      Read (arg2,*) itemp
+					if (itemp .eq. 1) then
+						alt_check = .true.
+					else
+						alt_check = .false.
 					endif
 				Endif
 	      	i = i+1

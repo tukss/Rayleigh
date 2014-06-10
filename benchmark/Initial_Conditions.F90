@@ -6,9 +6,10 @@ Module Initial_Conditions
 	Use Legendre_Transforms, Only : Legendre_Transform 
 	Use SendReceive
 	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral
-	Use Checkpointing, Only : read_checkpoint
+	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Implicit None
+	Logical :: alt_check = .false.
 	Integer :: init_type = 1
 	Integer :: magnetic_init_type = 1
 	Integer :: init_tag = 8989
@@ -18,7 +19,7 @@ Module Initial_Conditions
 	Logical :: custom_t
 	Character*120 :: custom_t_file
 	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter, &
-			magnetic_init_type
+			magnetic_init_type,alt_check
 Contains
 	
 	Subroutine Initialize_Fields()
@@ -84,14 +85,24 @@ Contains
 		type(SphericalBuffer) :: tempfield
 		Integer :: fcount(3,2)
 		fcount(:,:) = 4
+		If (magnetism) Then
+			fcount(:,:) = 6
+		Endif
 
 		Call tempfield%init(field_count = fcount, config = 'p1a')
 		Call tempfield%construct('p1a')
 
 		wsp%p1b(:,:,:,:) = 0.0d0
 		tempfield%p1a(:,:,:,:) = 0.0d0
+		!If (alt_check) Then
+			!Write(6,*)'Using New Checkpoint Read..'
+			Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
+		!Else
+			!Write(6,*)'Using Standard Checkpoint Read.'
+		!	Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+		!Endif
 
-		Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+
 
 		Call Set_All_RHS(tempfield%p1a)
 		Call tempfield%deconstruct('p1a')

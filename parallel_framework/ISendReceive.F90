@@ -212,13 +212,13 @@ Contains
     
 	End Subroutine Z_ISend_1D
 
-Subroutine D_ISend_2D(x, irq,n_elements, dest, tag, grp)
+Subroutine D_ISend_2D(x, irq,n_elements, dest, tag, grp,indstart)
     Real(8), Intent(in)  :: x(:,:)
 
-    Integer, Optional :: dest, n_elements, tag
+    Integer, Optional :: dest, n_elements, tag, indstart(2)
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq
-
+	 Integer :: ione, jone
     If (Present(n_elements)) Then
        n = n_elements
     Else
@@ -242,8 +242,14 @@ Subroutine D_ISend_2D(x, irq,n_elements, dest, tag, grp)
     Else
        tag2 = p
     End If
-    
-    Call mpi_isend(x(1,1), n, MPI_DOUBLE_PRECISION, p, tag2, comm2, irq,mpi_err)
+    If (Present(indstart)) Then
+			ione = indstart(1)
+			jone = indstart(2)
+	 Else
+			ione = 1
+			jone = 1
+    Endif
+    Call mpi_isend(x(ione,jone), n, MPI_DOUBLE_PRECISION, p, tag2, comm2, irq,mpi_err)
     
   End Subroutine D_ISend_2D
 
@@ -422,9 +428,8 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
 
 	Subroutine D_IReceive_2D(x, irq, n_elements, source, tag, grp, indstart)
 		Real(8), Intent(out)  :: x(:,:)
-
-    Integer, Optional :: source, n_elements, tag, indstart(1:3)
-	 Integer :: istart, jstart, kstart
+    Integer, Optional :: source, n_elements, tag, indstart(1:2)
+	 Integer :: istart, jstart, kstart, ione, jone
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq, status(MPI_STATUS_SIZE)
 
@@ -452,9 +457,16 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
        tag2 = MPI_ANY_TAG
     End If
 
-
+	 If (present(indstart)) Then
+		ione = indstart(1)
+		jone = indstart(2)
+	 Else
+		ione = 1
+		jone = 1
+	 Endif
+	
     
-    Call mpi_irecv(x(1,1), n, MPI_DOUBLE_PRECISION, p, tag2, comm2, irq, mpi_err)
+    Call mpi_irecv(x(ione,jone), n, MPI_DOUBLE_PRECISION, p, tag2, comm2, irq, mpi_err)
 
     If (p == MPI_ANY_SOURCE) source = status(MPI_SOURCE)
     If (tag2 == MPI_ANY_TAG) tag = status(MPI_TAG)

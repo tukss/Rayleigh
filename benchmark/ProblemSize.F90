@@ -10,7 +10,7 @@ Module ProblemSize
 
 	!//////////////////////////////////////////////////////////////
 	! Processor Configuration
-	Integer :: ncpu = 1, nprow = 1, npcol =1 
+	Integer :: ncpu = 1, nprow = 1, npcol =1 , npout = 1
 	Integer :: my_rank, my_row_rank, my_column_rank ! rank *within* row and rank *within* column
 	!//////////////////////////////////////////////////////////////
 	! Horizontal Grid Variables
@@ -33,7 +33,7 @@ Module ProblemSize
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:)
 	Type(Load_Config)   :: my_r
 
-	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax
+	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout
 Contains
 
 	Subroutine Init_ProblemSize()

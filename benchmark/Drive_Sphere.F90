@@ -83,7 +83,9 @@ Contains
 			Call AdvanceTime()
 
 			If (Mod(iteration,check_frequency) .eq. 0) Then
-                Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
+                !Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
+
+                Call Write_Checkpoint_Alt(wsp%p1b,iteration, deltat,new_deltat)
             Endif
 		Enddo
 		Call StopWatch(loop_time)%Increment()
