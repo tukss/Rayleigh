@@ -15,7 +15,11 @@ Module Physical_Space_Sphere
 	Use Timers
 	Use Run_Parameters
 	Use ClockInfo
+	Use ReferenceState
+	Use TransportCoefficients
+	Use NonDimensionalization
 	Implicit None
+
 Contains
 	Subroutine physical_space()
 		Implicit None
@@ -42,6 +46,9 @@ Contains
 		Call sintheta_div(dvrdt)
 		Call sintheta_div(dvpdp)
 		Call sintheta_div(dvtdp)
+
+		Call Compute_dvtheta_by_dtheta()
+		Call Compute_dvphi_by_dtheta()
 
 		If (magnetism) Then
 			Call rsintheta_div(jtheta)
@@ -71,13 +78,15 @@ Contains
 		!Nonlinear Advection
 		Call StopWatch(nl_time)%startclock()
 
-		Call Temperature_Advection()		
+		Call Temperature_Advection()	
+		Call Viscous_Heating()
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
 		Call Momentum_Advection_Phi()
 
 		If (magnetism) Then
-			Call Compute_EMF()
+			Call Ohmic_Heating()
+			Call Compute_EMF()		
 		Endif
 
 		Call StopWatch(nl_time)%increment()
@@ -99,6 +108,29 @@ Contains
 		Call StopWatch(rtranspose_time)%increment()
 	End Subroutine Physical_Space
 
+	Subroutine Compute_dvtheta_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+
+		DO_IDX
+			wsp%p3a(IDX,dvtdt) = -wsp%p3a(IDX,vr)*(radius(r)*ref%dlnrho(r)-2.0d0) &
+										- radius(r)*wsp%p3a(IDX,dvrdr) &
+										- wsp%p3a(IDX,vtheta)*cottheta(t) &
+										- wsp%p3a(IDX,dvpdp)*csctheta(t)
+		END_DO
+
+	End Subroutine Compute_dvtheta_by_dtheta
+
+	Subroutine Compute_dvphi_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			wsp%p3a(IDX,dvpdt) = radius(r)*(wsp%p3a(IDX,zvar)+wsp%p3a(IDX,dvtdp) &
+										-wsp%p3a(IDX,vphi)*cottheta(t) )
+		END_DO
+		!$OMP END PARALLEL DO
+	End Subroutine Compute_dvphi_by_dtheta
 
 	Subroutine Temperature_Advection()
 		Integer :: t,r,k
@@ -116,6 +148,129 @@ Contains
 		!$OMP END PARALLEL DO
 
 	End Subroutine Temperature_Advection
+
+	Subroutine Viscous_Heating()
+		Implicit None
+		Integer :: t,r,k
+		Real*8 :: tmp, tmp2
+		Real*8, Allocatable :: htemp(:,:,:), heating_coef(:)
+
+		Allocate(htemp(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
+
+		! Need to optimize these loops later, but for now, let's write this in
+		! easily debuggable way.
+
+		!Contributions from E_rr, E_theta_theta 	& E_phi_phi
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp,tmp2)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+					tmp = (wsp%p3a(k,r,t,dvpdp)*csctheta(t) +wsp%p3a(k,r,t,vr) &
+							+wsp%p3a(k,r,t,vtheta)*cottheta(t))*one_over_r(r)	!e_phi_phi
+					tmp2 = (wsp%p3a(k,r,t,dvtdt)+wsp%p3a(k,r,t,vr))*one_over_r(r) ! e_theta_theta
+					htemp(k,r,t) = wsp%p3a(k,r,t,dvrdr)*wsp%p3a(k,r,t,dvrdr)+tmp*tmp +tmp2*tmp2
+					
+				Enddo
+			Enddo
+		Enddo				
+		!$OMP END PARALLEL DO
+
+		!E_r_phi
+		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+					tmp = (wsp%p3a(IDX,dvrdp)*csctheta(t)*one_over_r(r) &
+							+wsp%p3a(IDX,dvpdr) &
+							-wsp%p3a(IDX,vphi)*one_over_r(r) )*0.5d0		! e_r_phi
+					
+					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					
+				Enddo
+			Enddo
+		Enddo			
+		!$OMP END PARALLEL DO
+
+
+		!E_r_theta
+		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+					tmp = (wsp%p3a(IDX,dvrdt)*one_over_r(r) &
+							+wsp%p3a(IDX,dvtdr) &
+							-wsp%p3a(IDX,vtheta)*one_over_r(r) )*0.5d0		! e_r_theta
+					
+					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					
+				Enddo
+			Enddo
+		Enddo			
+		!$OMP END PARALLEL DO
+
+
+		!E_phi_theta
+		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+					tmp = (wsp%p3a(IDX,dvpdt) &
+							+wsp%p3a(IDX,dvtdp)*csctheta(t) &
+							-wsp%p3a(IDX,vphi)*cottheta(t) )*0.5d0*one_over_r(r)		! e_phi_theta
+					
+					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					
+				Enddo
+			Enddo
+		Enddo			
+		!$OMP END PARALLEL DO
+
+
+		! Allocate heating_coeff
+		! Heating coeff is 2*nu/T_bar
+		Allocate(heating_coef(1:N_R))
+		heating_coef(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+
+					wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar)+heating_coef(r)*htemp(k,r,t)
+					
+				Enddo
+			Enddo
+		Enddo				
+		!$OMP END PARALLEL DO
+
+		DeAllocate(htemp)
+		DeAllocate(heating_coef)
+
+	End Subroutine Viscous_Heating
+
+
+	Subroutine Ohmic_Heating()
+		Implicit None
+		Integer :: t,r,k
+
+		!We need a prefactor here for nondimensionalization
+
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+				wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar) &
+									 + wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
+									 + wsp%p3a(k,r,t,jtheta)*wsp%p3a(k,r,t,jtheta) &
+									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi)
+				Enddo
+			Enddo
+		Enddo				
+		!$OMP END PARALLEL DO
+
+	End Subroutine Ohmic_Heating
+
 	Subroutine Momentum_Advection_Radial()
 		Implicit None
 		Integer :: t,r,k
@@ -132,16 +287,6 @@ Contains
 	
 		!$OMP END PARALLEL DO
 
-		If (magnetism .and. lorentz_forces) Then
-			! Add r_squared [JxB]_r
-			!$OMP PARALLEL DO PRIVATE(t,r,k)
-			DO_IDX
-				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ovPmEk* &
-					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
-			END_DO
-			!$OMP END PARALLEL DO
-		Endif
-
 		! Add Coriolis Terms if so desired
 		If (rotation) Then
 		!	! [- 2 z_hat cross u ]_r = 2 sintheta u_phi
@@ -152,6 +297,27 @@ Contains
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
+
+
+		! Multiply advection/coriolis pieces by rho
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			RHSP(IDX,wvar) = RHSP(IDX,pvar)*ref%density(r)
+		END_DO
+		!OMP END PARALLEL DO	
+
+
+		If (magnetism .and. lorentz_forces) Then
+			! Add r_squared [JxB]_r
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ovPmEk* &
+					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
+			END_DO
+			!$OMP END PARALLEL DO
+		Endif
+
+
 	
 	End Subroutine Momentum_Advection_Radial
 
@@ -229,16 +395,6 @@ Contains
 		END_DO
 		!$OMP END PARALLEL DO
 
-		If (magnetism .and. lorentz_forces) Then
-			! Add -[JxB]_theta
-			!$OMP PARALLEL DO PRIVATE(t,r,k)
-			DO_IDX
-				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
-					- ovPmEk*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
-			END_DO
-			!$OMP END PARALLEL DO
-		Endif
-
 		If (rotation) Then
 			! Add - the coriolis term (part of -RHS of theta)
 			! [2 z_hat cross u]_theta = -2 costheta u_phi
@@ -249,6 +405,25 @@ Contains
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
+
+		! Multiply advection/coriolis pieces by rho
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			RHSP(IDX,pvar) = RHSP(IDX,pvar)*ref%density(r)
+		END_DO
+		!OMP END PARALLEL DO	
+
+		If (magnetism .and. lorentz_forces) Then
+			! Add -[JxB]_theta
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
+					- ovPmEk*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
+			END_DO
+			!$OMP END PARALLEL DO
+		Endif
+
+
 
 
 		! At this point, we have [u dot grad u]_theta
@@ -278,6 +453,24 @@ Contains
 		END_DO
 		!$OMP END PARALLEL DO
 
+		If (rotation) Then
+			! Add - Coriolis term (we are building -RHS of vphi)
+			!$OMP PARALLEL DO PRIVATE(t,r,k)
+			DO_IDX
+				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
+					 + two_over_ek*costheta(t)*FIELDSP(IDX,vtheta) &
+					 + two_over_ek*sintheta(t)*FIELDSP(IDX,vr)
+			END_DO
+			!OMP END PARALLEL DO
+		Endif
+
+		! Multiply advection/coriolis pieces by rho
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			RHSP(IDX,zvar) = RHSP(IDX,zvar)*ref%density(r)
+		END_DO
+		!OMP END PARALLEL DO		
+
 		If (magnetism .and. lorentz_forces) Then
 			! Add -[JxB]_phi
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
@@ -289,16 +482,7 @@ Contains
 		Endif
 
 
-		If (rotation) Then
-			! Add - Coriolis term (we are building -RHS of vphi)
-			!$OMP PARALLEL DO PRIVATE(t,r,k)
-			DO_IDX
-				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
-					 + two_over_ek*costheta(t)*FIELDSP(IDX,vtheta) &
-					 + two_over_ek*sintheta(t)*FIELDSP(IDX,vr)
-			END_DO
-			!OMP END PARALLEL DO
-		Endif
+
 
 		! At this point, we have [u dot grad u]_phi
 		! Multiply by radius/sintheta so that we have r[u dot grad u]_phi/sintheta (getting ready for Z and dWdr RHS building)

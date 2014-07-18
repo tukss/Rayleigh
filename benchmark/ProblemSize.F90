@@ -1,10 +1,10 @@
 Module ProblemSize
 	Use Parallel_Framework, Only : pfi, Load_Config, Spherical
-	Use Finite_Difference, Only  : Initialize_Derivatives
+	Use Finite_Difference, Only  : Initialize_Derivatives, Rescale_Grid_FD
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, read_argv
-	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev
+	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
 	Use Timers
 	Implicit None
 
@@ -43,8 +43,8 @@ Contains
 		Integer, Allocatable :: m_vals(:)
 		Real*8 :: ell
 		Character*10 :: arg, arg2
-		rmin = (7.0d0)/13.0d0		! benchmark cluge
-		rmax = (20.0d0)/13.0d0
+		!rmin = (7.0d0)/13.0d0		! benchmark cluge
+		!rmax = (20.0d0)/13.0d0
 
 		n_phi = 2*n_theta
 		If (dealias) Then
@@ -202,6 +202,20 @@ Contains
 
 		If (.not. chebyshev) Call Initialize_Derivatives(Radius)
 	End Subroutine Initialize_Radial_Grid
-
-
+	Subroutine Rescale_Grid_and_Derivatives(length_scale)
+		Implicit None
+		Real*8, Intent(In) :: length_scale
+		Radius = radius/length_scale
+		R_squared       = Radius**2
+      One_Over_R      = (1.0d0)/Radius
+      Two_Over_R      = (2.0d0)/Radius
+      OneOverRSquared = (1.0d0)/r_Squared
+		ovr_repeated = ovr_repeated*length_scale
+		ovrsq_repeated = ovrsq_repeated*length_scale
+		If (chebyshev) Then
+			Call Rescale_Grid_CP(length_scale)
+		Else
+			Call Rescale_Grid_FD(length_scale)
+		Endif
+	End Subroutine 
 End Module ProblemSize

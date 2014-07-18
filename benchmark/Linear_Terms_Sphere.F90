@@ -8,6 +8,9 @@ Module Linear_Terms_Sphere
 	Use Timers
 	Use ClockInfo
 	Use Legendre_Polynomials, Only : pi
+	Use ReferenceState
+	Use TransportCoefficients
+	Use NonDimensionalization
 	Implicit None
 Contains	
 	Subroutine Linear_Init()
@@ -200,6 +203,13 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(weq,wvar, 2, amp,lp)
 
+				! These two diffusion bits are different 
+				! depending on variation of rho and nu
+				amp = W_Diffusion_Coefs_0		
+				Call add_implicit_term(weq,wvar, 0, amp,lp)
+				amp = W_Diffusion_Coefs_1
+				Call add_implicit_term(weq,wvar, 1, amp,lp)
+
 				!==================================================
 				!				Pressure (dWdr) Equation
 				
@@ -218,6 +228,13 @@ Contains
 				Call add_implicit_term(peq,wvar, 3, amp,lp)
 
 
+				! Again, these two bits depend on variation of rho and nu
+				amp = dW_Diffusion_Coefs_0
+				Call add_implicit_term(peq,wvar, 0, amp,lp)
+				amp = dW_Diffusion_Coefs_1
+				Call add_implicit_term(peq,wvar, 1, amp,lp)				
+				amp = dW_Diffusion_Coefs_2	
+				Call add_implicit_term(peq,wvar, 2, amp,lp)
 				!====================================================
 				!			Temperature Equation
 
@@ -231,7 +248,10 @@ Contains
 				amp = 1.0d0/Pr
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
-
+				! Kappa,rho, T variation in radius
+				amp = S_Diffusion_Coefs_1
+				Call add_implicit_term(teq,tvar,1,amp,lp)
+				
 				!=====================================================
 				!	Z Equation
 				amp = 1.0d0
@@ -241,6 +261,11 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(zeq,zvar, 2, amp,lp)				
 
+				! Variation of rho and nu
+				amp = Z_Diffusion_Coefs_0
+				Call add_implicit_term(zeq,zvar, 0, amp,lp)
+				amp = Z_Diffusion_Coefs_1
+				Call add_implicit_term(zeq,zvar, 1, amp,lp)
 				If (magnetism) Then
 					!=========================================
 					!  Btor Equation
@@ -250,6 +275,10 @@ Contains
 					Call add_implicit_term(aeq,avar, 0, amp,lp)					
 					amp = 1.0d0/Pm
 					Call add_implicit_term(aeq,avar, 2, amp,lp)	
+
+					! Eta variation in radius
+					amp = A_Diffusion_Coefs_1
+					Call add_implicit_term(aeq,avar,1,amp,lp)
 
 					!=========================================
 					!  Bpol Equation

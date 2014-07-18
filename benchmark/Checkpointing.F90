@@ -14,9 +14,10 @@ Module Checkpointing
 	Integer,private,Allocatable :: mode_count(:)
 	Integer,private :: nlm_total, checkpoint_tag = 425
 	Integer, Allocatable, Private :: lmstart(:)
-	Integer*8, Private :: my_check_disp, buffsize, full_disp		! for writing checkpoints
-	Integer*8, Private :: my_check_disp2, buffsize2
-	Integer*8, Private :: my_in_disp, buffsize_in, full_in_disp		! for reading checkpoints
+	Integer :: buffsize, buffsize2, buffsize_in  ! These cannot be long (8) - MPI-IO goes haywire.
+	Integer*8, Private :: my_check_disp,full_disp		! These need to be long ! for writing checkpoints
+	Integer*8, Private :: my_check_disp2
+	Integer*8, Private :: my_in_disp, full_in_disp		! for reading checkpoints
 	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z', achar = 'A', cchar = 'C'
 	Integer :: checkpoint_iter = 0
 	Real*8 :: checkpoint_dt, checkpoint_newdt
@@ -592,7 +593,8 @@ Contains
 			my_check_disp = my_check_disp*nlm_total  ! for old Checkpointing style
 			buffsize2 = nlm_total*nradii_at_rank(my_row_rank)	! for new
 			buffsize = nlm_total*my_r%delta  ! for old
-			full_disp = N_r*nlm_total
+			full_disp = N_r
+			full_disp = full_disp*nlm_total
 		Endif
 
 	End Subroutine Initialize_Checkpointing

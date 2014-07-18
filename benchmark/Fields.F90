@@ -38,6 +38,8 @@ Module Fields
 	Integer :: vr, vtheta, vphi,dtdt,dvrdt,dvtdr,dvpdr,dvrdr
 	Integer :: dvrdp, dvtdp, dvpdp, dtdp
 
+	Integer :: dvtdt, dvpdt
+
 	Integer :: avar, dadr, d2adr2 ! Toroidal magnetic streamfunction and its radial derivatives
 	Integer :: cvar, dcdr, d2cdr2 !Poloidal magnetic streamfunction and its radial derivatives
 
@@ -199,13 +201,20 @@ Contains
 			Call Add_Field(Jphi   ,arr, overwrite = dadr)
 		Endif
 		!///////////////////////////////////////////////////////
-		!  Finally we have fields of the d_by_dphi variety
+		!  Next we have fields of the d_by_dphi variety
 		!  that we add to the p3a buffer
 		arr(2) = 0
 		Call Add_Field(dvrdp,arr)
 		Call Add_field(dvtdp,arr)
 		Call Add_field(dvpdp,arr)
 		Call Add_field(dtdp,arr,overwrite = tvar)		
+
+
+		!///////////////////////////////////////////////////////
+		! dvtheta_by_dtheta and dvphi_by_dtheta can be computed
+		! in physical space configuration using continuity and Z stream function
+		Call Add_Field(dvtdt,arr)
+		Call Add_field(dvpdt,arr)		
 
 		wsfcount(1,1) = c1a_counter
 		wsfcount(2,1) = c2a_counter

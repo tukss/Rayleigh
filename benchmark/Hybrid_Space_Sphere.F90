@@ -9,13 +9,30 @@ Module Hybrid_Space_Sphere
 	Use Fields
 	Use Timers
 	Use ClockInfo
+	Use ReferenceState
 	Implicit None
+	Real*8, Allocatable :: rho_rep(:), dlnrho_rep(:)
 	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 Contains
+!///// TODO
+!		change /rho_rep to *one_over_rhorep
+
 !/////////////////////////////
 	!  This routine calculates terms that involve
 	!      theta derivatives and loads them into
 	!		 the buffer.
+	Subroutine Hybrid_Init()
+		! This routine will be unnecessary once the data storage
+		! in this configuration is reconfigured
+		Allocate(rho_rep(1:2*my_r%delta))
+		rho_rep(1:my_r%delta) = ref%density(my_r%min:my_r%max)
+		rho_rep(my_r%delta+1:2*my_r%delta) = ref%density(1:my_r%delta)
+
+		Allocate(dlnrho_rep(1:2*my_r%delta))
+		dlnrho_rep(1:my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
+		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(1:my_r%delta)
+	End Subroutine Hybrid_Init
+
 	Subroutine rlm_spacea()
 		Implicit None
 		Integer :: mp
@@ -192,7 +209,8 @@ Contains
 			m = m_values(mp)
 			Do r = rmn, rmx
 				rind = r-rmn+1
-				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,r)*ovrsq_repeated(rind)
+				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,r)*ovrsq_repeated(rind)/ &
+					rho_rep(rind)
 			Enddo
 		Enddo
 
@@ -208,7 +226,7 @@ Contains
 			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)+ftemp2(mp)%data(:,:)
 			do r = rmn, rmx
 				rind = r-rmn+1			
-				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)
+				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
 			enddo
 		Enddo
 
@@ -222,7 +240,7 @@ Contains
 			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)-ftemp2(mp)%data(:,:)
 			do r = rmn, rmx
 				rind = r-rmn+1			
-				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)
+				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
 			enddo
 		Enddo
 
@@ -248,9 +266,23 @@ Contains
 			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)+ftemp2(mp)%data(:,:)-wsp%s2a(mp)%data(:,rmn1:rmx1)
 			do r = rmn, rmx
 				rind = r-rmn+1			
-				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)
+				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
 			enddo
 		Enddo
+
+			!.... Small correction for density variation  :  - u_theta*dlnrhodr
+		rmn1 = (vtheta-1)*tnr+1
+		rmx1 = rmn1+tnr-1 
+		rmn = (dvtdr-1)*tnr+1
+		rmx = rmn+tnr-1
+
+		Do mp = my_mp%min, my_mp%max
+			do r = rmn, rmx
+				rind = r-rmn+1
+				rind2 = r-rmn+rmn1			
+				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)-wsp%s2a(mp)%data(:,rind2)*dlnrho_rep(rind)
+			enddo
+		Enddo		
 
 		!/////////////////////////////////
 		!sinphi dv phi dr 
@@ -267,11 +299,23 @@ Contains
 			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)-ftemp2(mp)%data(:,:)-wsp%s2a(mp)%data(:,rmn1:rmx1)
 			do r = rmn, rmx
 				rind = r-rmn+1			
-				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)
+				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
 			enddo
 		Enddo
 
+			!.... Small correction for density variation  :  - u_phi*dlnrhodr
+		rmn1 = (vphi-1)*tnr+1
+		rmx1 = rmn1+tnr-1 
+		rmn = (dvpdr-1)*tnr+1
+		rmx = rmn+tnr-1
 
+		Do mp = my_mp%min, my_mp%max
+			do r = rmn, rmx
+				rind = r-rmn+1
+				rind2 = r-rmn+rmn1			
+				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)-wsp%s2a(mp)%data(:,rind2)*dlnrho_rep(rind)
+			enddo
+		Enddo		
 		!/////////////////////////////////////////
 		!dvrdr	overwrites dwdr	
 		rmn = (dvrdr-1)*tnr
@@ -291,17 +335,33 @@ Contains
 			Enddo
 		Enddo
 
+			!.... Small correction for density variation  :  - u_r*dlnrhodr
+		rmn1 = (vr-1)*tnr+1
+		rmx1 = rmn1+tnr-1 
+		rmn = (dvrdr-1)*tnr+1
+		rmx = rmn+tnr-1
+
+		Do mp = my_mp%min, my_mp%max
+			do r = rmn, rmx
+				rind = r-rmn+1
+				rind2 = r-rmn+rmn1			
+				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)-wsp%s2a(mp)%data(:,rind2)*dlnrho_rep(rind)
+			enddo
+		Enddo		
+
+
 		Call d_by_dtheta(wsp%s2a,vr,dvrdt)
 
 		
-		! Convert Z to -H_Laplacian Z
+		! Convert Z to -H_Laplacian Z		
 		rmn = (zvar-1)*tnr+1
 		rmx = rmn+tnr-1
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
 			Do r = rmn,rmx
 				rind = r -rmn+1
-				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,r)*ovrsq_repeated(rind)
+				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,r)*&
+					& ovrsq_repeated(rind)/rho_rep(rind)
 			Enddo
 		Enddo
 	End Subroutine Velocity_Derivatives

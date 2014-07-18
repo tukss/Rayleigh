@@ -57,7 +57,17 @@ Contains
 	End Subroutine Initialize_Derivatives
 
 
-
+	Subroutine Rescale_Grid_FD(length_scale)
+		Implicit None
+		Real*8, Intent(In) :: length_scale
+		! Following initialization, we can rescale the FD arrays if we choose
+		! This is useful when nondimensionalizing after the reference state has been set up
+		! (which typically requires a radial grid to have been established)
+		x_fd(:) = x_fd(:)/length_scale
+		d_coefs(:,:) = d_coefs(:,:)*length_scale
+		dd_coefs(:,:) = dd_coefs(:,:)*(length_scale**2)
+		ddd_coefs(:,:) = ddd_coefs(:,:)*(length_scale**3)
+	End Subroutine Rescale_Grid_FD
 
 	!=========================================================================
 	!

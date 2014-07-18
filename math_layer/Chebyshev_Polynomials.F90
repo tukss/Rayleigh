@@ -54,6 +54,19 @@ Contains
 		Endif
 	End Subroutine Initialize_Chebyshev
 
+	Subroutine Rescale_Grid_CP(length_scale)
+		Implicit None
+		Real*8, Intent(In) :: length_scale
+		! Following initialization, we can rescale the chebyshev arrays if we choose
+		! This is useful when nondimensionalizing after the reference state has been set up
+		! (which typically requires a radial grid to have been established)
+		
+		dcheby(:,:,1) = dcheby(:,:,1)*length_scale
+		dcheby(:,:,2) = dcheby(:,:,2)*(length_scale**2)
+		dcheby(:,:,3) = dcheby(:,:,3)*(length_scale**3)
+
+	End Subroutine Rescale_Grid_CP
+
 	Subroutine Gen_Colocation_Points()
 		Implicit None
 		Integer :: i

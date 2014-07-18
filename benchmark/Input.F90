@@ -5,6 +5,9 @@ Module Input
 	Use BoundaryConditions, Only : boundary_conditions_namelist
 	Use Initial_Conditions, Only : initial_conditions_namelist, alt_check
 	Use TestSuite, Only : test_namelist
+	Use ReferenceState, Only : reference_namelist
+	Use NonDimensionalization, Only : NonDimensionalization_Namelist
+	Use TransportCoefficients, Only : Transport_Namelist
 	!Use ArgCheck, Only : CheckArgs
 	Implicit None
 Contains
@@ -19,6 +22,9 @@ Contains
 		Read(unit=20, nml=boundary_conditions_namelist)
 		Read(unit=20, nml=initial_conditions_namelist)
 		Read(unit=20, nml=test_namelist)
+		Read(unit=20, nml=reference_namelist)
+		Read(unit=20, nml=NonDimensionalization_Namelist)
+		Read(unit=20, nml=Transport_Namelist)
 		Close(20)
 
 		! Check the command line to see if any arguments were passed explicitly

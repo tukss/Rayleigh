@@ -1,6 +1,6 @@
 Module Drive_Sphere
 	Use ClockInfo
-	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb
+	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Physical_Space_Sphere, Only : physical_space
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp
 	Use Checkpointing
@@ -8,6 +8,7 @@ Module Drive_Sphere
 	Use Timers
 	Use Fields
 	Use Run_Parameters
+	Use NonDimensionalization
 Contains
 
 	Subroutine Initialize_TimeStepping(iter)
@@ -66,7 +67,7 @@ Contains
 			ovPmek = 1.0d0/(Pm*ek)
 		Endif
 
-
+		Call Hybrid_Init()
 		Call StopWatch(loop_time)%StartClock()
 		Do iteration = first_iteration, last_iteration
 			If (chebyshev) Then

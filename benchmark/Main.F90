@@ -30,7 +30,15 @@ Program Main
 Contains
 	Subroutine Main_Initialization()
 		Implicit None
+		Character*120 :: ndrf='reference_nd'
 		Call Init_ProblemSize()
+		Call Initialize_Reference()
+		
+		Call Initialize_Transport_Coefficients()
+		Call NonDimensionalize()
+		Call Write_Reference(ndrf)
+		Call pfi%exit()
+		STOP
 		Call Initialize_Diagnostics()
 		Call Initialize_Field_Structure()	! organization
 		Call Full_Barrier()
