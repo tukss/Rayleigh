@@ -1,0 +1,12 @@
+cd build
+rm *.F90
+rm Makefile
+ln -s ../parallel_framework/*.F90 .
+ln -s ../data_structures/*.F90 .
+ln -s ../math_layer/*.F90 .
+ln -s ../IO/*.F90 .
+ln -s ../test_suite/*.F90 .
+ln -s ../benchmark/*.F90 .
+ln -s ../benchmark/Makefile_nick Makefile
+make clean
+make pseudo

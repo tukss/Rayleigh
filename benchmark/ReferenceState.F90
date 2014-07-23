@@ -154,7 +154,7 @@ Contains
 		Implicit None
 		Character*120, Optional, Intent(In) :: filename
 		Character*120 :: ref_file
-		Integer :: i
+		Integer :: i,sig = 314
 		if (present(filename)) then
 			ref_file = filename
 		else
@@ -162,7 +162,8 @@ Contains
 		endif
 
 		If (my_rank .eq. 0) Then
-			Open(unit=15,file=ref_file,form='unformatted', status='replace')
+			Open(unit=15,file=ref_file,form='unformatted', status='replace',access='stream')
+            Write(15)sig
 			Write(15)n_r
 			Write(15)(radius(i),i=1,n_r)
 			Write(15)(ref%density(i),i=1,n_r)
