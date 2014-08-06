@@ -271,6 +271,8 @@ Contains
 		Enddo
 
 			!.... Small correction for density variation  :  - u_theta*dlnrhodr
+            ! Notice that there is a -u_theta/r term above.  These should be combined
+            ! for efficiency later
 		rmn1 = (vtheta-1)*tnr+1
 		rmx1 = rmn1+tnr-1 
 		rmn = (dvtdr-1)*tnr+1
@@ -325,7 +327,7 @@ Contains
 			Do r = 1, tnr
 			rind = r+rmn
 			Do l = m, l_max
-				wsp%s2a(mp)%data(l,rind) = l_l_plus1(l)*wsp%s2a(mp)%data(l,rind)*ovrsq_repeated(r)	! real part
+				wsp%s2a(mp)%data(l,rind) = l_l_plus1(l)*wsp%s2a(mp)%data(l,rind)*ovrsq_repeated(r)/rho_rep(r)
 			Enddo
 			Enddo
 			Do r = 1,tnr
@@ -353,7 +355,7 @@ Contains
 		Call d_by_dtheta(wsp%s2a,vr,dvrdt)
 
 		
-		! Convert Z to -H_Laplacian Z		
+		! Convert Z to ell(ell+1) Z/r^2  (i.e. omega_r)		
 		rmn = (zvar-1)*tnr+1
 		rmx = rmn+tnr-1
 		Do mp = my_mp%min, my_mp%max

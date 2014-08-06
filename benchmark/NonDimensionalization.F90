@@ -3,6 +3,7 @@ Module NonDimensionalization
 	Use ReferenceState
 	Use TransportCoefficients
 	Use ProblemSize
+    Use BoundaryConditions, Only : T_top, T_Bottom
 	Implicit None
 	Integer :: nd_type = 1	! Non-dimensionalization Type
 	Integer :: nd_index = 1	! Radial index of reference state/transport parameters that non-dimensionalization is based off of
@@ -18,6 +19,10 @@ Module NonDimensionalization
 	Logical :: Fix_Entropy_Top = .true., Fix_Entropy_Bottom = .true.
 	Real*8 :: Entropy_Top = 0.0d0, Entropy_Bottom = 1000.0d0
 
+
+    !////////////////////////////
+    ! Dimensional-like terms
+
 	!//////////////////////////
 	! Nondimensional Parameters
 	Real*8 :: Ra = 1.0d0
@@ -26,7 +31,7 @@ Module NonDimensionalization
 	Real*8 :: Pm = 1.0d0
 
 
-	Real*8 :: nd_entropy
+	Real*8 :: nd_entropy, nd_gravity
 
 	Real*8 :: nd_length, nd_mass, nd_time, nd_rho, nd_temperature, nd_nu, nd_kappa, nd_eta, nd_pressure
 
@@ -60,7 +65,7 @@ Subroutine Standard_ND
 	nd_rho = ref%density(nd_index)
 	nd_mass = nd_rho*nd_length**3
 	nd_mass = poly_mass
-
+    nd_gravity = Gravitational_Constant*nd_mass/(nd_length**2)
 	nd_temperature = ref%temperature(nd_index)
 	nd_nu = nu(nd_index)
 	nd_kappa = kappa(nd_index)
@@ -76,14 +81,18 @@ Subroutine Standard_ND
 		nd_pressure = angular_velocity*nd_rho*nd_nu
 	Else
 		nd_pressure = nd_rho*(nd_length/nd_time)**2
+        Ek = 1.0d0  ! Technically Ek is infinity if Omega = 0
+                    ! But the scaling of pressure by Ek in the nondimensionalized momentum eq
+                    ! changes to no scaling at all whem Omega = 0, which is the same as Ek = 1
 	Endif
-	nd_entropy = Entropy_Bottom-Entropy_Top
-
+	nd_entropy = T_bottom-T_top ! Entropy_Bottom-Entropy_Top
+    T_bottom = T_bottom/nd_entropy      ! ugly - need to clean up the notation here
+    T_top = T_top/nd_entropy            ! Mix of Boussinesq (T) and Anelastic (S)
 
 	
 	!Nondimensionalize the Transport Parameters
 	nu = nu/nd_nu
-	kappa = kappa/nd_kappa
+	kappa = kappa/nd_kappa/Pr
 	dlnu = dlnu*nd_length
 	dlnkappa = dlnkappa*nd_length
 	If (magnetism) Then
@@ -96,6 +105,9 @@ Subroutine Standard_ND
 	Ra = Gravitational_Constant*nd_mass*nd_entropy*nd_length/nd_nu/nd_kappa/Pressure_Specific_Heat
 	Pr = nd_nu/nd_kappa
 	Ek = nd_nu/Angular_Velocity/nd_length/nd_length
+
+    ref%gravity_term_s = ref%gravity_term_s*(pressure_specific_heat/nd_gravity)
+    ref%gravity_term_s = ref%gravity_term_s*Ra
 
 	If ((my_rank .eq. 0) .and. (print_reference) ) Then
 		Write(6,*)'Ra:   ', Ra

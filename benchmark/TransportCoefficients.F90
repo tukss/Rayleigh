@@ -23,7 +23,11 @@ Module TransportCoefficients
 Contains
 
 	Subroutine Compute_Diffusion_Coefs()
-		!////////////////////////////////////////
+        ! These coefficients are nonzero only when nu and/or rho vary in radius
+        ! The formulas here have been verified against the derivation in my notes
+        ! and against those implemented in ASH (which are slightly different from Brun et al. 2004
+        ! due to sign errors in that paper)
+		!////////////////////////////////////////+
 		! W Coefficients for W Equation
 		Allocate(W_Diffusion_Coefs_0(1:N_R))
 		Allocate(W_Diffusion_Coefs_1(1:N_R))
@@ -37,13 +41,18 @@ Contains
 		Allocate(DW_Diffusion_Coefs_1(1:N_R))
 		Allocate(DW_Diffusion_Coefs_2(1:N_R))
 		DW_Diffusion_Coefs_2 = dlnu-ref%dlnrho
-		DW_Diffusion_Coefs_1 = ref%d2lnrho+(2.0d0)/radius*ref%dlnrho+2.0d0/radius*dlnu+dlnu*ref%dlnrho
-		DW_Diffusion_Coefs_0 = 2.0d0/radius+2.0d0*ref%dlnrho/3.0d0+dlnu
-		!////////////////////////////////////////
+        DW_Diffusion_Coefs_1 = ref%d2lnrho+(2.0d0)/radius*ref%dlnrho+2.0d0/radius*dlnu+dlnu*ref%dlnrho
+		!DW_Diffusion_Coefs_0 = 2.0d0/radius+2.0d0*ref%dlnrho/3.0d0+dlnu
+        DW_Diffusion_Coefs_0 = 2.0d0*ref%dlnrho/3.0d0+dlnu      !pulled out 2/r since that doesn't depend on rho or nu
+            !include the factor of nu in these coefficients (and add minus sign for coefs 1 and 0)
+        DW_Diffusion_Coefs_2 =  DW_Diffusion_Coefs_2*nu
+        DW_Diffusion_Coefs_1 = -DW_Diffusion_Coefs_1*nu
+        DW_Diffusion_Coefs_0 = -DW_Diffusion_Coefs_0*nu
+		!//////////////////////////////////////// +
 		! S Coefficients for S Equation
 		Allocate(S_Diffusion_Coefs_1(1:N_R))
 		S_diffusion_Coefs_1 = kappa*(dlnkappa+ref%dlnrho+ref%dlnT)
-		!////////////////////////////////////////
+		!//////////////////////////////////////// +
 		! Z Coefficients for the Z Equation
 		Allocate(Z_Diffusion_Coefs_0(1:N_R))
 		Allocate(Z_Diffusion_Coefs_1(1:N_R))
@@ -57,6 +66,10 @@ Contains
 			Allocate(A_Diffusion_Coefs_1(1:N_R))
 			A_Diffusion_Coefs_1 = eta*dlneta
 		Endif
+
+        !If (my_rank .eq. 0) Then
+        !    Write(6,*)'Checking...', kappa
+        !Endif
 	End Subroutine Compute_Diffusion_Coefs
 
 	Subroutine Initialize_Transport_Coefficients()
@@ -64,7 +77,7 @@ Contains
 		Call Initialize_Nu()							! Viscosity
 		Call Initialize_Kappa()						! Thermal Diffusivity
 		If (magnetism) Call Initialize_Eta()	! Magnetic Diffusivity
-		Call Compute_Diffusion_Coefs
+		!Call Compute_Diffusion_Coefs
 	End Subroutine Initialize_Transport_Coefficients
 
 

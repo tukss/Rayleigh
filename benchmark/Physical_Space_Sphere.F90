@@ -35,6 +35,7 @@ Contains
 		Call fft_to_physical(wsp%p3a,rsc = .true.)
 		Call StopWatch(fft_time)%increment()
 
+
 		Call StopWatch(pspace_time)%startclock()
 		! Convert all our terms of the form "sintheta var" to "var"
 		Call StopWatch(sdiv_time)%startclock()
@@ -79,7 +80,7 @@ Contains
 		Call StopWatch(nl_time)%startclock()
 
 		Call Temperature_Advection()	
-		Call Viscous_Heating()
+		!Call Viscous_Heating()
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
 		Call Momentum_Advection_Phi()
@@ -96,7 +97,7 @@ Contains
 
 		Call StopWatch(pspace_time)%increment()
 
-
+        
 		Call StopWatch(fft_time)%startclock()
 		Call fft_to_spectral(wsp%p3b, rsc = .true.)
 		Call StopWatch(fft_time)%increment()
@@ -113,7 +114,7 @@ Contains
 		Integer :: t, r,k
 
 		DO_IDX
-			wsp%p3a(IDX,dvtdt) = -wsp%p3a(IDX,vr)*(radius(r)*ref%dlnrho(r)-2.0d0) &
+			wsp%p3a(IDX,dvtdt) = -wsp%p3a(IDX,vr)*(radius(r)*ref%dlnrho(r)+2.0d0) &
 										- radius(r)*wsp%p3a(IDX,dvrdr) &
 										- wsp%p3a(IDX,vtheta)*cottheta(t) &
 										- wsp%p3a(IDX,dvpdp)*csctheta(t)
@@ -126,7 +127,7 @@ Contains
 		Integer :: t, r,k
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
-			wsp%p3a(IDX,dvpdt) = radius(r)*(wsp%p3a(IDX,zvar)+wsp%p3a(IDX,dvtdp) &
+			wsp%p3a(IDX,dvpdt) = radius(r)*(wsp%p3a(IDX,zvar)+wsp%p3a(IDX,dvtdp)*csctheta(t) &
 										-wsp%p3a(IDX,vphi)*cottheta(t) )
 		END_DO
 		!$OMP END PARALLEL DO
@@ -142,6 +143,7 @@ Contains
 				wsp%p3b(k,r,t,tvar) = -wsp%p3a(k,r,t,vr)*wsp%p3a(k,r,t,dtdr) &
 									 - wsp%p3a(k,r,t,dtdt)*wsp%p3a(k,r,t,vtheta) &
 									 - wsp%p3a(k,r,t,vphi)*wsp%p3a(k,r,t,dtdp)*csctheta(t)
+
 				Enddo
 			Enddo
 		Enddo				
@@ -154,7 +156,7 @@ Contains
 		Integer :: t,r,k
 		Real*8 :: tmp, tmp2
 		Real*8, Allocatable :: htemp(:,:,:), heating_coef(:)
-
+        Real*8 :: one_third
 		Allocate(htemp(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
 
 		! Need to optimize these loops later, but for now, let's write this in
@@ -181,11 +183,10 @@ Contains
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
-					tmp = (wsp%p3a(IDX,dvrdp)*csctheta(t)*one_over_r(r) &
-							+wsp%p3a(IDX,dvpdr) &
-							-wsp%p3a(IDX,vphi)*one_over_r(r) )*0.5d0		! e_r_phi
+					tmp = (wsp%p3a(IDX,dvrdp)*csctheta(t)- wsp%p3a(IDX,vphi))*one_over_r(r) &
+							+wsp%p3a(IDX,dvpdr) ! 2*e_r_phi
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0  ! +2 e_r_phi**2
 					
 				Enddo
 			Enddo
@@ -198,11 +199,10 @@ Contains
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
-					tmp = (wsp%p3a(IDX,dvrdt)*one_over_r(r) &
-							+wsp%p3a(IDX,dvtdr) &
-							-wsp%p3a(IDX,vtheta)*one_over_r(r) )*0.5d0		! e_r_theta
+					tmp = (wsp%p3a(IDX,dvrdt)*one_over_r(r)-wsp%p3a(IDX,vtheta))*one_over_r(r) &
+							+wsp%p3a(IDX,dvtdr) ! 2*e_r_theta
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0   ! + 2+e_r_theta**2
 					
 				Enddo
 			Enddo
@@ -217,15 +217,28 @@ Contains
 				Do k =1, n_phi
 					tmp = (wsp%p3a(IDX,dvpdt) &
 							+wsp%p3a(IDX,dvtdp)*csctheta(t) &
-							-wsp%p3a(IDX,vphi)*cottheta(t) )*0.5d0*one_over_r(r)		! e_phi_theta
+							-wsp%p3a(IDX,vphi)*cottheta(t) )*one_over_r(r)		! 2*e_phi_theta
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*2.0d0
+					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0   ! + 2*e_phi_theta**2
 					
 				Enddo
 			Enddo
 		Enddo			
 		!$OMP END PARALLEL DO
 
+        one_third = 1.0d0/3.0d0
+        ! -1/3 (div dot v )**2
+		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp)
+		Do t = my_theta%min, my_theta%max
+			Do r = my_r%min, my_r%max
+				Do k =1, n_phi
+					tmp = wsp%p3a(IDX,dvpdt)*ref%dlnrho(r)
+					htemp(IDX) = htemp(IDX)-tmp*tmp*one_third   ! + 2*e_phi_theta**2
+					
+				Enddo
+			Enddo
+		Enddo			
+		!$OMP END PARALLEL DO
 
 		! Allocate heating_coeff
 		! Heating coeff is 2*nu/T_bar
@@ -302,7 +315,7 @@ Contains
 		! Multiply advection/coriolis pieces by rho
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
-			RHSP(IDX,wvar) = RHSP(IDX,pvar)*ref%density(r)
+			RHSP(IDX,wvar) = RHSP(IDX,wvar)*ref%density(r)
 		END_DO
 		!OMP END PARALLEL DO	
 

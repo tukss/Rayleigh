@@ -36,9 +36,9 @@ Contains
 		
 		Call Initialize_Transport_Coefficients()
 		Call NonDimensionalize()
+        Call Compute_Diffusion_Coefs()
 		Call Write_Reference(ndrf)
-		Call pfi%exit()
-		STOP
+		
 		Call Initialize_Diagnostics()
 		Call Initialize_Field_Structure()	! organization
 		Call Full_Barrier()

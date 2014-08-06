@@ -22,7 +22,7 @@ Module ReferenceState
 		Real*8, Allocatable :: dsdr(:)
 
 		Real*8, Allocatable :: Gravity(:)
-
+        Real*8, Allocatable :: Gravity_term_s(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
 		Real*8 :: gamma
 
 		Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
@@ -69,6 +69,7 @@ Contains
 		Allocate(ref%d2lnrho(1:N_R))
 		Allocate(ref%dlnt(1:N_R))
 		Allocate(ref%dsdr(1:N_R))
+        Allocate(ref%gravity_term_s(1:N_R))
 	End Subroutine Allocate_Reference_State
 
 	Subroutine Polytropic_Reference()
@@ -144,6 +145,7 @@ Contains
 
       Ref%dsdr = 0.d0
 
+      Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat
       Deallocate(zeta)
 
 

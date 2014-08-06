@@ -15,6 +15,7 @@ Module Spherical_IO
 		Integer :: full3d_values(1:nqmax) = -1
 		Integer :: output_frequency, eng_frequency, checkpoint_frequency
 		Integer :: full3d_frequency= 100000
+        Integer :: endian_tag = 314
 		Real(8) :: checkpoint_time
       Namelist /output_namelist/shellavg_values, globalavg_values, &
 			& shellslice_values, shellslice_levels, azavg_values, output_frequency, &
@@ -423,7 +424,8 @@ Contains
       	Write(iterstring,i_ofmt) this_iter
          !shell_slice_file = trim(run_dir)//'/Shell_Slices/'//trim(iterstring)
 			shell_slice_file = 'Shell_Slices/'//trim(iterstring)
-	 		Open(unit=15,file=shell_slice_file,form='unformatted', status='replace')
+	 		Open(unit=15,file=shell_slice_file,form='unformatted', status='replace', access='stream')
+            Write(15)endian_tag
          Write(15)nphi,ntheta,nshell_levels,nq_shell
          Write(15)(qvals_shell(i),i=1,nq_shell)
 	 		Write(15)(radius(shell_levels(i)),i=1,nshell_levels)
@@ -770,7 +772,8 @@ Contains
 
             write(iterstring,i_ofmt) this_iter
             shellav_file = 'Shell_Avgs/'//trim(iterstring)
-            open(unit=15,file=shellav_file,form='unformatted', status='replace')
+            open(unit=15,file=shellav_file,form='unformatted', status='replace', access='stream')
+            Write(15)endian_tag
             Write(15)nr, nq_shellav
             Write(15)(qvals_shellav(i),i=1,nq_shellav)
             Write(15)(radius(i),i=1,nr)

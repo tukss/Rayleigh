@@ -9,6 +9,7 @@ Module Initial_Conditions
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Use Timers
+    Use BoundaryConditions, Only : T_top, T_bottom
 	Implicit None
 	Logical :: alt_check = .false.
 	Integer :: init_type = 1
@@ -69,7 +70,9 @@ Contains
         If (init_Type .eq. 5) Then
             call random_init()
         Endif
-
+        If (init_type .eq. 6) Then
+			call abenchmark_init_hydro()
+		Endif
 		If (magnetism) Then
 			If (magnetic_init_type .eq. 1) Then
 				call benchmark_insulating_init()
@@ -168,6 +171,99 @@ Contains
 
 		Call tempfield%deconstruct('p1b')
 	End Subroutine Benchmark_Init_Hydro
+
+	Subroutine ABenchmark_Init_Hydro()
+		Implicit None
+		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
+		Real*8 :: x, norm
+		Integer :: i, r, l, m, mp
+		Integer :: fcount(3,2)
+        Real*8 :: d, beta, denom, zeta_0, c0, c1, n_rho, bm_n,ee, delta_s
+        Real*8, Allocatable :: zeta(:)
+		type(SphericalBuffer) :: tempfield
+		fcount(:,:) = 1
+
+		Allocate(rfunc1(my_r%min: my_r%max))
+		Allocate(rfunc2(my_r%min: my_r%max))
+        !!!!!!!!!
+        ! Stuff to set up background entropy gradient (taken from Mark's benchmark init in ASH)
+        Delta_S = t_bottom ! bottom_entropy
+        If (my_rank .eq. 0) Write(6,*)'Delta_S is ', delta_s
+        d = radius(1) - radius(N_R)
+        beta = radius(N_R) / radius(1)
+        n_rho = 5.0d0
+        bm_n = 2.0d0
+        denom = beta * exp(N_rho / bm_n) + 1.d0
+        zeta_0 = (beta+1.d0)/denom
+
+        c0 = (2.d0 * zeta_0 - beta - 1.d0) / (1.d0 - beta)
+
+        denom = (1.d0 - beta)**2
+        c1 = (1.d0+beta)*(1.d0-zeta_0)/denom
+
+        Allocate(zeta(1:N_R))
+      
+        zeta = c0 + c1 * d / Radius
+
+        ee = -1.d0*bm_n
+        denom = zeta(1)**ee - zeta(N_R)**ee
+
+         
+
+        !!!!!!!
+
+        norm = 2.0d0*Pi/(radius(1)-radius(N_R))
+		Do r = my_r%min, my_r%max
+
+			rfunc2(r) = Delta_S * (zeta(1)**ee - zeta(r)**ee) / denom
+
+            rfunc1(r) = (1.0d0-Cos(norm*(radius(r)-radius(N_R))))*temp_amp
+		Enddo
+
+        DeAllocate(zeta)
+		! We put our temporary field in spectral space
+		Call tempfield%init(field_count = fcount, config = 's2b')		
+		Call tempfield%construct('s2b')		
+
+		! Set the ell = 0 temperature and the real part of Y_19^19	and Y_1_1	
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			Do l = m, l_max
+				if ( (l .eq. 19) .and. (m .eq. 19) ) Then
+					Do r = my_r%min, my_r%max
+						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)
+					Enddo
+				endif
+				if ( (l .eq. 1) .and. (m .eq. 1) ) Then
+					Do r = my_r%min, my_r%max
+						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)*0.1d0
+					Enddo
+				endif
+				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
+					Do r = my_r%min, my_r%max
+						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc2(r)*sqrt(4.0d0*pi)
+					Enddo
+				endif
+			Enddo
+		Enddo
+		DeAllocate(rfunc1,rfunc2)
+
+		Call tempfield%reform() ! goes to p1b
+		If (chebyshev) Then
+			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
+			Call tempfield%construct('p1a')
+			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
+			Call tempfield%deconstruct('p1a')
+		Endif
+		! Set temperature.  Leave the other fields alone
+		Call Set_RHS(teq,tempfield%p1b(:,:,:,1))
+
+		Call tempfield%deconstruct('p1b')
+	End Subroutine ABenchmark_Init_Hydro
+
+
 	Subroutine Diffusion_Init_Hydro()
 		Implicit None
 		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
@@ -683,7 +779,10 @@ Contains
 		Endif
 
     	h = xa(khi)-xa(klo)
-    	If (h .eq. 0.0D0) pause 'bad xa input in splint'
+    	If (h .eq. 0.0D0) Then
+            Write(6,*) 'bad xa input in splint'
+            STOP
+        Endif
     	a = (xa(khi)-x)/h
     	b = (x-xa(klo))/h
 

@@ -156,11 +156,16 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(teq,tvar, 0, amp,lp, static = .true.)	! Time independent part
 
-				amp = 2.0d0/radius/Pr
+				!amp = 2.0d0/radius/Pr
+                amp = 2.0d0/radius*kappa
 				Call add_implicit_term(teq,tvar, 1, amp,lp)
-				amp = 1.0d0/Pr
+				!amp = 1.0d0/Pr
+                amp = 1.0d0*kappa
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
+				! Kappa,rho, T variation in radius
+				amp = S_Diffusion_Coefs_1
+				Call add_implicit_term(teq,tvar,1,amp,lp)
 
 				!=======================================
 				!   Hydrostatic balance
@@ -168,6 +173,7 @@ Contains
 
 				! 	 t
 				amp = -Ra/ek*( (radius/r_outer)**gpower )
+                amp = ref%gravity_term_s
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
 				amp = 1.0d0
@@ -185,12 +191,14 @@ Contains
 				!				Radial Momentum Equation
 				
 				! Temperature
-				amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
-				amp = amp/H_Laplacian
+				!amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
+                !amp = -(Ra/Ek)*ref%gravity
+				!amp = amp/H_Laplacian
+                amp = ref%gravity_term_s/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
 				! Pressure
-				amp = 1.0d0/(Ek*H_Laplacian)		! dPdr
+				amp = 1.0d0/(Ek*H_Laplacian)*ref%density		! dPdr
 				Call add_implicit_term(weq,pvar, 1, amp,lp)
 
 
@@ -198,9 +206,11 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(weq,wvar, 0, amp,lp,static = .true.)	! This term does not a get a dt factor
 
-				amp = H_Laplacian		! Diffusion
+				!amp = H_Laplacian		! Diffusion
+                amp = H_Laplacian*nu
 				Call add_implicit_term(weq,wvar, 0, amp,lp)
-				amp = 1.0d0
+				!amp = 1.0d0
+                amp = nu
 				Call add_implicit_term(weq,wvar, 2, amp,lp)
 
 				! These two diffusion bits are different 
@@ -214,22 +224,25 @@ Contains
 				!				Pressure (dWdr) Equation
 				
 				! Pressure
-				amp = -(1.0d0)/Ek	
+				amp = -(1.0d0)/Ek*ref%density	
 				Call add_implicit_term(peq,pvar, 0, amp,lp)
 
 				! W
 				amp = 1.0d0
 				Call add_implicit_term(peq,wvar, 1, amp,lp, static = .true.)	! Time independent term
-				amp =-H_Laplacian*2.0d0/radius	
+				!amp =-H_Laplacian*2.0d0/radius	
+				amp =-nu*H_Laplacian*2.0d0/radius
 				Call add_implicit_term(peq,wvar, 0, amp,lp)
-				amp = H_Laplacian
+                !amp = H_Laplacian
+				amp = H_Laplacian*nu
 				Call add_implicit_term(peq,wvar, 1, amp,lp)
-				amp = 1.0d0
+				!amp = 1.0d0
+                amp = nu
 				Call add_implicit_term(peq,wvar, 3, amp,lp)
 
 
 				! Again, these two bits depend on variation of rho and nu
-				amp = dW_Diffusion_Coefs_0
+				amp = dW_Diffusion_Coefs_0*H_Laplacian
 				Call add_implicit_term(peq,wvar, 0, amp,lp)
 				amp = dW_Diffusion_Coefs_1
 				Call add_implicit_term(peq,wvar, 1, amp,lp)				
@@ -241,24 +254,32 @@ Contains
 				! T 
 				amp = 1.0d0
 				Call add_implicit_term(teq,tvar, 0, amp,lp, static = .true.)		! Time independent term
-				amp = H_Laplacian/Pr		! Diffusion
+
+				!amp = H_Laplacian/Pr		! Diffusion
+                amp = H_Laplacian*kappa
 				Call add_implicit_term(teq,tvar, 0, amp,lp)
-				amp = 2.0d0/radius/Pr
+				!amp = 2.0d0/radius/Pr
+				amp = 2.0d0/radius*kappa
 				Call add_implicit_term(teq,tvar, 1, amp,lp)
-				amp = 1.0d0/Pr
+
+                ! amp = 1.0d0/Pr
+				amp = kappa
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
 				! Kappa,rho, T variation in radius
-				amp = S_Diffusion_Coefs_1
+				amp = S_Diffusion_Coefs_1/Pr
 				Call add_implicit_term(teq,tvar,1,amp,lp)
 				
 				!=====================================================
 				!	Z Equation
 				amp = 1.0d0
 				Call add_implicit_term(zeq,zvar, 0, amp,lp, static = .true.)	! Time-independent piece
-				amp = H_Laplacian
+
+				!amp = H_Laplacian
+                amp = H_Laplacian*nu
 				Call add_implicit_term(zeq,zvar, 0, amp,lp)				
-				amp = 1.0d0
+				!amp = 1.0d0
+                amp = nu
 				Call add_implicit_term(zeq,zvar, 2, amp,lp)				
 
 				! Variation of rho and nu
@@ -498,7 +519,8 @@ Contains
 				r = N_R
 				Call Load_BC(lp,r,weq,wvar,one,0)
 
-		
+
+                If (no_slip_boundaries) Then		
 				! No Slip Top and Bottom
 				! Z and dWdr vanish at the boundaries
                 r = 1
@@ -512,6 +534,23 @@ Contains
 				r = N_R
 				Call Load_BC(lp,r,peq,wvar,one,1)
 				Call Load_BC(lp,r,zeq,zvar,one,0)
+                Else
+                    ! stress-free boundaries
+                    r = 1
+                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                    Call Load_BC(lp,r,peq,wvar,one,2)
+                    Call Load_BC(lp,r,peq,wvar,samp,1)
+                    Call Load_BC(lp,r,zeq,zvar,one,1)
+                    Call Load_BC(lp,r,zeq,zvar,samp,0)
+
+                    r = N_R
+                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                    Call Load_BC(lp,r,peq,wvar,one,2)
+                    Call Load_BC(lp,r,peq,wvar,samp,1)
+                    Call Load_BC(lp,r,zeq,zvar,one,1)
+                    Call Load_BC(lp,r,zeq,zvar,samp,0)
+                Endif
+
 				if (bandsolve) Then
 					Call Band_Arrange(weq,lp)
 					Call Band_Arrange(zeq,lp)
