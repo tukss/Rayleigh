@@ -1,7 +1,7 @@
 Module Drive_Sphere
 	Use ClockInfo
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
-	Use Physical_Space_Sphere, Only : physical_space
+	Use Physical_Space_Sphere, Only : physical_space, coriolis_term
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp
 	Use Checkpointing
 	Use Controls
@@ -60,7 +60,11 @@ Contains
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
 		If (rotation) Then
-			two_over_ek = 2.0d0/ek
+            If (dimensional) Then
+                coriolis_term = 2.0d0*Angular_velocity
+            Else
+    			coriolis_term = 2.0d0/ek
+            Endif
 		Endif
 		If (magnetism) Then
 			ovPm = 1.0d0/Pm

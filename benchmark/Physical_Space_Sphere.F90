@@ -19,7 +19,7 @@ Module Physical_Space_Sphere
 	Use TransportCoefficients
 	Use NonDimensionalization
 	Implicit None
-
+    Real*8 :: coriolis_term = 0.0d0
 Contains
 	Subroutine physical_space()
 		Implicit None
@@ -306,7 +306,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX			
 				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
-					& two_over_ek*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
+					& coriolis_term*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -414,7 +414,7 @@ Contains
 
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,pvar) = RHSP(IDX,pvar)- two_over_ek*costheta(t)*FIELDSP(IDX,vphi)
+				RHSP(IDX,pvar) = RHSP(IDX,pvar)- coriolis_term*costheta(t)*FIELDSP(IDX,vphi)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -471,8 +471,8 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
-					 + two_over_ek*costheta(t)*FIELDSP(IDX,vtheta) &
-					 + two_over_ek*sintheta(t)*FIELDSP(IDX,vr)
+					 + coriolis_term*costheta(t)*FIELDSP(IDX,vtheta) &
+					 + coriolis_term*sintheta(t)*FIELDSP(IDX,vr)
 			END_DO
 			!OMP END PARALLEL DO
 		Endif
