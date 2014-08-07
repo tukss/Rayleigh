@@ -60,7 +60,7 @@ Subroutine Standard_ND
 	Logical :: print_reference = .true.
 	! Set standard length, time, and mass first
 	nd_length = radius(1)-radius(N_r)
-	write(6,*)'nd length: ', nd_length
+	!write(6,*)'nd length: ', nd_length
 	nd_time = nd_length*nd_length/nu(nd_index)
 	nd_rho = ref%density(nd_index)
 	nd_mass = nd_rho*nd_length**3

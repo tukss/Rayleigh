@@ -9,7 +9,7 @@ Module Diagnostics
 	Integer, Parameter, Private :: V_r = 1,   V_theta = 2, V_phi = 3
   	Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
 	
-	Integer, Parameter, Private :: v_sq = 6
+	Integer, Parameter, Private :: v_sq = 6, kinetic_energy = 7
 
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
@@ -103,6 +103,20 @@ Contains
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
 				Call Add_Quantity(v_sq,qty)
+			Endif	
+
+			If (compute_q(kinetic_energy) .ne. 0) Then
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						    qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
+						Enddo
+					Enddo
+				Enddo                
+				Call Add_Quantity(kinetic_energy,qty)
 			Endif	
 
 			If (compute_q(diagnostic1) .ne. 0) Then
