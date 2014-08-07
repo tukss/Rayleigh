@@ -173,7 +173,7 @@ Contains
 
 				! 	 t
 				amp = -Ra/ek*( (radius/r_outer)**gpower )
-                amp = ref%gravity_term_s
+                amp = -ref%gravity_term_s
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
 				amp = 1.0d0
@@ -194,7 +194,7 @@ Contains
 				!amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
                 !amp = -(Ra/Ek)*ref%gravity
 				!amp = amp/H_Laplacian
-                amp = ref%gravity_term_s/H_Laplacian
+                amp = -ref%gravity_term_s/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
 				! Pressure
