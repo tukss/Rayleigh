@@ -3,6 +3,7 @@ Module Diagnostics
 	Use Spherical_IO
 	Use Fields
 	Use Legendre_Polynomials, Only : gl_weights
+    Use ReferenceState
 	Implicit None
 	!/////////////////////////////////////////////////////////
 	!  Quantity Codes (some care must be taken to
