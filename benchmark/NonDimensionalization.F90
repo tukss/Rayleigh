@@ -92,7 +92,7 @@ Subroutine Standard_ND
 	
 	!Nondimensionalize the Transport Parameters
 	nu = nu/nd_nu
-	kappa = kappa/nd_kappa/Pr
+	
 	dlnu = dlnu*nd_length
 	dlnkappa = dlnkappa*nd_length
 	If (magnetism) Then
@@ -104,6 +104,7 @@ Subroutine Standard_ND
 
 	Ra = Gravitational_Constant*nd_mass*nd_entropy*nd_length/nd_nu/nd_kappa/Pressure_Specific_Heat
 	Pr = nd_nu/nd_kappa
+    kappa = kappa/nd_kappa/Pr
 	Ek = nd_nu/Angular_Velocity/nd_length/nd_length
 
     ref%gravity_term_s = ref%gravity_term_s*(pressure_specific_heat/nd_gravity)

@@ -267,7 +267,7 @@ Contains
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
 				! Kappa,rho, T variation in radius
-				amp = S_Diffusion_Coefs_1/Pr
+				amp = S_Diffusion_Coefs_1          !/Pr
 				Call add_implicit_term(teq,tvar,1,amp,lp)
 				
 				!=====================================================
@@ -398,6 +398,7 @@ Contains
 				Call Load_BC(lp,r,weq,wvar,one,0)
 
 		
+                If (no_slip_boundaries) Then		
 				! No Slip Top and Bottom
 				! Z and dWdr vanish at the boundaries
                 r = 1
@@ -411,6 +412,23 @@ Contains
 				r = N_R
 				Call Load_BC(lp,r,peq,wvar,one,1)
 				Call Load_BC(lp,r,zeq,zvar,one,0)
+                Else
+                    ! stress-free boundaries
+                    r = 1
+                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                    Call Load_BC(lp,r,peq,wvar,one,2)
+                    Call Load_BC(lp,r,peq,wvar,samp,1)
+                    Call Load_BC(lp,r,zeq,zvar,one,1)
+                    Call Load_BC(lp,r,zeq,zvar,samp,0)
+
+                    r = N_R
+                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                    Call Load_BC(lp,r,peq,wvar,one,2)
+                    Call Load_BC(lp,r,peq,wvar,samp,1)
+                    Call Load_BC(lp,r,zeq,zvar,one,1)
+                    Call Load_BC(lp,r,zeq,zvar,samp,0)
+                Endif
+
 
 
 				!*******************************************************
