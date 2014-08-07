@@ -66,8 +66,10 @@ Contains
 
 		Call Add_Derivative(peq,wvar,0,wsp%p1b,wsp%p1a,wvar)	
 		Call Add_Derivative(peq,wvar,1,wsp%p1b,wsp%p1a,dwdr)
+        Call Add_Derivative(peq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
-		Call Add_Derivative(weq,wvar,0,wsp%p1b,wsp%p1a,wvar)	
+		Call Add_Derivative(weq,wvar,0,wsp%p1b,wsp%p1a,wvar)
+	    Call Add_Derivative(weq,wvar,1,wsp%p1b,wsp%p1a,dwdr)
 		Call Add_Derivative(weq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
 		If (deriv_cluge) Then
@@ -109,7 +111,7 @@ Contains
 		Call d_by_dx(zvar,dzdr,wsp%p1a,1)	
 
 		Call Add_Derivative(zeq,zvar,0,wsp%p1b,wsp%p1a,zvar)	
-
+        Call Add_Derivative(zeq,zvar,1,wsp%p1b,wsp%p1a,dzdr)
 
 		If (magnetism) Then
 			!//////////////
@@ -251,8 +253,10 @@ Contains
 
 		Call Add_Derivative(peq,wvar,0,wsp%p1b,wsp%p1a,wvar)	
 		Call Add_Derivative(peq,wvar,1,wsp%p1b,wsp%p1a,dwdr)
+		Call Add_Derivative(peq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
 		Call Add_Derivative(weq,wvar,0,wsp%p1b,wsp%p1a,wvar)	
+		Call Add_Derivative(weq,wvar,1,wsp%p1b,wsp%p1a,dwdr)
 		Call Add_Derivative(weq,wvar,2,wsp%p1b,wsp%p1a,d2wdr2)
 
 		
@@ -284,7 +288,7 @@ Contains
 
 
 		Call Add_Derivative(zeq,zvar,0,wsp%p1b,wsp%p1a,zvar)	
-
+		Call Add_Derivative(zeq,zvar,1,wsp%p1b,wsp%p1a,dzdr)
 
 		!///////////////////////////////////////
 		!  Magnetic Terms

@@ -145,7 +145,7 @@ Contains
 
       Ref%dsdr = 0.d0
 
-      Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat
+      Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat*ref%density
       Deallocate(zeta)
 
 

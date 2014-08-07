@@ -108,7 +108,7 @@ Subroutine Standard_ND
 	Ek = nd_nu/Angular_Velocity/nd_length/nd_length
 
     ref%gravity_term_s = ref%gravity_term_s*(pressure_specific_heat/nd_gravity)
-    ref%gravity_term_s = ref%gravity_term_s*Ra
+    ref%gravity_term_s = ref%gravity_term_s*Ra/nd_rho
 
 	If ((my_rank .eq. 0) .and. (print_reference) ) Then
 		Write(6,*)'Ra:   ', Ra
