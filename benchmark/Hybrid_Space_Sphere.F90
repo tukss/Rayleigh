@@ -26,11 +26,11 @@ Contains
 		! in this configuration is reconfigured
 		Allocate(rho_rep(1:2*my_r%delta))
 		rho_rep(1:my_r%delta) = ref%density(my_r%min:my_r%max)
-		rho_rep(my_r%delta+1:2*my_r%delta) = ref%density(1:my_r%delta)
+		rho_rep(my_r%delta+1:2*my_r%delta) = ref%density(my_r%min:my_r%max)
 
 		Allocate(dlnrho_rep(1:2*my_r%delta))
 		dlnrho_rep(1:my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
-		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(1:my_r%delta)
+		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
 	End Subroutine Hybrid_Init
 
 	Subroutine rlm_spacea()
