@@ -25,11 +25,11 @@ Contains
 		! This routine will be unnecessary once the data storage
 		! in this configuration is reconfigured
 		Allocate(rho_rep(1:2*my_r%delta))
-		rho_rep(1:my_r%delta) = ref%density(my_r%min:my_r%max)
+		rho_rep(1:my_r%delta)              = ref%density(my_r%min:my_r%max)
 		rho_rep(my_r%delta+1:2*my_r%delta) = ref%density(my_r%min:my_r%max)
 
 		Allocate(dlnrho_rep(1:2*my_r%delta))
-		dlnrho_rep(1:my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
+		dlnrho_rep(1:my_r%delta)              = ref%dlnrho(my_r%min:my_r%max)
 		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
 	End Subroutine Hybrid_Init
 
@@ -263,14 +263,14 @@ Contains
 
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)+ftemp2(mp)%data(:,:)-wsp%s2a(mp)%data(:,rmn1:rmx1)
+			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)+ftemp2(mp)%data(:,:) !-wsp%s2a(mp)%data(:,rmn1:rmx1)  !PROBLEM
 			do r = rmn, rmx
 				rind = r-rmn+1			
 				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
 			enddo
 		Enddo
 
-			!.... Small correction for density variation  :  - u_theta*dlnrhodr
+			!.... Small correction for density variation  :  - u_theta*dlnrhodr (added -u_theta/r as well here)
             ! Notice that there is a -u_theta/r term above.  These should be combined
             ! for efficiency later
 		rmn1 = (vtheta-1)*tnr+1
@@ -282,7 +282,8 @@ Contains
 			do r = rmn, rmx
 				rind = r-rmn+1
 				rind2 = r-rmn+rmn1			
-				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)-wsp%s2a(mp)%data(:,rind2)*dlnrho_rep(rind)
+				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)- &
+                    & wsp%s2a(mp)%data(:,rind2)*(dlnrho_rep(rind)+ovr_repeated(rind))
 			enddo
 		Enddo		
 
@@ -298,7 +299,7 @@ Contains
 
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)-ftemp2(mp)%data(:,:)-wsp%s2a(mp)%data(:,rmn1:rmx1)
+			ftemp1(mp)%data(:,:) = ftemp1(mp)%data(:,:)-ftemp2(mp)%data(:,:)
 			do r = rmn, rmx
 				rind = r-rmn+1			
 				wsp%s2a(mp)%data(:,r) = ftemp1(mp)%data(:,rind)*ovr_repeated(rind)/rho_rep(rind)
@@ -306,6 +307,7 @@ Contains
 		Enddo
 
 			!.... Small correction for density variation  :  - u_phi*dlnrhodr
+            ! .... moved -u_phi/r here as well
 		rmn1 = (vphi-1)*tnr+1
 		rmx1 = rmn1+tnr-1 
 		rmn = (dvpdr-1)*tnr+1
@@ -315,7 +317,8 @@ Contains
 			do r = rmn, rmx
 				rind = r-rmn+1
 				rind2 = r-rmn+rmn1			
-				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)-wsp%s2a(mp)%data(:,rind2)*dlnrho_rep(rind)
+				wsp%s2a(mp)%data(:,r) = wsp%s2a(mp)%data(:,r)- &
+                        &  wsp%s2a(mp)%data(:,rind2)*(dlnrho_rep(rind)+ovr_repeated(rind))
 			enddo
 		Enddo		
 		!/////////////////////////////////////////

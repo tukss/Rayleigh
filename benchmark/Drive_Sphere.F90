@@ -62,6 +62,7 @@ Contains
 		If (rotation) Then
             If (dimensional) Then
                 coriolis_term = 2.0d0*Angular_velocity
+                Write(6,*)'Angular velocity: ', angular_velocity
             Else
     			coriolis_term = 2.0d0/ek
             Endif
