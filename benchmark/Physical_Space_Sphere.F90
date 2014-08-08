@@ -394,8 +394,8 @@ Contains
 			RHSP(IDX,pvar) = wsp%p3a(IDX,dvrdr)       &	
 				 + ( wsp%p3a(IDX,dvpdp)*csctheta(t)    & ! vphi/sintheta/r dvrdphi		!check this comment...
 				 +   wsp%p3a(IDX,vtheta)*cottheta(t)   & !vtheta cot(theta)/r
-				 +   wsp%p3a(IDX,vr)                    &   !ur/r
-                 +   wsp%p3a(IDX,vr)*ref%dlnrho(r)  ) *one_over_r(r)!ur dlnrho/r
+				 +   wsp%p3a(IDX,vr) ) *one_over_r(r)                   &   !ur/r
+                 +   wsp%p3a(IDX,vr)*ref%dlnrho(r) !ur dlnrho
 		END_DO
 		!$OMP END PARALLEL DO
 
