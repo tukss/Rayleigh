@@ -80,7 +80,7 @@ Contains
 		Call StopWatch(nl_time)%startclock()
 
 		Call Temperature_Advection()	
-		!Call Viscous_Heating()
+		If (viscous_heating) Call Compute_Viscous_Heating()
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
 		Call Momentum_Advection_Phi()
@@ -151,7 +151,7 @@ Contains
 
 	End Subroutine Temperature_Advection
 
-	Subroutine Viscous_Heating()
+	Subroutine Compute_Viscous_Heating()
 		Implicit None
 		Integer :: t,r,k
 		Real*8 :: tmp, tmp2
@@ -260,7 +260,7 @@ Contains
 		DeAllocate(htemp)
 		DeAllocate(heating_coef)
 
-	End Subroutine Viscous_Heating
+	End Subroutine Compute_Viscous_Heating
 
 
 	Subroutine Ohmic_Heating()
