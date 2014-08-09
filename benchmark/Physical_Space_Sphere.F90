@@ -127,8 +127,8 @@ Contains
 		Integer :: t, r,k
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		DO_IDX
-			wsp%p3a(IDX,dvpdt) = radius(r)*(wsp%p3a(IDX,zvar)+wsp%p3a(IDX,dvtdp)*csctheta(t) &
-										-wsp%p3a(IDX,vphi)*cottheta(t) )
+			wsp%p3a(IDX,dvpdt) = radius(r)*wsp%p3a(IDX,zvar)+wsp%p3a(IDX,dvtdp)*csctheta(t) &
+            -wsp%p3a(IDX,vphi)*cottheta(t)
 		END_DO
 		!$OMP END PARALLEL DO
 	End Subroutine Compute_dvphi_by_dtheta
@@ -199,7 +199,7 @@ Contains
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
-					tmp = (wsp%p3a(IDX,dvrdt)*one_over_r(r)-wsp%p3a(IDX,vtheta))*one_over_r(r) &
+					tmp = (wsp%p3a(IDX,dvrdt)-wsp%p3a(IDX,vtheta))*one_over_r(r) &
 							+wsp%p3a(IDX,dvtdr) ! 2*e_r_theta
 					
 					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0   ! + 2+e_r_theta**2
@@ -232,7 +232,7 @@ Contains
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
-					tmp = wsp%p3a(IDX,dvpdt)*ref%dlnrho(r)
+					tmp = -wsp%p3a(IDX,vr)*ref%dlnrho(r)
 					htemp(IDX) = htemp(IDX)-tmp*tmp*one_third   ! + 2*e_phi_theta**2
 					
 				Enddo
