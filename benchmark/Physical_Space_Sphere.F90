@@ -274,9 +274,9 @@ Contains
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
 				wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar) &
-									 + wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
+									 + (wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
 									 + wsp%p3a(k,r,t,jtheta)*wsp%p3a(k,r,t,jtheta) &
-									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi)
+									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi))*eta(r)
 				Enddo
 			Enddo
 		Enddo				

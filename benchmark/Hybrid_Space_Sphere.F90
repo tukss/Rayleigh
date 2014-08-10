@@ -12,6 +12,7 @@ Module Hybrid_Space_Sphere
 	Use ReferenceState
 	Implicit None
 	Real*8, Allocatable :: rho_rep(:), dlnrho_rep(:)
+    Real*8 :: jfactor
 	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 Contains
 !///// TODO
@@ -31,6 +32,9 @@ Contains
 		Allocate(dlnrho_rep(1:2*my_r%delta))
 		dlnrho_rep(1:my_r%delta)              = ref%dlnrho(my_r%min:my_r%max)
 		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
+
+        !jfactor = 1.0d0 ! For Boussinesq benchmark
+        jfactor = 1.0d0/(4.0d0*pi)
 	End Subroutine Hybrid_Init
 
 	Subroutine rlm_spacea()
@@ -374,7 +378,7 @@ Contains
 	Subroutine Compute_BandJ()
 		Implicit None
 		Integer :: l, m, mp, rmn,rmx, r, rind, rmn2,rmx2, roff, rind2, roff2
-
+       
 		!/////////////// BR /////////////////////		
 		!First convert C to Br  !! Br overwrites C
 		rmn = (br-1)*tnr+1
@@ -400,7 +404,8 @@ Contains
 			Do r = rmn, rmx
 				rind = r +roff 
             rind2 = r+roff2
-				wsp%s2a(mp)%data(m:l_max,r) = l_l_plus1(m:l_max)*wsp%s2a(mp)%data(m:l_max,rind2)*ovrsq_repeated(rind)
+				wsp%s2a(mp)%data(m:l_max,r) = jfactor*l_l_plus1(m:l_max) &
+                    *wsp%s2a(mp)%data(m:l_max,rind2)*ovrsq_repeated(rind)
 			Enddo
 		Enddo     
 
@@ -446,6 +451,7 @@ Contains
 			Do r = rmn, rmx
 				rind = r+ roff 
 				wsp%s2a(mp)%data(m:l_max,r) = wsp%s2a(mp)%data(m:l_max,r)+ftemp2(mp)%data(m:l_max,rind)
+                wsp%s2a(mp)%data(m:l_max,r) = jfactor*wsp%s2a(mp)%data(m:l_max,r)
 			Enddo
         Enddo
 
@@ -460,7 +466,7 @@ Contains
 			m = m_values(mp)
 			Do r = rmn, rmx
 				rind = r+ roff 
-				wsp%s2a(mp)%data(m:l_max,r) = ftemp1(mp)%data(m:l_max,rind)-ftemp2(mp)%data(m:l_max,rind)
+				wsp%s2a(mp)%data(m:l_max,r) = jfactor*(ftemp1(mp)%data(m:l_max,rind)-ftemp2(mp)%data(m:l_max,rind))
 			Enddo
         Enddo
 
