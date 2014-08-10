@@ -2,7 +2,7 @@ Module Diagnostics
 	Use ProblemSize
 	Use Spherical_IO
 	Use Fields
-	Use Legendre_Polynomials, Only : gl_weights
+	Use Legendre_Polynomials, Only : gl_weights, pi
     Use ReferenceState
     Use TransportCoefficients
 	Implicit None
@@ -21,11 +21,13 @@ Module Diagnostics
 	!/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
 	Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
 	Integer, Parameter, Private :: J_r = 204, J_theta = 205, J_phi = 206
-	Integer, Parameter, Private :: B_sq = 207
+	Integer, Parameter, Private :: B_sq = 207, magnetic_energy=208, zonal_me = 209
+    Integer, Parameter, Private :: merid_me = 210
 
 	!///////////////////////////////////
 	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: rweights(:)
+    Real*8 :: over_eight_pi
 Contains
 
 	Subroutine Initialize_Diagnostics()
@@ -33,7 +35,7 @@ Contains
         Integer :: i
         Real*8 :: delr
         Real*8, Allocatable :: tweights(:)
-
+        over_eight_pi = 1.0d0/pi
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
 
@@ -247,6 +249,52 @@ Contains
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2
 				Call Add_Quantity(b_sq,qty)
 			Endif	
+
+			If (compute_q(magnetic_energy) .ne. 0) Then
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
+				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
+				qty(1:n_phi,:,:) = (qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2)*over_eight_pi
+				Call Add_Quantity(magnetic_energy,qty)
+			Endif	
+
+			If (compute_q(zonal_me) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+                        ! compute mean v_phi here
+                        tmp = 0.0d0
+						Do p = 1, n_phi
+						    tmp = tmp+buffer(p,r,t,bphi)
+						Enddo
+                        tmp = tmp*over_n_phi
+                        tmp = over_eight_pi*tmp**2
+                        qty(:,r,t) = tmp
+					Enddo
+				Enddo
+				Call Add_Quantity(zonal_me,qty)
+			Endif	
+
+            ! Here we can do something like:
+            !If (use_mean_vr .or. use_mean_vphi) then
+            ! then we can individual quantities within - taking moments for example
+			If (compute_q(merid_me) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+                        ! compute mean v_phi here
+                        tmp = 0.0d0
+                        tmp2 = 0.0d0
+						Do p = 1, n_phi
+						    tmp = tmp+buffer(p,r,t,br)
+                            tmp2 = tmp2+buffer(p,r,t,btheta)
+						Enddo
+                        tmp = tmp*over_n_phi
+                        tmp2 = tmp2*over_n_phi
+                        tmp = over_eight_pi*(tmp**2+tmp2**2)                       
+                        qty(:,r,t) = tmp
+					Enddo
+				Enddo
+				Call Add_Quantity(merid_me,qty)
+			Endif	
+
 
 			Endif
 			DeAllocate(qty)
