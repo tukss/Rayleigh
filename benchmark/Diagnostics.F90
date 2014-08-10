@@ -4,6 +4,7 @@ Module Diagnostics
 	Use Fields
 	Use Legendre_Polynomials, Only : gl_weights
     Use ReferenceState
+    Use TransportCoefficients
 	Implicit None
 	!/////////////////////////////////////////////////////////
 	!  Quantity Codes (some care must be taken to
@@ -11,7 +12,8 @@ Module Diagnostics
   	Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
 	
 	Integer, Parameter, Private :: v_sq = 6, kinetic_energy = 7
-
+    Integer, Parameter, Private :: gradt_r = 8, cond_flux_r = 9
+    Integer, Parameter, Private :: zonal_ke = 10, merid_ke = 11
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -59,13 +61,13 @@ Contains
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
 		Real*8, Intent(In) :: current_time
-		Real*8 :: mypi
+		Real*8 :: mypi, over_n_phi, tmp, tmp2
 		Integer :: p,t,r
 		
 		If (mod(iteration,output_frequency) .eq. 0) Then
 			Call Begin_Outputting(iteration)
 			Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
-
+            over_n_phi = 1.0d0/dble(n_phi)
 			If (compute_q(v_r) .ne. 0) Then
 				
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
@@ -98,6 +100,66 @@ Contains
 				Enddo
 				Call Add_Quantity(temperature,qty)
 			Endif		
+
+			If (compute_q(gradt_r) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						qty(p,r,t) = buffer(p,r,t,dtdr)
+						Enddo
+					Enddo
+				Enddo
+				Call Add_Quantity(gradt_r,qty)
+			Endif		
+
+			If (compute_q(cond_flux_r) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						qty(p,r,t) = ref%density(r)*ref%temperature(r)*kappa(r)*buffer(p,r,t,dtdr)
+						Enddo
+					Enddo
+				Enddo
+				Call Add_Quantity(cond_flux_r,qty)
+			Endif	
+
+			If (compute_q(zonal_ke) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+                        ! compute mean v_phi here
+                        tmp = 0.0d0
+						Do p = 1, n_phi
+						    tmp = tmp+buffer(p,r,t,vphi)
+						Enddo
+                        tmp = tmp*over_n_phi
+                        tmp = 0.5d0*ref%density(r)*tmp**2
+                        qty(:,r,t) = tmp
+					Enddo
+				Enddo
+				Call Add_Quantity(zonal_ke,qty)
+			Endif	
+
+            ! Here we can do something like:
+            !If (use_mean_vr .or. use_mean_vphi) then
+            ! then we can individual quantities within - taking moments for example
+			If (compute_q(merid_ke) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+                        ! compute mean v_phi here
+                        tmp = 0.0d0
+                        tmp2 = 0.0d0
+						Do p = 1, n_phi
+						    tmp = tmp+buffer(p,r,t,vr)
+                            tmp2 = tmp2+buffer(p,r,t,vtheta)
+						Enddo
+                        tmp = tmp*over_n_phi
+                        tmp2 = tmp2*over_n_phi
+                        tmp = 0.5d0*ref%density(r)*(tmp**2+tmp2**2)                       
+                        qty(:,r,t) = tmp
+					Enddo
+				Enddo
+				Call Add_Quantity(merid_ke,qty)
+			Endif	
 
 			If (compute_q(v_sq) .ne. 0) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
