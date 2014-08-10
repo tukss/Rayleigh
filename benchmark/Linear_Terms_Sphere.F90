@@ -292,9 +292,9 @@ Contains
 					!  Btor Equation
 					amp = 1.0d0
 					Call add_implicit_term(aeq,avar, 0, amp,lp, static = .true.)	! Time-independent piece
-					amp = H_Laplacian/Pm
+					amp = H_Laplacian*eta
 					Call add_implicit_term(aeq,avar, 0, amp,lp)					
-					amp = 1.0d0/Pm
+					amp = 1.0d0*eta
 					Call add_implicit_term(aeq,avar, 2, amp,lp)	
 
 					! Eta variation in radius
@@ -305,9 +305,9 @@ Contains
 					!  Bpol Equation
 					amp = 1.0d0
 					Call add_implicit_term(ceq,cvar, 0, amp,lp, static = .true.)	! Time-independent piece
-					amp = H_Laplacian/Pm
+					amp = H_Laplacian*eta
 					Call add_implicit_term(ceq,cvar, 0, amp,lp)
-					amp = 1.0d0/Pm
+					amp = 1.0d0*eta
 					Call add_implicit_term(ceq,cvar, 2, amp,lp)					
 				Endif
 			
