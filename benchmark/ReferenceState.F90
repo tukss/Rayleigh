@@ -7,6 +7,7 @@
 
 Module ReferenceState
 	Use ProblemSize
+    Use Legendre_Polynomials, Only : pi
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
@@ -24,12 +25,13 @@ Module ReferenceState
 		Real*8, Allocatable :: Gravity(:)
         Real*8, Allocatable :: Gravity_term_s(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
 		Real*8 :: gamma
-
+        Real*8, Allocatable :: heating(:)
 		Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
 	End Type ReferenceInfo
 
 	Integer :: reference_type
-	
+    Integer :: heating_type = 0 ! 0 means no reference heating.  > 0 selects optional reference heating
+    Real*8  :: Luminosity
 	Type(ReferenceInfo) :: ref
 	Real*8 :: pressure_specific_heat  ! CP (not CV)
 	Real*8 :: poly_n
@@ -41,7 +43,8 @@ Module ReferenceState
 
 
 
-	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, pressure_specific_heat
+	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
+            & pressure_specific_heat, heating_type, luminosity
 Contains
 
 	Subroutine Initialize_Reference()
@@ -148,10 +151,70 @@ Contains
       Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat*ref%density
       Deallocate(zeta)
 
-
+      Call Initialize_Reference_Heating()
 
 	End Subroutine Polytropic_Reference
 
+
+    Subroutine Initialize_Reference_Heating()
+        Implicit None
+        ! This is where a volumetric heating function Phi(r) is computed
+        ! This function appears in the entropy equation as
+        ! dSdt = Phi(r)
+        ! Phi(r) may represent internal heating of any type.  For stars, this heating would be
+        ! associated with temperature diffusion of the reference state and/or nuclear burning.
+
+        If (heating_type .gt. 0) Then
+            If (.not. Allocated(ref%heating)) Allocate(ref%heating(1:N_R))
+            ref%heating(:) = 0.0d0
+        Endif
+
+        If (heating_type .eq. 1) Then
+            Call Constant_Reference_Heating()
+        Endif
+    End Subroutine Initialize_Reference_Heating
+
+    Subroutine Constant_Reference_Heating()
+        Implicit None
+        Real*8 :: integral, alpha, riweight, delr, val
+        Real*8, Allocatable :: temp(:)
+        Integer :: i
+        ! Luminosity is specified as an input
+        ! Phi(r) is set to alpha such that 
+        ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity
+        Allocate(temp(1:N_R))
+
+        temp = ref%density*ref%temperature
+        Call Integrate_in_radius(temp,integral)
+        integral = integral*4.0d0*pi
+        alpha = Luminosity/integral
+        ref%heating(:) = alpha
+
+        DeAllocate(temp)
+    End Subroutine Constant_Reference_Heating
+
+    Subroutine Integrate_in_radius(func,int_func)
+        Implicit None
+        Real*8, Intent(In) :: func(1:)
+        Real*8, Intent(Out) :: int_func
+        Integer :: i
+        Real*8 :: delr, riweight
+        !compute integrate_r=rmin_r=rmax func*r^2 dr
+        int_func = 0.0d0
+        Do i = 2, n_r-1
+            delr = (radius(i-1)-radius(i+1))/2.0d0
+            riweight = delr*radius(i)**2
+            int_func = int_func+func(i)*riweight
+        Enddo
+        delr = (radius(1)-radius(2))/2.0d0
+        riweight = delr*radius(1)**2
+        int_func = int_func+riweight*func(1)
+
+        delr = (radius(n_r-1)-radius(n_r))/2.0d0
+        riweight = delr*radius(n_r)**2
+        int_func = int_func+riweight*func(n_r)
+
+    End Subroutine Integrate_in_radius
 	Subroutine Write_Reference(filename)
 		Implicit None
 		Character*120, Optional, Intent(In) :: filename

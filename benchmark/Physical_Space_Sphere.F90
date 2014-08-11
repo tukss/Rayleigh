@@ -79,7 +79,8 @@ Contains
 		!Nonlinear Advection
 		Call StopWatch(nl_time)%startclock()
 
-		Call Temperature_Advection()	
+		Call Temperature_Advection()
+        Call Volumetric_Heating()	
 		If (viscous_heating) Call Compute_Viscous_Heating()
 		Call Momentum_Advection_Radial()
 		Call Momentum_Advection_Theta()
@@ -150,6 +151,23 @@ Contains
 		!$OMP END PARALLEL DO
 
 	End Subroutine Temperature_Advection
+
+    Subroutine Volumetric_Heating()
+        Implicit None
+        Integer :: t,r,k
+        If (heating_type .gt. 0) Then
+            ! Added a volumetric heating to the energy equation
+		    !$OMP PARALLEL DO PRIVATE(t,r,k)
+		    Do t = my_theta%min, my_theta%max
+			    Do r = my_r%min, my_r%max
+				    Do k =1, n_phi
+				        wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar)+ref%heating(r)
+				    Enddo
+			    Enddo
+		    Enddo				
+		    !$OMP END PARALLEL DO
+        Endif
+    End Subroutine Volumetric_Heating
 
 	Subroutine Compute_Viscous_Heating()
 		Implicit None

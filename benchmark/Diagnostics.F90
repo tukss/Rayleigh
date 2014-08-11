@@ -14,6 +14,7 @@ Module Diagnostics
 	Integer, Parameter, Private :: v_sq = 6, kinetic_energy = 7
     Integer, Parameter, Private :: gradt_r = 8, cond_flux_r = 9
     Integer, Parameter, Private :: zonal_ke = 10, merid_ke = 11
+    Integer, Parameter, Private :: vol_heating = 12
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -182,6 +183,21 @@ Contains
 					Enddo
 				Enddo                
 				Call Add_Quantity(kinetic_energy,qty)
+			Endif	
+
+			If (compute_q(vol_heating) .ne. 0) Then
+                If (allocated(ref%heating)) Then
+				    Do t = my_theta%min, my_theta%max
+					    Do r = my_r%min, my_r%max
+					    	Do p = 1, n_phi
+					    	    qty(p,r,t) = ref%heating(r)*ref%density(r)*ref%temperature(r)
+						    Enddo
+					    Enddo
+				    Enddo                
+                Else
+                    qty(:,:,:) = 0.0d0
+                Endif
+				Call Add_Quantity(vol_heating,qty)
 			Endif	
 
 			If (compute_q(diagnostic1) .ne. 0) Then
