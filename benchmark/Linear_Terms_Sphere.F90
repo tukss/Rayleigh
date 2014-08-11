@@ -380,10 +380,20 @@ Contains
 
 				! Temperature Boundary Conditions (T fixed bottom and top)
 				r = 1
-				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                If (fix_tvar_top) Then
+    				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                Endif
+                If (fix_dtdr_top) Then
+                    Call Load_BC(lp,r,teq,tvar,one,1)	
+                Endif
+
 				r = N_R
-				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
-				
+                If (fix_tvar_bottom) Then
+    				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
+                Endif
+                If (fix_dtdr_bottom) Then
+                    Call Load_BC(lp,r,teq,tvar,one,1)
+                Endif	    			
 
 
 
@@ -673,14 +683,27 @@ Contains
 				equation_set(1,weq)%rhs(N_R+1,1,indx) = zero	! Pressure node
 
 
-
+                If (fix_tvar_top) Then
 				!Top temperature (in spectral space, but BC's specified in physical space
 				!    so multiply by sqrt4pi)
 				equation_set(1,weq)%RHS(1+ii,1,indx)   = T_Top*sqrt(4.0D0*Pi)
+                Endif
+                If (fix_dtdr_top) Then
+				!Top temperature (in spectral space, but BC's specified in physical space
+				!    so multiply by sqrt4pi)
+				equation_set(1,weq)%RHS(1+ii,1,indx)   = dTdr_Top*sqrt(4.0D0*Pi)
+                Endif
+
+                If (fix_tvar_bottom) Then
 				!Bottom Temperature
 				equation_set(1,weq)%RHS(N_R+ii,1,indx) = T_Bottom*sqrt(4.0D0*Pi)
-
+                Endif
             
+                If (fix_dtdr_bottom) Then
+				!Bottom Temperature
+				equation_set(1,weq)%RHS(N_R+ii,1,indx) = dTdr_Bottom*sqrt(4.0D0*Pi)
+                Endif
+
          Endif
 
 
