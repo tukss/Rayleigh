@@ -189,7 +189,6 @@ Contains
         integral = integral*4.0d0*pi
         alpha = Luminosity/integral
         ref%heating(:) = alpha
-
         DeAllocate(temp)
     End Subroutine Constant_Reference_Heating
 
