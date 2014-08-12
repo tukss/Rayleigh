@@ -21,7 +21,7 @@ Module Checkpointing
 	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z', achar = 'A', cchar = 'C'
 	Integer :: checkpoint_iter = 0
 	Real*8 :: checkpoint_dt, checkpoint_newdt
-
+    Real*8 :: checkpoint_time 
 	!//////////////////////////
 	! New variables for new checkpointing style
 	Integer :: Noutputs_per_row, Nradii_per_output
@@ -75,9 +75,13 @@ Contains
 		Endif
 	End Subroutine Initialize_Checkpointing_old
 
+    Subroutine Get_Checkpoint_Time(in_time)
+        Implicit None
+        Real*8, Intent(InOut) :: in_time
+        in_time = checkpoint_time
+    End Subroutine Get_Checkpoint_Time
 
-
-	Subroutine Write_Checkpoint(abterms,iteration,dt,new_dt)
+	Subroutine Write_Checkpoint(abterms,iteration,dt,new_dt,elapsed_time)
 		Implicit None
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Real*8, Intent(In) :: dt, new_dt
@@ -85,6 +89,7 @@ Contains
 		Integer :: mp, m, nm,nmodes, offset,nl,p,np
 		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
+        Real*8 :: elapsed_time
 		Character*8 :: iterstring
 		Character*120 :: cfile
 		np = pfi%rcomm%np
@@ -175,6 +180,7 @@ Contains
 					Write(15)dt
 					Write(15)new_dt
 	            Write(15)(radius(i),i=1,N_R)
+                Write(15)elapsed_time
 	            Close(15)
 
 				Endif
@@ -194,7 +200,7 @@ Contains
 		Integer, Allocatable :: lmstart_old(:)
 		Real*8, Allocatable :: old_radius(:)
 		Real*8, Allocatable :: rowstrip(:,:), myarr(:,:), sendarr(:,:)
-		Real*8 :: dt_pars(2),dt,new_dt
+		Real*8 :: dt_pars(3),dt,new_dt
 		Character*8 :: iterstring
 		Character*120 :: cfile
 		dim2 = tnr*numfields*2
@@ -211,12 +217,14 @@ Contains
 			 Read(15)new_dt
 			 Allocate(old_radius(1:N_r_old))
 	       Read(15)(old_radius(i),i=1,N_R)
+           Read(15)Checkpoint_time
 	       Close(15)				
 			 old_pars(1) = n_r_old
 			 old_pars(2) = grid_type_old
 			 old_pars(3) = l_max_old
 			 dt_pars(1) = dt
 			 dt_pars(2) = new_dt
+             dt_pars(3) = checkpoint_time
 
 			If (l_max_old .lt. l_max) Then
 					Write(6,*)' '
@@ -258,7 +266,7 @@ Contains
 		Call MPI_Bcast(dt_pars,2, MPI_DOUBLE_PRECISION, 0, pfi%gcomm%comm, ierr)
 		checkpoint_dt = dt_pars(1)
 		checkpoint_newdt = dt_pars(2)
-
+        checkpoint_Time = dt_pars(3)
 		Call chktmp%construct('s2b')
 		chktmp%config = 's2b'
 

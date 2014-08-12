@@ -34,7 +34,7 @@ Contains
 			new_deltat = checkpoint_newdt
 			deltat = checkpoint_dt
 			old_deltat = 0.0d0
-			simulation_time = 0.0d0 !////////////// CHANGE THIS to WORK WITH CHECKPOINTING
+            Call Get_Checkpoint_Time(simulation_time)
 		Endif
 		new_timestep = .true.
 
@@ -89,7 +89,7 @@ Contains
 			Call AdvanceTime()
 
 			If (Mod(iteration,check_frequency) .eq. 0) Then
-                Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat)                    
+                Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat,simulation_time)                    
 					 Call StopWatch(cwrite_time)%StartClock()
                 !Call Write_Checkpoint_Alt(wsp%p1b,iteration, deltat,new_deltat)
 					 Call StopWatch(cwrite_time)%Increment()

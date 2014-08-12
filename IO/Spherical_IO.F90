@@ -664,7 +664,8 @@ Contains
             Enddo			
             write(iterstring,i_ofmt) this_iter
             azfile = 'AZ_Avgs/'//trim(iterstring)
-            Open(unit=15,file=azfile,form='unformatted', status='replace')
+            Open(unit=15,file=azfile,form='unformatted', status='replace',access='stream')
+            Write(15)endian_tag
             Write(15)nr, ntheta,nq_azav
             Write(15)(qvals_azav(i),i=1,nq_azav)
             Write(15)(radius(i),i=1,nr)
@@ -712,7 +713,8 @@ Contains
 
             write(iterstring,i_ofmt) this_iter
             gfile = 'G_Avgs/'//trim(iterstring)
-            Open(unit=15,file=gfile,form='unformatted', status='replace')
+            Open(unit=15,file=gfile,form='unformatted', status='replace', access='stream')
+            Write(15)endian_tag
             Write(15)nq_globav
             Write(15)(qvals_globav(i),i=1,nq_globav)
             Write(15)(full_avg(i),i=1,nq_globav)
