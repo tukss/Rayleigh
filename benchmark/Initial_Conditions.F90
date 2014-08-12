@@ -9,7 +9,7 @@ Module Initial_Conditions
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Use Timers
-    Use BoundaryConditions, Only : T_top, T_bottom
+    Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom, fix_dtdr_top, fix_dtdr_bottom
 	Implicit None
 	Logical :: alt_check = .false.
 	Integer :: init_type = 1
@@ -73,6 +73,9 @@ Contains
         If (init_type .eq. 6) Then
 			call abenchmark_init_hydro()
 		Endif
+        If (init_Type .eq. 7) Then
+            call random_init_star()
+        Endif
 		If (magnetism) Then
 			If (magnetic_init_type .eq. 1) Then
 				call benchmark_insulating_init()
@@ -599,6 +602,131 @@ Contains
 
 	End Subroutine Random_Init
 
+
+	Subroutine Random_Init_Star()
+		Implicit None
+		Integer :: ncombinations, i, m, r, seed(1), mp,n, l, ind1, ind2
+		Integer :: mode_count, my_mode_start, my_mode_end, fcount(3,2)
+		Real*8, Allocatable :: rand(:), rfunc1(:), rfunc2(:), lpow(:)
+		Real*8 :: amp, phase, lmid, alpha,x
+		Real*8, Allocatable :: new_temp(:)
+		type(SphericalBuffer) :: tempfield
+		fcount(:,:) = 1
+        ! Random initialization with no ell=0 entropy perturbation.
+
+		!////////////////////////
+		!Allocate(rfunc1(my_r%min: my_r%max))
+		Allocate(rfunc2(my_r%min: my_r%max))
+
+		Do r = my_r%min, my_r%max
+			x = 2.0d0*pi*(radius(r)-r_inner)/(r_outer-r_inner)
+			!rfunc1(r) = 0.2d0*(1.0d0-3.0d0*x*x+3.0d0*x**4-x**6)
+			rfunc2(r) = 0.5d0*(1.0d0-Cos(x))
+		Enddo
+		If (custom_t) Then
+			! Processors owning m = 0 (and thus ell = 0)
+			! Should read a custom temperature file and replace rfunc2
+			Do mp = 1, my_mp%max		
+				m = m_values(mp)
+				If (m .eq. 0) Then
+					Allocate(new_temp(1:N_R))
+					Call Load_Radial_Profile(custom_t_file,new_temp)
+					rfunc2(my_r%min:my_r%max) = new_temp(my_r%min:my_r%max)
+					DeAllocate(new_temp)
+				Endif
+			Enddo
+		Endif
+
+
+		! We put our temporary field in spectral space
+		Call tempfield%init(field_count = fcount, config = 's2b')		
+		Call tempfield%construct('s2b')		
+
+
+		!///////////////////////
+		ncombinations = 0
+		Do m = 0, l_max
+			ncombinations = ncombinations+ (l_max-m+1)
+		Enddo
+			!Set up the random phases and amplitudes
+			Allocate(rand(1:ncombinations*2))
+		If (my_rank .eq. 0) Then
+			Call system_clock(seed(1))		
+			Call random_seed()
+			Call random_number(rand)
+
+
+			Do i = 1, ncombinations
+				rand(i) = 2*temp_amp*(rand(i)-0.5d0)		! first half of rand contains the amplitude
+			Enddo
+			! We leave the second half alone (contains phases)
+
+			! Send rand
+			Do n = 1, ncpu -1
+					Call send(rand, dest = n,tag=init_tag, grp=pfi%gcomm)
+			Enddo
+		Else
+			! receive rand
+				Call receive(rand, source= 0,tag=init_tag,grp = pfi%gcomm)
+		Endif	
+
+		! Everyone establishes their range of random phases		
+		mode_count = 0
+		Do mp = 1, my_mp%max		
+			if (mp .eq. my_mp%min) then
+				my_mode_start = mode_count+1
+			endif
+			m = m_values(mp)
+			mode_count = mode_count + (l_max-m+1)
+			if (mp .eq. my_mp%max) then
+				my_mode_end = mode_count
+			endif
+		Enddo
+
+		Allocate(lpow(0:l_max))
+		lmid = l_max/2.0d0
+		alpha = lmid/3.0d0
+		Do l = 0, l_max
+				lpow(l) = exp(- ((l-lmid)/alpha )**2)
+		Enddo
+
+
+		ind1 = my_mode_start
+		ind2 = ind1+ncombinations
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)			
+			Do l = m, l_max
+				tempfield%s2b(mp)%data(l,:) = 0.0d0
+
+				amp = rand(ind1)*lpow(l)
+				phase = rand(ind2)
+				ind1 = ind1+1
+				ind2 = ind2+1
+				Do r = my_r%min, my_r%max
+					tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
+                        amp*rfunc2(r)*phase
+					tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) = tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
+                        amp*rfunc2(r)*(1.0d0-phase)
+				Enddo
+			Enddo
+		Enddo
+		DeAllocate(rfunc2, lpow)
+
+		Call tempfield%reform() ! goes to p1b
+
+		! Set temperature.  Leave the other fields alone
+		If (chebyshev) Then
+			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
+			Call tempfield%construct('p1a')
+			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
+			Call tempfield%deconstruct('p1a')
+		Endif
+		Call Set_RHS(teq,tempfield%p1b(:,:,:,1))
+
+		Call tempfield%deconstruct('p1b')
+
+	End Subroutine Random_Init_Star
 
 	!////////////////////////////////////
 	!  Magnetic Initialization

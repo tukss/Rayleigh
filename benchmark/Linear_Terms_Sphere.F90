@@ -347,11 +347,26 @@ Contains
 				Call Clear_Row(teq,lp,1)
 				Call Clear_Row(teq,lp,N_R)
 
+
+				!*******************************************************
+				! Entropy Boundary Conditions
+
 				! Temperature Boundary Conditions (T fixed bottom and top)
 				r = 1
-				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                If (fix_tvar_top) Then
+    				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                Endif
+                If (fix_dtdr_top) Then
+                    Call Load_BC(lp,r,teq,tvar,one,1)	
+                Endif
+
 				r = N_R
-				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
+                If (fix_tvar_bottom) Then
+    				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
+                Endif
+                If (fix_dtdr_bottom) Then
+                    Call Load_BC(lp,r,teq,tvar,one,1)
+                Endif	    
 
 
 				! The ell=0 pressure is really a diagnostic of the system.
