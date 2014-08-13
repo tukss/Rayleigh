@@ -70,6 +70,54 @@ class ShellAverage:
         fd.close()
 
 
+class AzAverage:
+    """Rayleigh AZAverage Structure
+    ----------------------------------
+    self.n_r     : number of radial points
+    self.radius  : radial coordinates
+    """
+
+    def __init__(self,filename='none',path='Shell_Avgs/',esize=8):
+        """filename  : The reference state file to read.
+           path      : The directory where the file is located (if full path not in filename
+           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        if (filename == 'none'):
+            the_file = path+'00000001'
+        else:
+            the_file = path+filename
+        fd = open(the_file,'rb')
+        # We read an integer to assess which endian the file was written in...
+        bs = check_endian(fd,314,'int32')
+        
+        nr     = swapread(fd,dtype='int32',count=1,swap=bs)
+        ntheta = swapread(fd,dtype='int32',count=1,swap=bs)
+        nq     = swapread(fd,dtype='int32',count=1,swap=bs)
+
+
+       
+        qv       = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
+        rad      = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        sintheta = np.reshape(swapread(fd,dtype='float64',count=ntheta,swap=bs),(ntheta), order = 'F')
+        tmp      = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta,swap=bs),(nr,ntheta,nq), order = 'F')
+
+        simtime     = swapread(fd,dtype='float64',count=1,swap=bs)
+
+        self.ntheta   = ntheta
+        self.nr       = nr
+        self.nq       = nq
+        self.radius   = rad
+        self.vals     = tmp
+        self.qv       = qv
+        self.sintheta = sintheta
+        self.simtime  = simtime
+        maxq = 250
+        lut = np.zeros(maxq)+int(1000)
+        self.lut = lut.astype('int32')
+        for i,q in enumerate(self.qv):
+            self.lut[q] = i
+        fd.close()
+
+
 class ShellSlice:
     """Rayleigh ShellAverage Structure
     ----------------------------------
