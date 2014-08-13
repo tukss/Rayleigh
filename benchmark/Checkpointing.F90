@@ -75,11 +75,7 @@ Contains
 		Endif
 	End Subroutine Initialize_Checkpointing_old
 
-    Subroutine Get_Checkpoint_Time(in_time)
-        Implicit None
-        Real*8, Intent(InOut) :: in_time
-        in_time = checkpoint_time
-    End Subroutine Get_Checkpoint_Time
+
 
 	Subroutine Write_Checkpoint(abterms,iteration,dt,new_dt,elapsed_time)
 		Implicit None
@@ -219,6 +215,7 @@ Contains
 	       Read(15)(old_radius(i),i=1,N_R)
            Read(15)Checkpoint_time
 	       Close(15)				
+            Write(6,*)'Checkpoint time is: ', checkpoint_time
 			 old_pars(1) = n_r_old
 			 old_pars(2) = grid_type_old
 			 old_pars(3) = l_max_old

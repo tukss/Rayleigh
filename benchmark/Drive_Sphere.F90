@@ -34,7 +34,7 @@ Contains
 			new_deltat = checkpoint_newdt
 			deltat = checkpoint_dt
 			old_deltat = 0.0d0
-            Call Get_Checkpoint_Time(simulation_time)
+            simulation_time = checkpoint_time
 		Endif
 		new_timestep = .true.
 
