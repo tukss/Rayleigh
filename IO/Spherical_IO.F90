@@ -32,6 +32,7 @@ Module Spherical_IO
 		Integer, Allocatable, Private :: compute_shell(:), shell_levels(:)
 		Integer, Allocatable, Private :: step_zero(:), step_one(:), step_two(:), step_three(:), step_five(:)
 		Integer, Allocatable, Private :: qvals_azav(:), qvals_shellav(:), qvals_globav(:), qvals_shell(:)
+		Integer, Allocatable, Private :: oqvals_azav(:), oqvals_shellav(:), oqvals_globav(:), oqvals_shell(:)
 		Integer, Allocatable, Private :: qvals_3d(:)
 		Integer, Private :: nq_max, nq_azav, nq_shellav, nq_globav, azav_ind, shellav_ind
 		Integer, Private :: first_azav_q, last_azav_q, first_shellav_q, last_shellav_q
@@ -137,6 +138,18 @@ Contains
 		Allocate(qvals_shellav(1:nq_shellav))
 		Allocate(qvals_globav(1:nq_globav))
 		Allocate(qvals_shell(1:nq_shell))
+
+        If (myid .eq. 0) Then
+            ! The outputting process needs to know the order
+            ! in which the different diagnostics were loaded
+            ! into the output arrays.
+            ! The load order can differ from the main_input order
+            ! of requested quantities.
+            Allocate(oqvals_azav(1:nq_azav))
+            Allocate(oqvals_shellav(1:nq_shellav))
+            Allocate(oqvals_globav(1:nq_globav))
+            Allocate(oqvals_shell(1:nq_shell))
+        Endif
 		Allocate(qvals_3d(1:nq_3d))
 		Allocate(shell_levels(1:nshell_levels))
 
@@ -333,14 +346,14 @@ Contains
 
 		If (my_nshells .gt. 0) Then
 
-
+          
 		  !If (qval .eq. first_shell_q) Then
 		  If (start_shell_slice) Then
 			Allocate(shell_slice_outputs(1:nphi,my_theta_min:my_theta_max,1:my_nshells,1:nq_shell))
 			shell_ind = 1	
 			start_shell_slice = .false.
 		  Endif
-
+            
 		  shell_lev_ind =1
 		  Do j = 1, nshell_levels
 		    ilocal = shell_levels(j)-my_rmin+1
@@ -350,7 +363,7 @@ Contains
 				shell_lev_ind = shell_lev_ind +1
 		    Endif
 		  Enddo
-
+            If (myid .eq. 0) oqvals_shell(shell_ind) = qval
 		  shell_ind = shell_ind+1	! advance counter for next quantity to store (if any)
 		Endif
 
@@ -427,7 +440,7 @@ Contains
 	 		Open(unit=15,file=shell_slice_file,form='unformatted', status='replace', access='stream')
             Write(15)endian_tag
          Write(15)nphi,ntheta,nshell_levels,nq_shell
-         Write(15)(qvals_shell(i),i=1,nq_shell)
+         Write(15)(oqvals_shell(i),i=1,nq_shell)
 	 		Write(15)(radius(shell_levels(i)),i=1,nshell_levels)
 	 		Write(15)(shell_levels(i),i=1,nshell_levels)
 	 		Write(15)(sintheta(j),j=1,ntheta)
@@ -563,6 +576,7 @@ Contains
 
 		If (compute_azav(qval) .eq. 1) Then
 			azav_outputs(:,:,azav_ind) = f_of_r_theta
+            If (myid .eq. 0) oqvals_azav(azav_ind) = qval
 			azav_ind = azav_ind+1
 		Endif
 		
@@ -579,6 +593,7 @@ Contains
 			Allocate(shellav_outputs(my_rmin:my_rmax,1:nq_shellav))			
             start_shell_average = .false.
 		Endif
+
 		f_of_r(:) = 0.0D0
 
         Do t = my_theta_min, my_theta_max
@@ -588,6 +603,7 @@ Contains
 
 		If (compute_shellav(qval) .eq. 1) Then
 			shellav_outputs(:,shellav_ind) = f_of_r(:)
+            If (myid .eq. 0) oqvals_shellav(shellav_ind) = qval
 			shellav_ind = shellav_ind+1
 		Endif
 
@@ -604,6 +620,7 @@ Contains
 			Allocate(globav_outputs(1:nq_globav))			
             start_global_average = .false.
 		Endif
+
         this_average =0.0d0
         do i = my_rmin, my_rmax
             this_average = this_average+f_of_r(i)*r_integration_weights(i)
@@ -611,6 +628,7 @@ Contains
 
 		If (compute_globav(qval) .eq. 1) Then
 			globav_outputs(globav_ind) = this_average
+            If (myid .eq. 0) oqvals_globav(globav_ind) = qval
 			globav_ind = globav_ind+1
 		Endif
 
@@ -667,7 +685,7 @@ Contains
             Open(unit=15,file=azfile,form='unformatted', status='replace',access='stream')
             Write(15)endian_tag
             Write(15)nr, ntheta,nq_azav
-            Write(15)(qvals_azav(i),i=1,nq_azav)
+            Write(15)(oqvals_azav(i),i=1,nq_azav)
             Write(15)(radius(i),i=1,nr)
             Write(15)(sintheta(i),i=1,ntheta)
             Write(15)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
@@ -716,7 +734,7 @@ Contains
             Open(unit=15,file=gfile,form='unformatted', status='replace', access='stream')
             Write(15)endian_tag
             Write(15)nq_globav
-            Write(15)(qvals_globav(i),i=1,nq_globav)
+            Write(15)(oqvals_globav(i),i=1,nq_globav)
             Write(15)(full_avg(i),i=1,nq_globav)
 				Write(15)simtime
             Close(15)
@@ -777,7 +795,7 @@ Contains
             open(unit=15,file=shellav_file,form='unformatted', status='replace', access='stream')
             Write(15)endian_tag
             Write(15)nr, nq_shellav
-            Write(15)(qvals_shellav(i),i=1,nq_shellav)
+            Write(15)(oqvals_shellav(i),i=1,nq_shellav)
             Write(15)(radius(i),i=1,nr)
             Write(15)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
 				Write(15)simtime

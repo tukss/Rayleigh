@@ -66,6 +66,7 @@ class ShellAverage:
         self.nq = nq
         self.radius      = rad
         self.vals = tmp
+        self.qv = qv
         fd.close()
 
 

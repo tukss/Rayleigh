@@ -15,6 +15,8 @@ Module Diagnostics
     Integer, Parameter, Private :: gradt_r = 8, cond_flux_r = 9
     Integer, Parameter, Private :: zonal_ke = 10, merid_ke = 11
     Integer, Parameter, Private :: vol_heating = 12
+
+	Integer, Parameter, Private :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -90,7 +92,38 @@ Contains
 				Call Add_Quantity(v_phi,qty)
 			Endif	
 
+			If (compute_q(rhov_r) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi				
+				            qty(p,r,t) = buffer(p,r,t,vr)*ref%density(r)
+                        Enddo
+                    Enddo
+                Enddo
+				Call Add_Quantity(rhov_r,qty)
+			Endif		
 
+			If (compute_q(rhov_theta) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi				
+				            qty(p,r,t) = buffer(p,r,t,vtheta)*ref%density(r)
+                        Enddo
+                    Enddo
+                Enddo
+				Call Add_Quantity(rhov_theta,qty)
+			Endif				
+
+			If (compute_q(rhov_phi) .ne. 0) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi				
+				            qty(p,r,t) = buffer(p,r,t,vphi)*ref%density(r)
+                        Enddo
+                    Enddo
+                Enddo
+				Call Add_Quantity(rhov_phi,qty)
+			Endif	
 
 			If (compute_q(temperature) .ne. 0) Then
 				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
