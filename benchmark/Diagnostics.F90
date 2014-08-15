@@ -17,6 +17,7 @@ Module Diagnostics
     Integer, Parameter, Private :: vol_heating = 12
 
 	Integer, Parameter, Private :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
+    Integer, Parameter, Private :: thermalE_flux_radial = 16
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -69,30 +70,30 @@ Contains
 		Real*8 :: mypi, over_n_phi, tmp, tmp2
 		Integer :: p,t,r
 		
-		If (mod(iteration,output_frequency) .eq. 0) Then
+		If (time_to_output(iteration)) Then
 			Call Begin_Outputting(iteration)
 			Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
-			If (compute_q(v_r) .ne. 0) Then
+			If (compute_quantity(v_r)) Then
 				
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
 				!write(6,*)'Computing vr ', maxval(qty)
-				Call Add_Quantity(v_r,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(v_theta) .ne. 0) Then
+			If (compute_quantity(v_theta)) Then
 				
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)
-				Call Add_Quantity(v_theta,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(v_phi) .ne. 0) Then
+			If (compute_quantity(v_phi)) Then
 				
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)
-				Call Add_Quantity(v_phi,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(rhov_r) .ne. 0) Then
+			If (compute_quantity(rhov_r)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi				
@@ -100,10 +101,10 @@ Contains
                         Enddo
                     Enddo
                 Enddo
-				Call Add_Quantity(rhov_r,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(rhov_theta) .ne. 0) Then
+			If (compute_quantity(rhov_theta)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi				
@@ -111,10 +112,10 @@ Contains
                         Enddo
                     Enddo
                 Enddo
-				Call Add_Quantity(rhov_theta,qty)
+				Call Add_Quantity(qty)
 			Endif				
 
-			If (compute_q(rhov_phi) .ne. 0) Then
+			If (compute_quantity(rhov_phi)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi				
@@ -122,10 +123,10 @@ Contains
                         Enddo
                     Enddo
                 Enddo
-				Call Add_Quantity(rhov_phi,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(temperature) .ne. 0) Then
+			If (compute_quantity(temperature)) Then
 				! This is really d_by_dphi temperature/r with the current logic in Physics.F90
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
@@ -134,10 +135,10 @@ Contains
 						Enddo
 					Enddo
 				Enddo
-				Call Add_Quantity(temperature,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(gradt_r) .ne. 0) Then
+			If (compute_quantity(gradt_r)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi
@@ -145,10 +146,10 @@ Contains
 						Enddo
 					Enddo
 				Enddo
-				Call Add_Quantity(gradt_r,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(cond_flux_r) .ne. 0) Then
+			If (compute_quantity(cond_flux_r)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi
@@ -156,10 +157,10 @@ Contains
 						Enddo
 					Enddo
 				Enddo
-				Call Add_Quantity(cond_flux_r,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(zonal_ke) .ne. 0) Then
+			If (compute_quantity(zonal_ke)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
                         ! compute mean v_phi here
@@ -172,13 +173,13 @@ Contains
                         qty(:,r,t) = tmp
 					Enddo
 				Enddo
-				Call Add_Quantity(zonal_ke,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
             ! Here we can do something like:
             !If (use_mean_vr .or. use_mean_vphi) then
             ! then we can individual quantities within - taking moments for example
-			If (compute_q(merid_ke) .ne. 0) Then
+			If (compute_quantity(merid_ke)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
                         ! compute mean v_phi here
@@ -194,17 +195,17 @@ Contains
                         qty(:,r,t) = tmp
 					Enddo
 				Enddo
-				Call Add_Quantity(merid_ke,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(v_sq) .ne. 0) Then
+			If (compute_quantity(v_sq)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-				Call Add_Quantity(v_sq,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(kinetic_energy) .ne. 0) Then
+			If (compute_quantity(kinetic_energy)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
@@ -215,10 +216,25 @@ Contains
 						Enddo
 					Enddo
 				Enddo                
-				Call Add_Quantity(kinetic_energy,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(vol_heating) .ne. 0) Then
+
+
+			If (compute_quantity(thermalE_flux_radial)) Then
+                Write(6,*)'hmmm'
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)*buffer(1:n_phi,:,:,pvar)   !pvar is temperature/r
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						    qty(p,r,t) = qty(p,r,t)*ref%density(r)*ref%temperature(r)*radius(r)
+						Enddo
+					Enddo
+				Enddo                
+				Call Add_Quantity(qty)
+			Endif	
+
+			If (compute_quantity(vol_heating)) Then
                 If (allocated(ref%heating)) Then
 				    Do t = my_theta%min, my_theta%max
 					    Do r = my_r%min, my_r%max
@@ -230,10 +246,10 @@ Contains
                 Else
                     qty(:,:,:) = 0.0d0
                 Endif
-				Call Add_Quantity(vol_heating,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(diagnostic1) .ne. 0) Then
+			If (compute_quantity(diagnostic1)) Then
 				mypi = acos(-1.0d0)
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
@@ -243,10 +259,10 @@ Contains
 						Enddo
 					Enddo
 				Enddo
-				Call Add_Quantity(diagnostic1,qty)
+				Call Add_Quantity(qty)
 			Endif
 
-			If (compute_q(diagnostic2) .ne. 0) Then
+			If (compute_quantity(diagnostic2)) Then
 				mypi = acos(-1.0d0)
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
@@ -256,57 +272,57 @@ Contains
 						Enddo
 					Enddo
 				Enddo
-				Call Add_Quantity(diagnostic2,qty)
+				Call Add_Quantity(qty)
 			Endif
 
 			If (magnetism) Then
 			!//////////////////// Magnetic Quantities
-			If (compute_q(B_r) .ne. 0) Then
+			If (compute_quantity(B_r)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)
-				Call Add_Quantity(B_r,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(B_theta) .ne. 0) Then
+			If (compute_quantity(B_theta)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)
-				Call Add_Quantity(b_theta,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(b_phi) .ne. 0) Then
+			If (compute_quantity(b_phi)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)
-				Call Add_Quantity(b_phi,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
 
-			If (compute_q(J_r) .ne. 0) Then
+			If (compute_quantity(J_r)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jr)
-				Call Add_Quantity(J_r,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(J_theta) .ne. 0) Then
+			If (compute_quantity(J_theta)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jtheta)
-				Call Add_Quantity(j_theta,qty)
+				Call Add_Quantity(qty)
 			Endif		
 
-			If (compute_q(j_phi) .ne. 0) Then
+			If (compute_quantity(j_phi)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jphi)
-				Call Add_Quantity(j_phi,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(b_sq) .ne. 0) Then
+			If (compute_quantity(b_sq)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2
-				Call Add_Quantity(b_sq,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(magnetic_energy) .ne. 0) Then
+			If (compute_quantity(magnetic_energy)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
 				qty(1:n_phi,:,:) = (qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2)*over_eight_pi
-				Call Add_Quantity(magnetic_energy,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
-			If (compute_q(zonal_me) .ne. 0) Then
+			If (compute_quantity(zonal_me)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
                         ! compute mean v_phi here
@@ -319,13 +335,13 @@ Contains
                         qty(:,r,t) = tmp
 					Enddo
 				Enddo
-				Call Add_Quantity(zonal_me,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
             ! Here we can do something like:
             !If (use_mean_vr .or. use_mean_vphi) then
             ! then we can individual quantities within - taking moments for example
-			If (compute_q(merid_me) .ne. 0) Then
+			If (compute_quantity(merid_me)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
                         ! compute mean v_phi here
@@ -341,7 +357,7 @@ Contains
                         qty(:,r,t) = tmp
 					Enddo
 				Enddo
-				Call Add_Quantity(merid_me,qty)
+				Call Add_Quantity(qty)
 			Endif	
 
 

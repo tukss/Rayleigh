@@ -13,7 +13,17 @@ Module Spherical_IO
 
 	!////////////////////////////////////////////
     Integer, Parameter :: nqmax=300, nshellmax=100
+    Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
 
+    !Each diagnostic type has an associated version number that is written to the file
+    !following the endian tag.  Hopefully, reading routines can be backward compatible if
+    !significant changes are made to the output structure (and reflected in the version number)
+  
+    Integer, Parameter :: shellslice_version = 1
+    Integer, Parameter :: azavg_version = 1
+    Integer, Parameter :: shellavg_version = 1
+    Integer, Parameter :: globalavg_version = 1
+    Integer, Parameter :: full3d_version = 1    !currently unused
     Type, Public :: DiagnosticInfo
         ! Need to see if we can make these allocatable, but for now..
         ! Each instance of this class has two static arrays used for reading in namelist input
@@ -26,6 +36,9 @@ Module Spherical_IO
         Integer :: nq, nlevels ! Number of nonzero elements of values and levels
         Integer :: my_nlevels  ! Number of nonzero elements of levels that are in process
 
+        Integer :: file_unit = 15
+        Character*120 :: file_prefix = 'None'
+
         Integer, Allocatable :: oqvals(:)   ! Array of size nq used by I/O process to record output ordering of diagnostics
 
         Integer :: frequency = 10000000 ! How often we write this diagnostic type
@@ -33,13 +46,20 @@ Module Spherical_IO
         Integer :: current_rec = 1       ! Which record we are on within a file
         Integer :: file_header_size =0 ! Size of file header in bytes
         Integer :: file_record_size = 0 ! Size of each record in bytes
+        Integer :: file_position = 1   ! Keep track of where we are (byte-wise) within the file
         Integer :: avg_level = 0       ! global_averages = 3, shell_averages = 1, az_averages = 1, all others = 0
 
         Integer :: ind = 1              ! index of current diagnostic being stored (advances throughout an output calculation)
         Logical :: begin_output = .false.
         Integer :: mpi_tag = 1          ! For use when communicating before writing the file
 
+        Integer :: output_version = -1  ! See note at top
 
+        !This flag changes throughout the diagnostic evaluation
+        !If the qty being output at the current iteration is supposed to be
+        !output as this diagnostic type, the grab_this_q will be set to true.
+        !Otherwise grab_this_q remains false.
+        Logical :: grab_this_q = .false.
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! Additional Organizational Arrays are required for managing shell-slice like outputs
         Integer, Allocatable :: my_shell_levs(:), have_shell(:), my_shell_ind(:)
@@ -56,7 +76,8 @@ Module Spherical_IO
         Procedure :: OpenFile
         Procedure :: Set_File_Info
         Procedure :: CloseFile
-
+        Procedure :: update_position
+        Procedure :: getq_now
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! 
 
@@ -65,28 +86,30 @@ Module Spherical_IO
 
     Type(DiagnosticInfo) :: Shell_Averages, Shell_Slices, Global_Averages, AZ_Averages, Full_3D
 
-    Integer :: averaging_level(1:nqmax) = 0, compute_q(1:nqmax) = -1
+    Integer :: current_averaging_level = 0
+    Integer :: current_qval = 0
+
+    Integer :: averaging_level(1:nqmax) = 0, compute_q(1:nqmax) = 0
     Integer :: shellavg_values(1:nqmax)=-1, globalavg_values(1:nqmax)=-1
     Integer :: shellslice_values(1:nqmax) =-1, shellslice_levels(1:nshellmax)=-1, azavg_values(1:nqmax)=-1
     Integer :: full3d_values(1:nqmax) = -1, spectra_values(1:nqmax)=-1, spectra_levels(1:nshellmax)=-1
     Integer :: histo_values(1:nqmax) = -1, histo_levels(1:nshellmax)=-1
 
-    Integer :: globalavg_nrec = 1
+    Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1
 
-    Integer :: output_frequency, eng_frequency, checkpoint_frequency
+    Integer :: globalavg_frequency = 1000000, shellavg_frequency = 1000000
+    Integer :: azavg_frequency = 1000000, shellslice_frequency = 1000000
+
     Integer :: full3d_frequency= 100000
-    Integer :: endian_tag = 314
-    Real(8) :: checkpoint_time
-    Namelist /output_namelist/shellavg_values, globalavg_values, &
-        & shellslice_values, shellslice_levels, azavg_values, output_frequency, &
-        & checkpoint_frequency, checkpoint_time, eng_frequency, full3d_values, &
-        & full3d_frequency, globalavg_nrec
 
-    Character*120 :: run_dir
-    Integer :: itmax, restart_checkpoint
-    Real(8) :: tend, wtlimit
-    Namelist /input_namelist/run_dir, itmax, restart_checkpoint, &
-        & tend, wtlimit
+
+    Namelist /output_namelist/shellavg_values, globalavg_values, &
+        & shellslice_values, shellslice_levels, azavg_values, &
+        & full3d_values, &
+        & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
+        & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency
+
+
 
     Integer, Private :: nq_max
     Integer :: integer_zero = 0
@@ -132,8 +155,9 @@ Contains
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in)
 		Implicit None
 		Integer :: i,j, k, ind
-        Integer :: rsize, hsize
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
+        Character*120 :: fdir
+
 		! Handles output bookkeeping
 
 		my_theta_min = pfi%my_2p%min
@@ -180,25 +204,37 @@ Contains
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
 
-        !Next, set the header and record sizes for the different outputs.  By "header," we mean
-        !all the information that is written out only at the beginning of the file.  By "record,"
-        !we mean information written out every iteration
-        !All outputs (save possibly full_3d output) will have the endian tag and the current record count as the first 
-        !8 bytes (4 byte integers each) in the file.
+        !Next, provide the file directory, frequency info, output versions etc.
 
         ! Global Averages
-        hsize = 4*Global_Averages%nq+12 ! endian tag, nrec, nq, qvalues array
-        rsize = 8*Global_Averages%nq+12 ! global_averages, simtime (8 bytes), iteration # (4 bytes)
-        Call Global_Averages%set_file_info(hsize,rsize,globalavg_nrec,output_frequency)    ! 3 is hard-coded recs per file now..
+        fdir = 'G_Avgs/'
+        Call Global_Averages%set_file_info(globalavg_version,globalavg_nrec,globalavg_frequency,fdir)    
+
+        ! Shell Averages
+        fdir = 'Shell_Avgs/'
+        Call Shell_Averages%set_file_info(shellavg_version,shellavg_nrec,shellavg_frequency,fdir)    ! 3 is hard-coded recs per file now..
+
+        ! Azimuthal Averages
+        fdir = 'AZ_Avgs/'
+        Call AZ_Averages%set_file_info(azavg_version,azavg_nrec,azavg_frequency,fdir)    ! 3 is hard-coded recs per file now..
+
+        ! Shell Slices
+        fdir = 'Shell_Slices/'
+        Call Shell_Slices%set_file_info(shellslice_version,shellslice_nrec,shellslice_frequency,fdir)    ! 3 is hard-coded recs per file now..
+
+        ! Full 3D (special because it only cares about the frequency, not nrec)
+        fdir = 'Spherical_3D/'
+        Call Full_3D%set_file_info(full3d_version,shellslice_nrec,full3d_frequency,fdir)    ! 3 is hard-coded recs per file now..
+
+        Write(6,*)'Shell F: ', Shell_Slices%frequency
    End Subroutine Initialize_Spherical_IO
 
 
 
 
-	Subroutine Get_Shell_Slice(qval,qty)
+	Subroutine Get_Shell_Slice(qty)
 		Implicit None
 		Integer :: j, ilocal, shell_lev_ind, shell_ind
-		Integer, Intent(In) :: qval
 		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
 
 		If (Shell_Slices%my_nlevels .gt. 0) Then
@@ -216,7 +252,7 @@ Contains
 				shell_lev_ind = shell_lev_ind +1
 		    Endif
 		  Enddo
-            If (myid .eq. 0) Shell_Slices%oqvals(shell_ind) = qval
+            If (myid .eq. 0) Shell_Slices%oqvals(shell_ind) = current_qval
             ! advance counter for next quantity to store (if any)
             Call Shell_Slices%AdvanceInd()
 		Endif
@@ -236,9 +272,10 @@ Contains
 
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
 		Integer :: nelem
-
+        Integer :: hsize, rsize, file_pos, funit, error
         nq_shell = Shell_Slices%nq
         shell_slice_tag = Shell_Slices%mpi_tag
+        funit = Shell_Slices%file_unit
 		! Later, we may want to generalize this, but for now just assume the process 0 handles the output
 		responsible = 0
 		If (myid .eq. io_node) responsible = 1
@@ -289,21 +326,23 @@ Contains
 				current_shell = s_end+1
 				!DeAllocate(buff)	! lot of allocation/de-allocation here.  Probably doesn't matter, but can optimize later.
 			Enddo
-
-      	Write(iterstring,i_ofmt) this_iter
-         !shell_slice_file = trim(run_dir)//'/Shell_Slices/'//trim(iterstring)
-			shell_slice_file = 'Shell_Slices/'//trim(iterstring)
-	 		Open(unit=15,file=shell_slice_file,form='unformatted', status='replace', access='stream')
-            Write(15)endian_tag
-         Write(15)nphi,ntheta,Shell_Slices%nlevels,Shell_Slices%nq
-         Write(15)(Shell_Slices%oqvals(i),i=1,Shell_Slices%nq)
-	 		Write(15)(radius(Shell_Slices%levels(i)),i=1,Shell_Slices%nlevels)
-	 		Write(15)(Shell_Slices%levels(i),i=1,Shell_Slices%nlevels)
-	 		Write(15)(sintheta(j),j=1,ntheta)
-			Write(15)((((all_shell_slices(k,j,i,qq),k=1,nphi),j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
-			Write(15)(costheta(j),j=1,ntheta)
-			Write(15)simtime
-			Close(15)
+            Call Shell_Slices%OpenFile(this_iter, error)
+            If (error .eq. 0) Then
+                If (Shell_Slices%current_rec .eq. 1) Then            
+                    Write(funit)ntheta,Shell_Slices%nlevels,Shell_Slices%nq
+                    Write(funit)(Shell_Slices%oqvals(i),i=1,Shell_Slices%nq)
+                    Write(funit)(radius(Shell_Slices%levels(i)),i=1,Shell_Slices%nlevels)
+                    Write(funit)(Shell_Slices%levels(i),i=1,Shell_Slices%nlevels)
+                    Write(funit)(costheta(j),j=1,ntheta)
+                    Call Shell_Slices%update_position() ! important to do after header has been written
+                Endif
+                file_pos = Shell_Slices%file_position
+                Write(funit, POS = file_pos)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
+                    & j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
+                Write(funit)simtime
+                Write(funit)this_iter
+                Call Shell_Slices%CloseFile()
+            Endif
 
 			DeAllocate(all_shell_slices)
 
@@ -319,49 +358,50 @@ Contains
 
 	End Subroutine Write_Shell_Slices
 
+    Function Compute_Quantity(qval) result(yesno)
+        integer, intent(in) :: qval 
+        Logical             :: yesno 
+        current_qval = qval
+        yesno = .false.
+        If (compute_q(qval) .eq. 1) Then
+            ! We check all diagnostic types and their respective frequencies
+            ! While doing so, we modify the averaging level
+            Call Full_3D%getq_now(yesno)
+            Call Shell_Slices%getq_now(yesno)
+            Call AZ_Averages%getq_now(yesno)
+            Call Shell_Averages%getq_now(yesno)
+            Call Global_Averages%getq_now(yesno)
+        Endif
+    End function Compute_quantity
 
-	Subroutine Add_Quantity( qval,qty)
+    Function Time_To_Output(iter) result(yesno)
+        integer, intent(in) :: iter 
+        Logical             :: yesno 
+        yesno = .false.
+
+
+         If (Mod(iter,Global_Averages%Frequency) .eq. 0) yesno = .true.
+         If (Mod(iter,Shell_Averages%Frequency) .eq. 0) yesno = .true.        
+          
+         If (Mod(iter,AZ_Averages%Frequency) .eq. 0) yesno = .true.
+         If (Mod(iter,Shell_Slices%Frequency) .eq. 0) yesno = .true. 
+         If (Mod(iter,Full_3D%Frequency) .eq. 0) yesno = .true.
+    End function Time_To_Output
+
+	Subroutine Add_Quantity(qty)
 		Implicit None
 		Logical :: log_exist
-		Integer :: i, this_iter, qval, oerr
-		character*120 :: ologfile
+		Integer :: i, this_iter, oerr
 		Real*8, Intent(In) :: qty(:,:,:)
 
-		If (compute_q(qval) .eq. 1) Then
-			If (Shell_Slices%compute(qval) .eq. 1) Then
-				Call get_shell_slice(qval,qty)
-			Endif
-			
 
-            If (averaging_level(qval) .ge. 1) Then
-				!!write(6,*)'in step 1'
-			    Call get_azimuthal_average(this_iter, qty,qval)
-				!output_ireq(1) = az_avg_tag
-				!call MPI_BARRIER(MPI_COMM_WORLD,oerr)
-					!write(6,*)'out step 1'
-			Endif
+		If (Shell_Slices%grab_this_q) Call get_shell_slice(qty)
 
-            If (averaging_level(qval) .ge. 2) Then
-			    Call get_shell_average(this_iter,qval)
-				!output_ireq(1) = shell_avg_tag
-				!call MPI_BARRIER(MPI_COMM_WORLD,oerr)
-			Endif
+        Call Get_Averages(qty)
 
-            If (averaging_level(qval) .ge. 3) Then
-			    Call get_global_average(this_iter,qval)
-				!output_ireq(1) = global_avg_tag
-				!call MPI_BARRIER(MPI_COMM_WORLD,oerr)
-			Endif
+		If (full_3d%grab_this_q) Call write_full_3d(qty)
 
-			! Step 5 is separate from the others.  
-			! For 3-D output, each output quantity is written as it is computed
-			If (full_3d%compute(qval) .eq. 1) Then
-				!Write(6,*)'Entering 3D output'
-				If (mod(current_iteration,full3d_frequency) .eq. 0) Then
-					Call write_full_3d(qty,qval)
-				Endif
-			Endif
-		Endif
+		
 
 
 
@@ -370,27 +410,19 @@ Contains
 	Subroutine Complete_Output(iter, sim_time)
 		Integer, Intent(In) :: iter
 		Real*8, Intent(In) :: sim_time
-        If (maxval(shell_slices%compute) .eq. 1) Then
-			 Call Write_Shell_Slices(iter,sim_time)
-		Endif
-        If (maxval(AZ_Averages%compute) .eq. 1) Then
-			 Call Write_Azimuthal_Average(iter,sim_time)
-		Endif
-		If (maxval(Shell_Averages%compute) .eq. 1) Then
-			 Call Write_Shell_Average(iter,sim_time)
-		Endif
-        If (maxval(global_averages%compute) .eq. 1) Then
-			 Call Write_Global_Average(iter,sim_time)
-		Endif
+
+	    If (Mod(iter,Shell_Slices%frequency) .eq. 0 ) Call Write_Shell_Slices(iter,sim_time)
+	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
+	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
+	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
+
         DeAllocate(f_of_r_theta)
         DeAllocate(f_of_r)
 	End Subroutine Complete_Output
 
-	Subroutine Get_Azimuthal_Average(this_iter,qty,qval)
+	Subroutine Get_Azimuthal_Average(qty)
 		Implicit None
-		Integer :: this_iter
 		Integer :: r, t, nq_azav, azav_ind
-		Integer, Intent(in) :: qval
 		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
         nq_azav = AZ_Averages%nq
 		If (AZ_Averages%begin_output) Then
@@ -408,18 +440,95 @@ Contains
 		!Write(6,*)'my max: ', maxval(f_of_r_theta)
 		f_of_r_theta = f_of_r_theta/dble(nphi)     ! average in phi
 
-		If (AZ_Averages%compute(qval) .eq. 1) Then
+		If (AZ_Averages%grab_this_q) Then
 			azav_outputs(:,:,azav_ind) = f_of_r_theta
-            If (myid .eq. 0) AZ_Averages%oqvals(azav_ind) = qval
+            If (myid .eq. 0) AZ_Averages%oqvals(azav_ind) = current_qval
 			Call AZ_Averages%AdvanceInd()
 		Endif
 		
 	END Subroutine Get_Azimuthal_Average
 
-	Subroutine Get_Shell_Average(this_iter, qval)
+	Subroutine Get_Averages(qty)
+        ! Takes azimuthal, shellular, and partial global averages of 3D array qty
 		Implicit None
-		Integer, Intent(In) :: this_iter, qval
-        Integer :: t, nq_shell, shellav_ind
+		Integer :: azav_ind,shellav_ind, globav_ind
+        Integer :: i, r,t 
+        Real*8 :: this_average
+		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
+
+        !//////////////////////////////
+        !First the azimuthal average
+        If (current_averaging_level .ge. 1) Then
+
+		    f_of_r_theta(:,:) = 0.0D0
+		
+		    Do t = my_theta_min, my_theta_max
+			    Do r = my_rmin, my_rmax
+				    f_of_r_theta(r,t) = sum(qty(:,r,t))
+			    Enddo
+		    Enddo
+
+		    f_of_r_theta = f_of_r_theta/dble(nphi)     ! average in phi
+
+		    If (AZ_Averages%grab_this_q) Then
+                If (.not. Allocated(azav_outputs)) Then
+			        Allocate(azav_outputs(my_rmin:my_rmax,my_theta_min:my_theta_max,1:AZ_Averages%nq))
+                Endif
+    		    azav_ind = AZ_Averages%ind
+			    azav_outputs(:,:,azav_ind) = f_of_r_theta
+                If (myid .eq. 0) AZ_Averages%oqvals(azav_ind) = current_qval
+			    Call AZ_Averages%AdvanceInd()
+		    Endif
+        Endif
+
+        !/////////////////////
+        !Now Average over the partial sphere (shell_averages)
+		If (current_averaging_level .ge. 2) Then
+		    f_of_r(:) = 0.0D0
+
+            Do t = my_theta_min, my_theta_max
+                f_of_r(:) = f_of_r(:) + f_of_r_theta(:,t)*theta_integration_weights(t)
+            Enddo
+
+
+		    If (Shell_Averages%grab_this_q) Then
+                If (.not. Allocated(shellav_outputs)) Then
+			        Allocate(shellav_outputs(my_rmin:my_rmax,1:Shell_Averages%nq))
+                Endif
+                shellav_ind = Shell_Averages%ind
+			    shellav_outputs(:,shellav_ind) = f_of_r(:)
+                If (myid .eq. 0) Shell_Averages%oqvals(shellav_ind) = current_qval
+                Call Shell_Averages%AdvanceInd()
+		    Endif
+        Endif
+
+        !////////////////////////
+        ! Finally, integrate in radius to get the partial global average
+        If (current_averaging_level .ge. 3) Then
+
+            this_average =0.0d0
+            do i = my_rmin, my_rmax
+                this_average = this_average+f_of_r(i)*r_integration_weights(i)
+            enddo
+
+		    If (Global_Averages%grab_this_q) Then
+    		    If (.not. Allocated(globav_outputs)) Then			
+    			    Allocate(globav_outputs(1:Global_Averages%nq))			
+    		    Endif
+                globav_ind = Global_Averages%ind
+			    globav_outputs(globav_ind) = this_average
+                If (myid .eq. 0) Global_Averages%oqvals(globav_ind) = current_qval
+                Call Global_Averages%AdvanceInd()
+		    Endif
+
+        Endif
+
+	END Subroutine Get_Averages
+
+
+	Subroutine Get_Shell_Average()
+		Implicit None
+        Integer :: t, nq_shell, shellav_ind,qval
 
         nq_shell = Shell_Averages%nq
 		If (Shell_Averages%begin_output) Then		
@@ -433,18 +542,17 @@ Contains
         Enddo
 
 
-		If (Shell_Averages%compute(qval) .eq. 1) Then
+		If (Shell_Averages%grab_this_q) Then
 			shellav_outputs(:,shellav_ind) = f_of_r(:)
-            If (myid .eq. 0) Shell_Averages%oqvals(shellav_ind) = qval
+            If (myid .eq. 0) Shell_Averages%oqvals(shellav_ind) = current_qval
             Call Shell_Averages%AdvanceInd()
 		Endif
 
 	END Subroutine Get_Shell_Average		
 
-	Subroutine Get_Global_Average(this_iter, qval)
+	Subroutine Get_Global_Average()
 		Implicit None
-		Integer, Intent(In) :: this_iter, qval
-        Integer :: i, nq_globav, globav_ind
+        Integer :: i, nq_globav, globav_ind, qval
         Real*8 :: this_average
 
         nq_globav = Global_Averages%nq
@@ -459,7 +567,7 @@ Contains
             this_average = this_average+f_of_r(i)*r_integration_weights(i)
         enddo
 
-		If (Global_Averages%compute(qval) .eq. 1) Then
+		If (Global_Averages%grab_this_q) Then
 			globav_outputs(globav_ind) = this_average
             If (myid .eq. 0) Global_Averages%oqvals(globav_ind) = qval
             Call Global_Averages%AdvanceInd()
@@ -470,7 +578,7 @@ Contains
 	Subroutine Write_Azimuthal_Average(this_iter,simtime)
 		Implicit None
 		Real*8, Allocatable :: buff(:,:,:), full_azavg(:,:,:)
-
+        Integer :: hsize, rsize, file_pos, funit, error
 		Integer :: responsible
 		Integer :: i, j, k, nq_azav
 		Integer, Intent(In) :: this_iter
@@ -483,6 +591,7 @@ Contains
         nq_azav = AZ_Averages%nq
 		responsible = 0
         az_avg_tag = AZ_Averages%mpi_tag
+        funit = AZ_Averages%file_unit
 		If (myid .eq. io_node) responsible = 1
 
 		If (responsible .eq. 1) Then
@@ -514,23 +623,25 @@ Contains
                     DeAllocate(buff)
                 Enddo
             Enddo			
-            write(iterstring,i_ofmt) this_iter
 
-            !Call AZ_Averages%OpenFile(this_iter,write_header)
-            azfile = 'AZ_Avgs/'//trim(iterstring)
-            Open(unit=15,file=azfile,form='unformatted', status='replace',access='stream')
 
-            ! If(write_header) Then
-            Write(15)endian_tag
-            Write(15)nr, ntheta,nq_azav
-            Write(15)(AZ_Averages%oqvals(i),i=1,nq_azav)
-            Write(15)(radius(i),i=1,nr)
-            Write(15)(sintheta(i),i=1,ntheta)
-            !Endif
-            Write(15)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
-				Write(15)simtime
-            Close(15)
-            !Call AZ_Averages%CloseFile()
+
+            Call AZ_Averages%OpenFile(this_iter, error)
+            If (error .eq. 0) Then
+                If (AZ_Averages%current_rec .eq. 1) Then
+                    Write(funit)nr, ntheta,nq_azav
+                    Write(funit)(AZ_Averages%oqvals(i),i=1,nq_azav)
+                    Write(funit)(radius(i),i=1,nr)
+                    Write(funit)(costheta(i),i=1,ntheta)
+                    Call AZ_Averages%update_position()
+                Endif
+           
+                file_pos = AZ_Averages%file_position
+                Write(funit, POS = file_pos)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
+		        Write(funit)simtime
+                Write(funit)this_iter
+                Call AZ_Averages%CloseFile()
+            Endif
 		Else
             Call send(azav_outputs, dest = 0,tag=az_avg_tag, grp=pfi%gcomm)
             DeAllocate(azav_outputs)
@@ -543,19 +654,20 @@ Contains
 
         Integer :: responsible
         Integer :: i,n, your_id , nq_globav, global_avg_tag, error, file_pos
-        Integer :: hsize, rsize
+        Integer :: hsize, rsize, funit
         Integer, Intent(In) :: this_iter
         Real*8, Intent(In) :: simtime
-        Character*8 :: iterstring
-        Character*120 :: gfile	
+
         nq_globav = Global_Averages%nq
-        responsible = 0
         global_avg_tag = Global_Averages%mpi_tag
+        funit = Global_Averages%file_unit
+
+        responsible = 0
         If (myid .eq. io_node) responsible = 1
 
         If (responsible .eq. 1) Then
-        ! Responsible node receives  all the pieces of the az_averages from the other nodes
-
+        !Responsible node receives  all the pieces of the az_averages from the other nodes
+        !Eventually I am going to replace this with a customized allreduce that uses a row/column cascade
 
             Allocate(full_avg(nq_globav))
             full_avg(:) = 0.0d0
@@ -565,29 +677,25 @@ Contains
                     Call receive(buff, source= n,tag=global_avg_tag,grp = pfi%gcomm)
                 Else
                     buff(:) = globav_outputs(:)
-                    DeAllocate(globav_outputs)
+                DeAllocate(globav_outputs)
                 Endif
                 full_avg(:) = full_avg(:)+buff(:)
             Enddo			
             DeAllocate(buff)
 
-            write(iterstring,i_ofmt) this_iter
-            gfile = 'G_Avgs/'//trim(iterstring)
-            !Open(unit=15,file=gfile,form='unformatted', status='replace', access='stream')
             Call Global_Averages%OpenFile(this_iter, error)
             If (error .eq. 0) Then
                 If (Global_Averages%current_rec .eq. 1) Then
-                    Write(15)nq_globav
-                    Write(15)(Global_Averages%oqvals(i),i=1,nq_globav)
+                    Write(funit)nq_globav
+                    Write(funit)(Global_Averages%oqvals(i),i=1,nq_globav)
+                    Call Global_Averages%update_position
                 Endif
+                file_pos = Global_Averages%file_position
 
-                hsize = Global_Averages%file_header_size
-                rsize = Global_Averages%file_record_size
-                file_pos = hsize+rsize*(Global_Averages%current_rec-1)+1
-                Write(15,POS = file_pos)(full_avg(i),i=1,nq_globav)
-                Write(15)simtime
-                Write(15)this_iter
-                Call Global_Averages%CloseFile ! Close(15)
+                Write(funit,POS = file_pos)(full_avg(i),i=1,nq_globav)
+                Write(funit)simtime
+                Write(funit)this_iter
+                Call Global_Averages%CloseFile 
             Endif
             DeAllocate(full_avg)
         Else
@@ -603,13 +711,13 @@ Contains
 		Real*8, Intent(In) :: simtime
 		Integer :: responsible
 		Integer :: i, j, k, n, nn, nq_shellav, shell_avg_tag
-		Character*8 :: iterstring
-		Character*120 :: shellav_file
         Real*8, Allocatable :: full_shellavg(:,:), buff(:,:)		
         Integer :: your_r_min, your_r_max, your_nr, your_id
+        Integer :: hsize, rsize, file_pos, funit, error
 
         shell_avg_tag = Shell_Averages%mpi_tag
         nq_shellav = Shell_Averages%nq
+        funit = Shell_Averages%file_unit
 		responsible = 0
 		If (myid .eq. io_node) responsible = 1
 
@@ -643,17 +751,21 @@ Contains
                 Enddo
 			Enddo
 
-            write(iterstring,i_ofmt) this_iter
-            shellav_file = 'Shell_Avgs/'//trim(iterstring)
-            open(unit=15,file=shellav_file,form='unformatted', status='replace', access='stream')
-            Write(15)endian_tag
-            Write(15)nr, nq_shellav
-            Write(15)(Shell_Averages%oqvals(i),i=1,nq_shellav)
-            Write(15)(radius(i),i=1,nr)
-            Write(15)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
-				Write(15)simtime
-            Close(15)
 
+            Call Shell_Averages%OpenFile(this_iter, error)
+            If (error .eq. 0) Then
+                If (Shell_Averages%current_rec .eq. 1) Then
+                    Write(funit)nr,nq_shellav
+                    Write(funit)(Shell_Averages%oqvals(i),i=1,nq_shellav)
+                    Write(funit)(radius(i),i=1,nr)
+                    Call Shell_Averages%update_position()
+                Endif
+                file_pos = Shell_Averages%file_position
+                Write(funit,POS=file_pos)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
+				Write(funit)simtime
+                Write(funit)this_iter
+                Call Shell_Averages%CloseFile
+            Endif
 		Else
             !  Non responsible nodes send their info				 
             Call send(shellav_outputs, dest = 0,tag=shell_avg_tag, grp = pfi%gcomm)
@@ -661,11 +773,10 @@ Contains
 		Endif
 	End Subroutine Write_Shell_Average
 
-	Subroutine Write_Full_3D(qty,qtag)
+	Subroutine Write_Full_3D(qty)
 		Use MPI_BASE ! Doing this here for now.  No other routine above sees MPI_Base, and I may want to keep it that way.
 		Implicit None		
 		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
-		Integer, Intent(In) :: qtag
 		Real*8, Allocatable :: my_shells(:,:,:), buff(:,:,:)
 		Integer :: i, j, k
 		Character*2 :: qstring
@@ -719,7 +830,7 @@ Contains
 
 
 			write(iterstring,i_ofmt) current_iteration
-			write(qstring,'(i2.2)') qtag
+			write(qstring,'(i2.2)') current_qval
          cfile = 'Spherical_3D/'//trim(iterstring)//'_'//qstring
 			!Write(6,*)cfile
 			call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
@@ -886,12 +997,17 @@ Contains
 
     End Subroutine Shell_Balance
 
-    Subroutine set_file_info(self,hsize,rsize,rcount, freq)
+    Subroutine set_file_info(self,oversion,rcount, freq, fpref,funit)
         Implicit None
         Class(DiagnosticInfo) :: self
-        Integer :: hsize, rsize, rcount, freq
-        self%file_header_size = hsize
-        self%file_record_size = rsize
+        Integer :: oversion, rcount, freq
+        Integer, Optional, Intent(In) :: funit
+        Character*120 :: fpref
+        If (present(funit)) Then
+            self%file_unit = funit
+        Endif
+        self%file_prefix = fpref
+        self%output_version = oversion
         self%rec_per_file = rcount
         self%frequency = freq
     End Subroutine set_file_info
@@ -916,27 +1032,26 @@ Contains
             ibelong = iter-imod+modcheck    ! This iteration belongs in a file with number= ibelong
         endif
         write(iterstring,i_ofmt) ibelong
-        filename = 'G_Avgs/'//trim(iterstring)
+        filename = trim(self%file_prefix)//trim(iterstring)
 
-
-        If (imod .eq. self%frequency) Then   ! time to begin a new file
-            !self%file_started = .true. 
+        If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
             Write(6,*)'Creating Filename: ', filename
-            Open(unit=15,file=filename,form='unformatted', status='replace',access='stream',iostat = errcheck)
-            Write(15)endian_tag
-            Write(15)integer_zero ! We write zero initially - only write current rec after the data is actually written
+            Open(unit=self%file_unit,file=filename,form='unformatted', status='replace',access='stream',iostat = errcheck)
+            Write(self%file_unit)endian_tag
+            Write(self%file_unit)self%output_version
+            Write(self%file_unit)integer_zero ! We write zero initially - only update nrec after the data is actually written
             self%current_rec = 1            
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
                 Write(6,*)'Unable to create file!!: ',filename
             Endif
         Else
-            Open(unit=15,file=filename,form='unformatted', status='old',access='stream', iostat = errcheck)    ! USE ERROR CHECK HERE
+            Open(unit=self%file_unit,file=filename,form='unformatted', status='old',access='stream', iostat = errcheck)    
             self%current_rec = self%current_rec+1
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
-                Write(6,*)'Expected, but failed to find, file: ', filename
+                Write(6,*)'Failed to find needed file: ', filename
                 Write(6,*)'Partial diagnostic files are not currently supported.'
                 Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
             Endif
@@ -947,8 +1062,28 @@ Contains
     Subroutine CloseFile(self)
         Implicit None
         Class(DiagnosticInfo) :: self
-        Write(15,POS = 5)self%current_rec
-        Close(15)
+        Call self%update_position()
+        Write(self%file_unit,POS = 9)self%current_rec
+        Close(self%file_unit)
     End Subroutine CloseFile
-
+    Subroutine Update_Position(self)
+        Implicit None
+        Class(DiagnosticInfo) :: self
+        INQUIRE(UNIT=self%file_unit, POS=self%file_position)
+    End Subroutine Update_Position
+    Subroutine getq_now(self,yesno)
+        Implicit None
+        Logical, Intent(InOut) :: yesno
+        Integer :: modcheck
+        Class(DiagnosticInfo) :: self
+        self%grab_this_q = .false.
+        If(self%compute(current_qval) .eq. 1) Then
+            modcheck = Mod(current_iteration,self%frequency)
+            If (modcheck .eq. 0) Then
+                yesno = .true.
+                current_averaging_level = Max(current_averaging_level,self%avg_level)
+                self%grab_this_q = .true.
+            Endif
+        Endif
+    End Subroutine getq_now
 End Module Spherical_IO
