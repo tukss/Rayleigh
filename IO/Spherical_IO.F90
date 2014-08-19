@@ -23,6 +23,7 @@ Module Spherical_IO
     Integer, Parameter :: azavg_version = 1
     Integer, Parameter :: shellavg_version = 1
     Integer, Parameter :: globalavg_version = 1
+    Integer, Parameter :: shellspectra_version = 1
     Integer, Parameter :: full3d_version = 1    !currently unused
     Type, Public :: DiagnosticInfo
         ! Need to see if we can make these allocatable, but for now..
@@ -84,7 +85,7 @@ Module Spherical_IO
 
     End Type DiagnosticInfo
 
-    Type(DiagnosticInfo) :: Shell_Averages, Shell_Slices, Global_Averages, AZ_Averages, Full_3D
+    Type(DiagnosticInfo) :: Shell_Averages, Shell_Slices, Global_Averages, AZ_Averages, Full_3D, Shell_Spectra
 
     Integer :: current_averaging_level = 0
     Integer :: current_qval = 0
@@ -92,13 +93,14 @@ Module Spherical_IO
     Integer :: averaging_level(1:nqmax) = 0, compute_q(1:nqmax) = 0
     Integer :: shellavg_values(1:nqmax)=-1, globalavg_values(1:nqmax)=-1
     Integer :: shellslice_values(1:nqmax) =-1, shellslice_levels(1:nshellmax)=-1, azavg_values(1:nqmax)=-1
-    Integer :: full3d_values(1:nqmax) = -1, spectra_values(1:nqmax)=-1, spectra_levels(1:nshellmax)=-1
+    Integer :: full3d_values(1:nqmax) = -1, shellspectra_values(1:nqmax)=-1, shellspectra_levels(1:nshellmax)=-1
     Integer :: histo_values(1:nqmax) = -1, histo_levels(1:nshellmax)=-1
 
-    Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1
+    Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1, shellspectra_nrec =1
 
     Integer :: globalavg_frequency = 1000000, shellavg_frequency = 1000000
     Integer :: azavg_frequency = 1000000, shellslice_frequency = 1000000
+    Integer :: shellspectra_frequency=1000000
 
     Integer :: full3d_frequency= 100000
 
@@ -107,7 +109,8 @@ Module Spherical_IO
         & shellslice_values, shellslice_levels, azavg_values, &
         & full3d_values, &
         & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
-        & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency
+        & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency, &
+        & shellspectra_nrec, shellspectra_frequency
 
 
 
@@ -116,6 +119,7 @@ Module Spherical_IO
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
     Real*8, Private, Allocatable :: shellav_outputs(:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
+    type(SphericalBuffer) :: spectra_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
     Character*6, Public :: i_ofmt = '(i8.8)', i_pfmt = '(i5.5)'
@@ -147,6 +151,7 @@ Contains
         Call Shell_Averages%reset()
         Call AZ_Averages%reset()
         Call Shell_Slices%reset()
+        !Call Shell_Spectra%reset()
 
         Allocate(f_of_r_theta(my_rmin:my_rmax,my_theta_min:my_theta_max))
         Allocate(f_of_r(my_rmin:my_rmax))
@@ -154,7 +159,7 @@ Contains
 
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in)
 		Implicit None
-		Integer :: i,j, k, ind
+		Integer :: i,j, k, ind,fcount(3,2), ntot
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
 
@@ -198,12 +203,24 @@ Contains
 		Call        AZ_Averages%Init(averaging_level,compute_q,myid,56,avg_level = 1,values = azavg_values)
         Call     Shell_Averages%Init(averaging_level,compute_q,myid,57,avg_level = 2,values = shellavg_values)
         Call       Shell_Slices%Init(averaging_level,compute_q,myid,58,values = shellslice_values, levels = shellslice_levels)
-
+        Call       Shell_Spectra%Init(averaging_level,compute_q,myid,58,values = shellspectra_values, levels = shellspectra_levels)
 
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
-
+        Call Shell_Spectra%Shell_Balance()
+        If (Shell_Spectra%nlevels .gt. 0) Then
+            !Shell spectra require an additional step
+            !Initialize the buffer object that we use for transposing spectra
+            !Some row ranks might have no buffer initialized.
+            ntot = Shell_Spectra%nq*Shell_Spectra%my_nlevels
+            fcount = ntot/my_nr
+            k = Mod(ntot,my_nr)
+            if (k .gt. 0) fcount = fcount+1
+            If (maxval(fcount) .gt. 0) Then
+           		!Call spectra_buffer%init(field_count = fcount, config = 'p3b')		
+            Endif	
+        Endif 
         !Next, provide the file directory, frequency info, output versions etc.
 
         ! Global Averages
@@ -212,19 +229,25 @@ Contains
 
         ! Shell Averages
         fdir = 'Shell_Avgs/'
-        Call Shell_Averages%set_file_info(shellavg_version,shellavg_nrec,shellavg_frequency,fdir)    ! 3 is hard-coded recs per file now..
+        Call Shell_Averages%set_file_info(shellavg_version,shellavg_nrec,shellavg_frequency,fdir)    
 
         ! Azimuthal Averages
         fdir = 'AZ_Avgs/'
-        Call AZ_Averages%set_file_info(azavg_version,azavg_nrec,azavg_frequency,fdir)    ! 3 is hard-coded recs per file now..
+        Call AZ_Averages%set_file_info(azavg_version,azavg_nrec,azavg_frequency,fdir)    
 
         ! Shell Slices
         fdir = 'Shell_Slices/'
-        Call Shell_Slices%set_file_info(shellslice_version,shellslice_nrec,shellslice_frequency,fdir)    ! 3 is hard-coded recs per file now..
+        Call Shell_Slices%set_file_info(shellslice_version,shellslice_nrec,shellslice_frequency,fdir)   
+
+        ! Shell Spectra
+        fdir = 'Shell_Spectra/'
+        Call Shell_Spectra%set_file_info(shellspectra_version,shellspectra_nrec,shellspectra_frequency,fdir) 
+
+
 
         ! Full 3D (special because it only cares about the frequency, not nrec)
         fdir = 'Spherical_3D/'
-        Call Full_3D%set_file_info(full3d_version,shellslice_nrec,full3d_frequency,fdir)    ! 3 is hard-coded recs per file now..
+        Call Full_3D%set_file_info(full3d_version,shellslice_nrec,full3d_frequency,fdir)    
 
         Write(6,*)'Shell F: ', Shell_Slices%frequency
    End Subroutine Initialize_Spherical_IO
@@ -236,28 +259,185 @@ Contains
 		Implicit None
 		Integer :: j, ilocal, shell_lev_ind, shell_ind
 		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
+        If (Shell_Slices%nlevels .gt. 0) Then
+            shell_ind = Shell_Slices%ind
+            If (myid .eq. 0) THen
 
-		If (Shell_Slices%my_nlevels .gt. 0) Then
+                Shell_Slices%oqvals(shell_ind) = current_qval
+            Endif
+        
 
-		  If (Shell_Slices%begin_output) Then
-			Allocate(shell_slice_outputs(1:nphi,my_theta_min:my_theta_max,1:Shell_Slices%my_nlevels,1:Shell_Slices%nq))
-		  Endif
+		    If (Shell_Slices%my_nlevels .gt. 0) Then
 
-            shell_ind = Shell_Slices%ind            
-		  shell_lev_ind =1
-		  Do j = 1, Shell_Slices%nlevels
-		    ilocal = Shell_Slices%levels(j)-my_rmin+1
-		    If (Shell_Slices%have_shell(j) .eq. 1) Then ! my processor has this radius
-				shell_slice_outputs(:,my_theta_min:my_theta_max,shell_lev_ind,shell_ind) = qty(:,ilocal,my_theta_min:my_theta_max)
-				shell_lev_ind = shell_lev_ind +1
+		      If (Shell_Slices%begin_output) Then
+			    Allocate(shell_slice_outputs(1:nphi,my_theta_min:my_theta_max,1:Shell_Slices%my_nlevels,1:Shell_Slices%nq))
+		      Endif
+
+            
+		      shell_lev_ind =1
+		      Do j = 1, Shell_Slices%nlevels
+		        ilocal = Shell_Slices%levels(j)-my_rmin+1
+		        If (Shell_Slices%have_shell(j) .eq. 1) Then ! my processor has this radius
+				    shell_slice_outputs(:,my_theta_min:my_theta_max,shell_lev_ind,shell_ind) = qty(:,ilocal,my_theta_min:my_theta_max)
+				    shell_lev_ind = shell_lev_ind +1
+		        Endif
+		      Enddo
+
+
 		    Endif
-		  Enddo
-            If (myid .eq. 0) Shell_Slices%oqvals(shell_ind) = current_qval
             ! advance counter for next quantity to store (if any)
             Call Shell_Slices%AdvanceInd()
+        Endif
+	End Subroutine Get_Shell_Slice
+
+	Subroutine Get_Shell_Spectra(qty)
+		Implicit None
+		Integer :: j, ilocal, shell_lev_ind, shell_ind, field_ind, rind
+		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
+
+        If (Shell_Spectra%nlevels .gt. 0) Then
+            shell_ind = Shell_Spectra%ind
+            If (myid .eq. 0) Then
+                Shell_Spectra%oqvals(shell_ind) = current_qval
+            Endif
+        
+
+		    If (Shell_Spectra%my_nlevels .gt. 0) Then
+
+		        If (Shell_Spectra%begin_output) Then
+			        Call spectra_buffer%construct('p3b')
+                    spectra_buffer%p3b(:,:,:,:) = 0.0d0
+		        Endif
+
+                            
+		        shell_lev_ind =1
+		        Do j = 1, Shell_Spectra%nlevels
+
+                    field_ind = (shell_lev_ind-1)/my_nr+1
+                    rind = shell_lev_ind-(field_ind-1)*my_nr
+
+		            ilocal = Shell_Slices%levels(j)-my_rmin+1
+		            If (Shell_Spectra%have_shell(j) .eq. 1) Then ! my processor has this radius
+
+				        spectra_buffer%p3b(1:nphi,my_theta_min:my_theta_max,rind,field_ind) = &
+                        & qty(1:nphi,ilocal,my_theta_min:my_theta_max)
+				        shell_lev_ind = shell_lev_ind +1
+		            Endif
+		        Enddo
+            Endif
+            Call Shell_Spectra%AdvanceInd()
 		Endif
 
-	End Subroutine Get_Shell_Slice
+	End Subroutine Get_Shell_Spectra
+
+	Subroutine Write_Shell_Spectra(this_iter,simtime)
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
+		Integer :: responsible, current_shell, s_start, s_end, this_rid
+		Integer :: i, j, k,ii,qq, this_id2, this_id1, i_start, i_end, j_start, j_end, k_total
+		Integer :: n, nn, this_id,this_nshell, nq_shell, shell_spectra_tag
+
+		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
+		Integer :: nelem
+        Integer :: hsize, rsize, file_pos, funit, error
+        nq_shell = Shell_Slices%nq
+        shell_spectra_tag = Shell_Spectra%mpi_tag
+        funit = Shell_Spectra%file_unit
+		! Later, we may want to generalize this, but for now just assume the process 0 handles the output
+		responsible = 0
+		If (myid .eq. io_node) responsible = 1
+
+        !//////////////////////
+        ! First thing we do is FFT/reform the buffer/Legendre Transform
+        !
+        If (Shell_Spectra%my_nlevels .gt. 1) Then
+            !Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
+            !Call spectra_buffer%reform()
+    		!Call spectra_buffer%construct('s2b')
+            !Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
+            !Call spectra_buffer%deconstruct('p2b')
+        Endif
+
+        ! I should replace this with a call to a method like Shell_Slices%comm
+		If (responsible .eq. 1) Then
+			! Responsible node receives  all the pieces of the shell slices from the other nodes
+
+		
+			Allocate(all_shell_slices(1:nphi,1:ntheta,Shell_Slices%nlevels,Shell_Slices%nq))
+			all_shell_slices(:,:,:,:) = 0.0d0
+			current_shell = 1
+			Do n = 1, Shell_Slices%nshell_r_ids  
+				 this_rid = Shell_Slices%shell_r_ids(n)
+				 this_nshell = Shell_Slices%nshells_at_rid(n)		
+				 s_start = current_shell
+				 s_end = s_start+this_nshell-1 
+
+
+				 Do nn = 0, nproc2-1
+					your_id = nn+this_rid*nproc2
+
+					your_ntheta    = pfi%all_2p(nn)%delta
+					your_theta_min = pfi%all_2p(nn)%min
+					your_theta_max = pfi%all_2p(nn)%max
+
+				 	Allocate(buff(1:nphi,1:your_ntheta,1:this_nshell,1:Shell_Slices%nq))
+
+
+					nelem = nphi*your_ntheta*this_nshell*nq_shell
+				 	If (your_id .ne. io_node) then
+						! Receive and copy
+
+             		Call receive(buff, source= your_id,tag=shell_spectra_tag,grp = pfi%gcomm)
+
+						all_shell_slices(1:nphi,your_theta_min:your_theta_max,s_start:s_end,1:nq_shell) = &
+							& buff(1:nphi , 1:your_ntheta, 1:this_nshell, 1:nq_shell)
+					Else
+						If (Shell_Slices%my_nlevels .gt. 0) Then
+							! Copy my shells into the main output array
+
+							all_shell_slices(1:nphi,your_theta_min:your_theta_max,s_start:s_end,1:nq_shell) &
+								& = shell_slice_outputs(:,:,:,:)
+						Endif			
+					Endif
+					DeAllocate(buff)
+ 				Enddo
+				current_shell = s_end+1
+				!DeAllocate(buff)	! lot of allocation/de-allocation here.  Probably doesn't matter, but can optimize later.
+			Enddo
+            Call Shell_Slices%OpenFile(this_iter, error)
+            If (error .eq. 0) Then
+                If (Shell_Slices%current_rec .eq. 1) Then            
+                    Write(funit)ntheta,Shell_Slices%nlevels,Shell_Slices%nq
+                    Write(funit)(Shell_Slices%oqvals(i),i=1,Shell_Slices%nq)
+                    Write(funit)(radius(Shell_Slices%levels(i)),i=1,Shell_Slices%nlevels)
+                    Write(funit)(Shell_Slices%levels(i),i=1,Shell_Slices%nlevels)
+                    Write(funit)(costheta(j),j=1,ntheta)
+                    Call Shell_Slices%update_position() ! important to do after header has been written
+                Endif
+                file_pos = Shell_Slices%file_position
+                Write(funit, POS = file_pos)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
+                    & j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
+                Write(funit)simtime
+                Write(funit)this_iter
+                Call Shell_Slices%CloseFile()
+            Endif
+
+			DeAllocate(all_shell_slices)
+
+		Else
+			!  Non responsible nodes send their info
+			If (Shell_Slices%my_nlevels .gt. 0) Then
+				Call send(shell_slice_outputs, dest = 0,tag=shell_spectra_tag, grp = pfi%gcomm)
+			Endif
+		Endif
+		If (Shell_Slices%my_nlevels .gt. 0) Then
+			DeAllocate(shell_slice_outputs)
+		Endif
+
+	End Subroutine Write_Shell_Spectra
+
 
 	Subroutine Write_Shell_Slices(this_iter,simtime)
 		Implicit None
