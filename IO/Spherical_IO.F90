@@ -1,6 +1,7 @@
 Module Spherical_IO
 	Use Parallel_Framework
 	Use SendReceive
+    Use Fourier_Transform
 	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
@@ -249,7 +250,7 @@ Contains
         fdir = 'Spherical_3D/'
         Call Full_3D%set_file_info(full3d_version,shellslice_nrec,full3d_frequency,fdir)    
 
-        Write(6,*)'Shell F: ', Shell_Slices%frequency
+        !Write(6,*)'Shell F: ', Shell_Slices%frequency
    End Subroutine Initialize_Spherical_IO
 
 
