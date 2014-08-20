@@ -1,4 +1,8 @@
-Module Linear_Terms_Sphere
+! This is a draft of a cartesian linear terms module
+! ultimately,  I would prefer to not have separate modules for
+! different geometries.   That shouldn't be that hard, but for now
+! this will do...
+Module Linear_Terms_Box
 	Use Load_Balance, Only : mp_lm_values, l_lm_values, my_num_lm, m_lm_values, my_lm_min, my_nl_lm, my_nm_lm, my_lm_lval, my_lm_max
 	Use Controls
 	Use ProblemSize
@@ -7,7 +11,7 @@ Module Linear_Terms_Sphere
 	Use BoundaryConditions
 	Use Timers
 	Use ClockInfo
-	Use Legendre_Polynomials, Only : pi
+	!Use Legendre_Polynomials, Only : pi
 	Use ReferenceState
 	Use TransportCoefficients
 	Use NonDimensionalization
@@ -118,21 +122,7 @@ Contains
 		Call Finalize_Equations()	
 		If (bandsolve) Call Use_BandSolve()
 		!============================================
-		!  Next decide which derivatives need to be saved.
-		!  This can be either for transposition later (i.e. nonlinear terms),
-		!  or for checkpointing and output (such at with P).
-		!  Saved derivatives will remain in memory until explicitly deallocated
-		!  by the user.  The Implicit Module simply places them into memory.  It 
-		!  does not deallocate them.
 
-		!Call Set_Deriv_Save(wvar,2)
-		!Call Set_Deriv_Save(pvar,0)
-		!Call Set_Deriv_Save(tvar,1)
-		!Call Set_Deriv_Save(zvar,1)
-		!If (magnetism) Then
-		!	Call Set_Deriv_Save(avar,1)
-		!	Call Set_Deriv_Save(cvar,2)
-		!Endif
 	End Subroutine Initialize_Benchmark_Equations
 
 	Subroutine Compute_Benchmark_Coefficients()
@@ -149,6 +139,7 @@ Contains
 			l = my_lm_lval(lp)		
 
 			H_Laplacian = - l_l_plus1(l) * OneOverRSquared
+            !Nomenclature above is OK if l_l_plus1 is initialized consistently and 1/r^2 is set to 1
 			If (l .eq. 0) Then
 				!====================================================
 				!			Temperature Equation
@@ -156,23 +147,20 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(teq,tvar, 0, amp,lp, static = .true.)	! Time independent part
 
-				!amp = 2.0d0/radius/Pr
-                amp = 2.0d0/radius*kappa
-				Call add_implicit_term(teq,tvar, 1, amp,lp)
+
 				!amp = 1.0d0/Pr
                 amp = 1.0d0*kappa
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
-				! Kappa,rho, T variation in radius
-				amp = S_Diffusion_Coefs_1
-				Call add_implicit_term(teq,tvar,1,amp,lp)
+				! Kappa,rho, T variation in radius  --- probably still correct, but check later
+				!amp = S_Diffusion_Coefs_1
+				!Call add_implicit_term(teq,tvar,1,amp,lp)
 
 				!=======================================
 				!   Hydrostatic balance
 				! 	 This part of the equation is static (i.e. not time-evolving)
 
 				! 	 t
-				amp = -Ra/ek*( (radius/r_outer)**gpower )
                 amp = -ref%gravity_term_s
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
@@ -191,9 +179,6 @@ Contains
 				!				Radial Momentum Equation
 				
 				! Temperature
-				!amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
-                !amp = -(Ra/Ek)*ref%gravity
-				!amp = amp/H_Laplacian
                 amp = -ref%gravity_term_s/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
@@ -215,10 +200,10 @@ Contains
 
 				! These two diffusion bits are different 
 				! depending on variation of rho and nu
-				amp = W_Diffusion_Coefs_0		
-				Call add_implicit_term(weq,wvar, 0, amp,lp)
-				amp = W_Diffusion_Coefs_1
-				Call add_implicit_term(weq,wvar, 1, amp,lp)
+				!amp = W_Diffusion_Coefs_0		
+				!Call add_implicit_term(weq,wvar, 0, amp,lp)
+				!amp = W_Diffusion_Coefs_1
+				!Call add_implicit_term(weq,wvar, 1, amp,lp)    ! also probably OK, but CHECK
 
 				!==================================================
 				!				Pressure (dWdr) Equation
@@ -231,7 +216,7 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(peq,wvar, 1, amp,lp, static = .true.)	! Time independent term
 				!amp =-H_Laplacian*2.0d0/radius	
-				amp =-nu*H_Laplacian*2.0d0/radius
+				amp =-nu*H_Laplacian*two_over_radius !  2.0d0/radius
 				Call add_implicit_term(peq,wvar, 0, amp,lp)
                 !amp = H_Laplacian
 				amp = H_Laplacian*nu
@@ -410,47 +395,6 @@ Contains
                     Call Load_BC(lp,r,teq,tvar,one,1)
                 Endif	    			
 
-                !////////////////////////////////////////
-                ! These are four different boundary conditions that are similar, though
-                ! slightly different, in nature.  The idea is to try some boundary conditions
-                ! that allow entropy and it's derivatives to vary on the boundary
-                ! Either Del dot Grad S, Del dot F_conductive, or Del_r dot Grad S or F_conductive is zero
-                
-                If (fix_divrt_top) Then
-                    r = 1
-                    !d2sdr2 + 2/r dsdr = 0 at r = r_top
-                    Call Load_BC(lp,r,teq,tvar,one,2)
-                    samp = 2.0d0/radius(r)
-                    Call Load_BC(lp,r,teq,tvar,samp,1)
-                Endif
-
-                If (fix_divt_top) Then
-                    r = 1
-                    !d2sdr2 + 2/r dsdr -l(l+1)/r^2= 0 at r = r_top
-                    Call Load_BC(lp,r,teq,tvar,one,2)
-                    samp = 2.0d0/radius(r)
-                    Call Load_BC(lp,r,teq,tvar,samp,1)
-                    samp = -l*1.0d0*(l*1.0d0+1)/radius(r)**2
-                    Call Load_BC(lp,r,teq,tvar,samp,0)
-                Endif
-
-
-                If (fix_divrFc_top) Then
-                    r = 1
-                    !d2sdr2 + 2/r dsdr = 0 at r = r_top
-                    Call Load_BC(lp,r,teq,tvar,one,2)
-                    samp = 2.0d0/radius(r)+(dlnkappa(r)+ref%dlnrho(r)+ref%dlnT(r))
-                    Call Load_BC(lp,r,teq,tvar,samp,1)
-                Endif
-                If (fix_divFc_top) Then
-                    r = 1
-                    !d2sdr2 + 2/r dsdr -l(l+1)/r^2= 0 at r = r_top
-                    Call Load_BC(lp,r,teq,tvar,one,2)
-                    samp = 2.0d0/radius(r)+(dlnkappa(r)+ref%dlnrho(r)+ref%dlnT(r))
-                    Call Load_BC(lp,r,teq,tvar,samp,1)
-                    samp = -l*1.0d0*(l*1.0d0+1)/radius(r)**2
-                    Call Load_BC(lp,r,teq,tvar,samp,0)
-                Endif
 
 
 				!************************************************************
@@ -767,4 +711,4 @@ Contains
          indx = indx + n_m + 1
       Enddo
     End Subroutine Fix_Boundary_Conditions
-End Module Linear_Terms_Sphere
+End Module Linear_Terms_Box
