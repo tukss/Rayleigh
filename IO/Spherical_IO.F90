@@ -1252,6 +1252,7 @@ Contains
         Implicit None
         Class(DiagnosticInfo) :: self
         INQUIRE(UNIT=self%file_unit, POS=self%file_position)
+        Write(6,*)'fpos2: ', self%file_position
     End Subroutine Update_Position
     Subroutine getq_now(self,yesno)
         Implicit None
