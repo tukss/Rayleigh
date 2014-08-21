@@ -115,7 +115,7 @@ Contains
 	End Subroutine Initialize_Kappa
 
 	Subroutine Initialize_Eta()
-		Select Case(nu_type)
+		Select Case(eta_type)
 			Case(1)	! Constant Eta
 				eta(:) = eta_top
 				dlneta(:) = 0.0d0

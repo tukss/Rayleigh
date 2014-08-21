@@ -942,6 +942,7 @@ Contains
                     Call Shell_Averages%update_position()
                 Endif
                 file_pos = Shell_Averages%file_position
+                write(6,*)'file pos: ', file_pos
                 Write(funit,POS=file_pos)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
 				Write(funit)simtime
                 Write(funit)this_iter
