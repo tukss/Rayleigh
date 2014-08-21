@@ -518,7 +518,7 @@ Contains
                     Call Shell_Slices%update_position() ! important to do after header has been written
                 Endif
                 file_pos = Shell_Slices%file_position
-                Write(funit, POS = file_pos)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
+                Write(funit)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
                     & j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
                 Write(funit)simtime
                 Write(funit)this_iter
@@ -818,7 +818,7 @@ Contains
                 Endif
            
                 file_pos = AZ_Averages%file_position
-                Write(funit, POS = file_pos)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
+                Write(funit)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
 		        Write(funit)simtime
                 Write(funit)this_iter
                 Call AZ_Averages%CloseFile()
@@ -873,7 +873,7 @@ Contains
                 Endif
                 file_pos = Global_Averages%file_position
 
-                Write(funit,POS = file_pos)(full_avg(i),i=1,nq_globav)
+                Write(funit)(full_avg(i),i=1,nq_globav)
                 Write(funit)simtime
                 Write(funit)this_iter
                 Call Global_Averages%CloseFile 
@@ -943,11 +943,9 @@ Contains
                 Endif
                     Write(funit)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
                 Write(funit) simtime
-                INQUIRE(funit,pos = file_pos)
-                Write(6,*)'post sa: ',file_pos
+
                 Write(funit)this_iter
-                INQUIRE(funit,pos = file_pos)
-                Write(6,*)'post this iter: ',file_pos
+
 
                 Call Shell_Averages%CloseFile
             Endif
