@@ -941,11 +941,14 @@ Contains
                     Write(funit)(radius(i),i=1,nr)
                     Call Shell_Averages%update_position()
                 Endif
-                file_pos = Shell_Averages%file_position
-                write(6,*)'file pos: ', file_pos
-                Write(funit,POS=file_pos)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
-				Write(funit)simtime
+                    Write(funit)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
+                Write(funit) simtime
+                INQUIRE(funit,pos = file_pos)
+                Write(6,*)'post sa: ',file_pos
                 Write(funit)this_iter
+                INQUIRE(funit,pos = file_pos)
+                Write(6,*)'post this iter: ',file_pos
+
                 Call Shell_Averages%CloseFile
             Endif
 		Else
@@ -1229,7 +1232,8 @@ Contains
                 Write(6,*)'Unable to create file!!: ',filename
             Endif
         Else
-            Open(unit=self%file_unit,file=filename,form='unformatted', status='old',access='stream', iostat = errcheck)    
+            Open(unit=self%file_unit,file=filename,form='unformatted', status='old',access='stream', &
+                & iostat = errcheck, POSITION = 'APPEND')    
             self%current_rec = self%current_rec+1
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
