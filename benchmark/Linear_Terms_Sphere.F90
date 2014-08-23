@@ -396,7 +396,9 @@ Contains
 				! Temperature Boundary Conditions (T fixed bottom and top)
 				r = 1
                 If (fix_tvar_top) Then
-    				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                    If (.not. fix_divrfc_top) Then
+        				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                    Endif
                 Endif
                 If (fix_dtdr_top) Then
                     Call Load_BC(lp,r,teq,tvar,one,1)	
