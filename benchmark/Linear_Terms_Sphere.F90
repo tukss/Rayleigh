@@ -446,12 +446,19 @@ Contains
                 Endif
                 If (fix_divFc_top) Then
                     r = 1
-                    !d2sdr2 + 2/r dsdr -l(l+1)/r^2= 0 at r = r_top
-                    Call Load_BC(lp,r,teq,tvar,one,2)
-                    samp = 2.0d0/radius(r)+(dlnkappa(r)+ref%dlnrho(r)+ref%dlnT(r))
-                    Call Load_BC(lp,r,teq,tvar,samp,1)
-                    samp = -l*1.0d0*(l*1.0d0+1)/radius(r)**2
-                    Call Load_BC(lp,r,teq,tvar,samp,0)
+                    if ( l .gt. 1) Then
+                        !d2sdr2 + 2/r dsdr -l(l+1)/r^2= 0 at r = r_top
+                        Call Load_BC(lp,r,teq,tvar,one,2)
+                        samp = 2.0d0/radius(r)+(dlnkappa(r)+ref%dlnrho(r)+ref%dlnT(r))
+                        Call Load_BC(lp,r,teq,tvar,samp,1)
+                        samp = -l*1.0d0*(l*1.0d0+1)/radius(r)**2
+                        Call Load_BC(lp,r,teq,tvar,samp,0)
+                    Else
+                        ! This boundary condition generally works well, but it can develop an ell=1
+                        ! convection mode that causes undesired (and probably unphysical) behavior
+                        samp = 1.0d0
+                        Call Load_BC(lp,r,teq,tvar,samp,0)
+                    Endif
                 Endif
 
 
