@@ -125,6 +125,7 @@ Contains
 
 		! sum_n (alpha_kn  c_n) = c'_k
 		Allocate(alpha(1:N_max,1:N_max))
+        alpha(:,:) = 0.0d0
 		alpha(N_max,:) = 0.0d0
 		alpha(N_max-1,N_max) = 2.0d0*(N_max-1)
 		Do k = N_max-2, 1, -1
