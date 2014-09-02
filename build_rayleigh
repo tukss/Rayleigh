@@ -1,15 +1,20 @@
 #!/bin/csh
+###  RAYLEIGH BUILD SCRIPT
+###  Usage:  ./build_rayleigh machine_name
+###  The Makefile employed is machine dependent
+###  See the Makefiles directory for example Makefiles
+###  The value of machine_name should correspond to one of the Makefiles
+###  in that directory.  Machine name for Makefile is indicated following underscore.
 
-##############################
-#  Choose a machine name 
-#  to pick the appropriate makefile.
-##setenv MACHINE Nick
-##setenv MACHINE Pleiades
-##setenv MACHINE Vesta
-setenv MACHINE LCD
-# Everything else should remain unchanged
-#########################3
+###  For example, to use Makefile_LCD
+###  ./build_rayleigh LCD
 
+###  To use Makefile_Pleiades
+###  ./build_rayleigh_Pleiades
+
+setenv MACHINE $1
+setenv RAYLEIGH_DEBUG $2
+mkdir build
 cd build
 rm *.F90
 rm Makefile
