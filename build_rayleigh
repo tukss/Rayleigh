@@ -7,6 +7,7 @@
 ##setenv MACHINE Pleiades
 ##setenv MACHINE Vesta
 setenv MACHINE LCD
+# Everything else should remain unchanged
 #########################3
 
 cd build
