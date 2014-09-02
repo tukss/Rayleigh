@@ -1,24 +1,69 @@
-PRO READ_SHELLAVG, file, res, SWAP = swap
-	time = 0.0d0
-	dims = lonarr(2)
+PRO READ_SHELLAVG, file, res
+	endian_tag = 0L
+	version = 0L
+	nrec = 0L
+	nr = 0L
+	nq = 0L
 	CLOSE, 13
-	IF (KEYWORD_SET(SWAP)) THEN BEGIN
-		OPENR, 13, file, /f77_unformatted, /swap_if_little_endian
-	ENDIF ELSE BEGIN
-		OPENR, 13, file, /f77_unformatted
-	ENDELSE
+	OPENR, 13, file
+	READU,13, endian_tag
+	If (endian_tag ne 314) THEN BEGIN
+		endian1 = endian_tag
+		CLOSE,13
+		OPENR,13,file, /swap_if_little_endian
+		READU,13,endian_tag
+		IF (endian_tag ne 314) THEN BEGIN
+			print, 'Unable to discern endianess of file!'
+			print, "Expected integer value 314 in first 4 bytes"
+			print, "Found : ", endian1
+			print, "And   : ", endian_tag
+			STOP
+		ENDIF
 
-	READU,13, dims
-	nr = dims[0]
-	nq = dims[1]
-	radius = dblarr(nr)
-	qvals = lonarr(nq)
-	vals = dblarr(nr,nq)
+	Endif
+	; Read the data dimensions
+	READU,13, version
+	READU,13, nrec
+	READU,13, nr
+	READU,13, nq
 
-	readu,13,qvals
-	readu,13,radius
-	readu,13, vals
-	readu,13, time
-	res = {vals:vals, radius:radius, q:qvals, time:time}
-	close, 13
+
+	; Read the header arrays
+	qvals      = LONARR(nq)
+	radius     = DBLARR(nr)
+
+	READU,13,qvals
+	READU,13,radius
+
+
+	; Read the individual records
+	vals = DBLARR(nr,nq,nrec)
+	tmp  = DBLARR(nr)
+	time = DBLARR(nrec)
+	iter = LONARR(nrec)
+	it = 0L
+	tm = 0.0d0
+	FOR i = 0, nrec-1 DO BEGIN
+		FOR k = 0, nq -1 DO BEGIN
+			READU,13,tmp
+			vals[*,k,i] = tmp
+		ENDFOR
+		READU,13,tm
+		READU,13,it
+		time[i] = tm
+		iter[i] = it
+	ENDFOR
+	CLOSE, 13
+
+	; Build a lookup table for the quantity codes
+	qmax = 400L
+	lut = LONARR(qmax+1)
+	lut[*] = qmax*2
+	FOR i = 0, nq -1 DO BEGIN
+		lut[qvals[i]] =  i
+	ENDFOR
+	
+	res = {vals:vals, radius:radius, qvals:qvals, time:time, $
+			iter:iter, version:version, lut:lut}
+
 END

@@ -10,21 +10,17 @@ F90FLAGS = -r8 -O0 -CB -g -traceback -fpp -FR -check all -I$(MKLROOT)/include/ff
 PROG =	pseudo
 
 .SUFFIXES: .o .F90 .f .F
-OBJ = Timing.o Finite_Difference.o Linear_Solve.o Structures.o Legendre_Polynomials.o Legendre_Transforms.o \
-	Fourier_Transform.o Fourier_Derivatives.o MPI_Base.o \
-	All_to_All.o MPI_LAYER.o Load_Balance.o Parallel_Framework.o \
-	ProblemSize.o PseudoPhysics.o Input.o Main.o \
-
 DSOBJ = Structures.o
 PFOBJ = MPI_Base.o All_to_All.o SendReceive.o ISendReceive.o General_MPI.o MPI_LAYER.o Load_Balance.o Parallel_Framework.o
 MOBJ  = Timing.o Finite_Difference.o Chebyshev_Polynomials.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o \
-	Fourier_Transform.o Spectral_Derivatives.o
+        Fourier_Transform.o Spectral_Derivatives.o
 IOOBJ = Spherical_IO.o
-POBJ  = Run_Parameters.o Controls.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o NonDimensionalization.o Fields.o Checkpointing.o Initial_Conditions.o Diagnostics.o BoundaryConditions.o \
-	ClockInfo.o Linear_Terms_Sphere.o Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
+POBJ  = Run_Parameters.o Controls.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o NonDimensionalization.o Fields.o Checkpointing.o Initial_Conditions.o Diagnostics.o \
+        ClockInfo.o Linear_Terms_Sphere.o Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
 ##Physics.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
 MAINOBJ = Input.o Main.o
+
 
 
 $(PROG) :$(DSOBJ) $(PFOBJ) $(MOBJ) $(IOOBJ) $(POBJ) $(TOBJ) $(MAINOBJ)

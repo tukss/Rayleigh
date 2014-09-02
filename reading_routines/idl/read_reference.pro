@@ -1,5 +1,26 @@
 pro read_reference, file, res
-	openr, 13, file, /f77_unformatted
+	CLOSE, 13
+
+	openr, 13, file
+	endian_tag = 0L
+        READU,13, endian_tag
+        If (endian_tag ne 314) THEN BEGIN
+                endian1 = endian_tag
+                CLOSE,13
+                OPENR,13,file, /swap_if_little_endian
+                READU,13,endian_tag
+                IF (endian_tag ne 314) THEN BEGIN
+                        print, 'Unable to discern endianess of file!'
+                        print, "Expected integer value 314 in first 4 bytes"
+                        print, "Found : ", endian1
+                        print, "And   : ", endian_tag
+                        STOP
+                ENDIF
+
+        Endif
+
+
+
 	nr = 0L
 	readu,13,nr
 
