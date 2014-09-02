@@ -7,7 +7,6 @@ Contains
 
 	Subroutine Test_Chebyshev_Transforms()
 		Implicit None
-		Real*8 :: scaling
 		Allocate(colocx(1:N_R))
 		colocx(:) = radius(:)
 		!Call Initialize_Chebyshev(colocx,1.0d0,1.5d0)
@@ -22,8 +21,7 @@ Contains
 	End Subroutine Test_Chebyshev_Transforms
 
 	Subroutine Test_Transform_1d
-		Integer :: i
-		Real*8 :: rdiff, test
+		Real*8 :: rdiff
 		Real*8, Allocatable :: f(:), c(:),fcheck(:)
 
 
@@ -99,8 +97,8 @@ Contains
 
 
 	Subroutine Test_Transform_2d
-		Integer :: i, j, n2
-		Real*8 :: rdiff, test
+		Integer :: i,  n2
+		Real*8 :: rdiff
 		Real*8, Allocatable :: f(:,:), c(:,:),fcheck(:,:)
 
 
@@ -141,10 +139,10 @@ Contains
 	End Subroutine Test_Transform_2d
 
 	Subroutine Test_Transform_3d
-		Integer :: i, j, n2, n3,n4
-		Real*8 :: rdiff, test
+		Integer :: i, j, n2, n3
+		Real*8 :: rdiff
 		Real*8, Allocatable :: f(:,:,:), c(:,:,:),fcheck(:,:,:)
-		Real*8 :: alpha, beta
+
 		n2 = 3
 		n3 = 3
 		Allocate(f(1:N_R,1:n2,1:n3))
@@ -205,10 +203,10 @@ Contains
 	End Subroutine Reldiff3d
 
 	Subroutine Test_Transform_4d
-		Integer :: i, j, k, n2, n3,n4
-		Real*8 :: rdiff, test
+		Integer :: i, j, n2, n3,n4
+		Real*8 :: rdiff
 		Real*8, Allocatable :: f(:,:,:,:), c(:,:,:,:),fcheck(:,:,:,:)
-		Real*8 :: alpha, beta
+
 		n2 = 3
 		n3 = 3
 		n4 = 2
@@ -281,9 +279,9 @@ Contains
 		! We test that functionality here
 		Implicit None
 		Integer :: i, j, k, kk, n2, n3,n4,nn, dorder,ind,d
-		Real*8 :: rdiff, test
-		Real*8, Allocatable :: f(:,:,:,:), c(:,:,:,:),ans(:,:,:,:), temp3d(:,:,:), atemp3d(:,:,:)
-		Real*8 :: alpha, beta, worst, worsta
+		Real*8 :: rdiff
+		Real*8, Allocatable :: f(:,:,:,:), c(:,:,:,:),ans(:,:,:,:)
+		Real*8 :: worst, worsta
 		n2 = 2
 		n3 = 2
 		n4 = 4
