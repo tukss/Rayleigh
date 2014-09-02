@@ -564,8 +564,7 @@ Contains
 
 	Subroutine Find_MyMinDT()
 		Implicit None
-		Real*8 :: ovt2, ovht2, ovrt2, maxt2
-		Real*8 ::  maxt
+		Real*8 :: ovt2, ovht2, ovrt2
 		Integer :: r
 		Call StopWatch(ts_time)%startclock()
 

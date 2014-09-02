@@ -18,12 +18,12 @@ Contains
 
 	Subroutine Amp_Test()
 		Implicit None
-		Integer :: i,m,mp,l, mxl,mxm,r
+		Integer :: i,m,mp,l, mxl,mxm
 		Integer :: fcount(3,2)
 
 		Integer :: colrank, rowrank, nmodes, this_mode, mcount, offset
 		Integer :: p, np, testing_tag = 90
-		Real*8  :: mxdiff,diff
+		Real*8  :: mxdiff
 		Real*8, Allocatable :: buff(:),reldiff(:), reldiffs(:)
 		Integer, Allocatable :: all_l_values(:), all_m_values(:)
 		Logical :: report
@@ -157,13 +157,13 @@ Contains
 
 	Subroutine Amp_Test_Parallel()
 		Implicit None
-		Integer :: i,m,mp,l, mxl,mxm,r
+		Integer :: i,m,mp,l, mxl,mxm
 		Integer :: fcount(3,2)
 		Integer :: nrl
 		Integer :: nf = 3
 		Integer :: colrank, rowrank, nmodes, this_mode, mcount, offset
 		Integer :: p, np, testing_tag = 90, testing_tag2 = 91
-		Real*8  :: mxdiff,diff, ans
+		Real*8  :: mxdiff, ans
 		Real*8, Allocatable :: buff(:),reldiff_real(:), reldiff_imag(:), reldiffs_real(:), reldiffs_imag(:)
 		Integer, Allocatable :: all_l_values(:), all_m_values(:)
 		Logical :: report

@@ -312,7 +312,7 @@ Contains
 				! If band solve, do the redefinition of the matrix here
 
 			Endif
-            Call Set_Boundary_Conditions2(lp)
+            Call Set_Boundary_Conditions(lp)
             If (bandsolve) Then
                 Call Band_Arrange(weq,lp)
 				Call Band_Arrange(zeq,lp)
@@ -326,7 +326,7 @@ Contains
 		DeAllocate(H_Laplacian)
 	End Subroutine Compute_Benchmark_Coefficients
 
-	Subroutine Set_Boundary_Conditions2(mode_ind)
+	Subroutine Set_Boundary_Conditions(mode_ind)
         ! Modified version of set_boundary_conditions
         ! Designed to work with more memory friendly logic
         ! Sets boundary condition of indicated l-value (index lp)
@@ -334,7 +334,7 @@ Contains
 		Implicit None
 		Real*8 :: samp,one
         Integer, Intent(In) :: mode_ind
-		Integer :: l, r,lp,  dorder
+		Integer :: l, r,lp
 		one = 1.0d0
         lp = mode_ind
 		!Do lp = 1, my_nl_lm
@@ -541,153 +541,9 @@ Contains
 		!Enddo
 
 
-	End Subroutine Set_Boundary_Conditions2
-
-
-	Subroutine Set_Boundary_Conditions
-		Implicit None
-		Real*8 :: samp,one
-		Integer :: l, r,lp,  dorder
-		one = 1.0d0
-
-		Do lp = 1, my_nl_lm
-			l = my_lm_lval(lp)
-
-			If (l .eq. 0) Then
-				Call Clear_Row(peq,lp,1)			! Pressure only has one boundary condition
-				Call Clear_Row(teq,lp,1)
-				Call Clear_Row(teq,lp,N_R)
-
-				! Temperature Boundary Conditions (T fixed bottom and top)
-				r = 1
-				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
-				r = N_R
-				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
-
-
-				! The ell=0 pressure is really a diagnostic of the system.
-				! It doesn't drive anything.  The simplist boundary condition
-				! is to enforce a pressure node at the top.
-				r = 1	
-				Call Load_BC(lp,r,peq,pvar,one,0)
-				if (bandsolve) Then
-					Call Band_Arrange(weq,lp)
-				Endif
-
-			Else
-
-				!*******************************************************
-				!		Clear the boundary rows
-				Call Clear_Row(weq,lp,1)
-				Call Clear_Row(weq,lp,N_R)
-				Call Clear_Row(peq,lp,1)
-				Call Clear_Row(peq,lp,N_R)			
-				Call Clear_Row(teq,lp,1)
-				Call Clear_Row(teq,lp,N_R)
-				Call Clear_Row(zeq,lp,1)
-				Call Clear_Row(zeq,lp,N_R)
-
-
-				!*******************************************************
-				! Entropy Boundary Conditions
-
-				! Temperature Boundary Conditions (T fixed bottom and top)
-				r = 1
-				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
-				r = N_R
-				Call Load_BC(lp,r,teq,tvar,one,0)	! lower boundary
-				
-
-
-
-				!************************************************************
-				! Velocity Boundary Conditions
-		
-				! Impenetrable top and bottom
-				! W vanishes at the boundaries
-				r = 1
-				Call Load_BC(lp,r,weq,wvar,one,0)
-				r = N_R
-				Call Load_BC(lp,r,weq,wvar,one,0)
-
-
-                If (no_slip_boundaries) Then		
-				! No Slip Top and Bottom
-				! Z and dWdr vanish at the boundaries
-                r = 1
-                !If ((l .eq. 1) .and. (Conserve_L) ) then
-                !    write(6,*)'Conserving Angular Momentum'
-    				!Call Load_BC(lp,r,zeq,zvar,one,0,integral = rweights)
-                !Else
-                    Call Load_BC(lp,r,zeq,zvar,one,0)
-                !Endif
-				Call Load_BC(lp,r,peq,wvar,one,1)
-				r = N_R
-				Call Load_BC(lp,r,peq,wvar,one,1)
-				Call Load_BC(lp,r,zeq,zvar,one,0)
-                Else
-                    ! stress-free boundaries
-                    r = 1
-                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
-                    Call Load_BC(lp,r,peq,wvar,one,2)
-                    Call Load_BC(lp,r,peq,wvar,samp,1)
-                    Call Load_BC(lp,r,zeq,zvar,one,1)
-                    Call Load_BC(lp,r,zeq,zvar,samp,0)
-
-                    r = N_R
-                    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
-                    Call Load_BC(lp,r,peq,wvar,one,2)
-                    Call Load_BC(lp,r,peq,wvar,samp,1)
-                    Call Load_BC(lp,r,zeq,zvar,one,1)
-                    Call Load_BC(lp,r,zeq,zvar,samp,0)
-                Endif
-
-				if (bandsolve) Then
-					Call Band_Arrange(weq,lp)
-					Call Band_Arrange(zeq,lp)
-				Endif
-
-				!*******************************************************
-				!		Magnetic Boundary Conditions
-
-				If (Magnetism) Then
-					!  Clear the boundary rows
-					Call Clear_Row(ceq,lp,1)
-					Call Clear_Row(ceq,lp,N_R)
-					Call Clear_Row(aeq,lp,1)
-					Call Clear_Row(aeq,lp,N_R)
-
-
-					! Match to a potential field at top and bottom
-					! Btor = 0 at top and bottom
-					r = 1
-					Call Load_BC(lp,r,aeq,avar,one,0)
-					r = N_R
-					Call Load_BC(lp,r,aeq,avar,one,0)
-
-					! dBpol/dr+ell*Bpol/r = 0 at outer boundary
-					r = 1
-					Call Load_BC(lp,r,ceq,cvar,one,1)
-					samp = my_lm_lval(lp)*one_over_r(r)
-					Call Load_BC(lp,r,ceq,cvar,samp,0)
-
-					! dBpol/dr-(ell+1)*Bpol/r = 0 at inner boundary
-					r = N_R
-					Call Load_BC(lp,r,ceq,cvar,one,1)	
-					samp = - (l+1)*One_Over_R(r)
-					Call Load_BC(lp,r,ceq,cvar,samp,0)	
-					if (bandsolve) Then
-						Call Band_Arrange(aeq,lp)
-						Call Band_Arrange(ceq,lp)
-					Endif
-				Endif	! Magnetism
-
-
-			Endif ! l = 0 or not
-		Enddo
-
-
 	End Subroutine Set_Boundary_Conditions
+
+
 
 	Subroutine Fix_Boundary_Conditions()
 		Implicit None

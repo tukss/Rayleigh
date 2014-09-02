@@ -199,7 +199,7 @@ Contains
 
 	Subroutine Velocity_Components()
 		Implicit None
-		Integer :: l, m, mp, rmn,rmx, r, rind
+		Integer ::  m, mp, rmn,rmx, r, rind
 
 		
 		!Compute the velocity vield
@@ -253,7 +253,7 @@ Contains
 
 	Subroutine Velocity_Derivatives()
 		Implicit None
-		Integer :: r,rind,rind2,rmn,rmn1,rmx,rmx1, rmn2, rmx2
+		Integer :: r,rind,rind2,rmn,rmn1,rmx,rmx1, rmn2
 		Integer :: l, m, mp
 		!/////////////////////////////////
 		!sintheta dv theta dr 
@@ -377,7 +377,7 @@ Contains
 
 	Subroutine Compute_BandJ()
 		Implicit None
-		Integer :: l, m, mp, rmn,rmx, r, rind, rmn2,rmx2, roff, rind2, roff2
+		Integer :: m, mp, rmn,rmx, r, rind, rmn2, roff, rind2, roff2
        
 		!/////////////// BR /////////////////////		
 		!First convert C to Br  !! Br overwrites C
@@ -526,7 +526,7 @@ Contains
 	End Subroutine Compute_BandJ
 	Subroutine Adjust_Emf()
 		Implicit None
-		Integer :: m, mp, r,rmn,rmx,rind1,rind2,rmn1, rmn2, rmn3, roff,rind
+		Integer :: m, mp, r,rmn,rmx,roff,rind
 
 		Call d_by_sdtheta(wsp%s2b, emfphi,ftemp1)	
 		Call d_by_dphi(wsp%s2b,emftheta,ftemp2)
