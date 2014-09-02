@@ -123,7 +123,7 @@ Contains
 		Implicit None
 		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
 		Real*8 :: x
-		Integer :: i, r, l, m, mp
+		Integer :: r, l, m, mp
 		Integer :: fcount(3,2)
 		type(SphericalBuffer) :: tempfield
 		fcount(:,:) = 1
@@ -179,8 +179,8 @@ Contains
 	Subroutine ABenchmark_Init_Hydro()
 		Implicit None
 		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
-		Real*8 :: x, norm
-		Integer :: i, r, l, m, mp
+		Real*8 :: norm
+		Integer :: r, l, m, mp
 		Integer :: fcount(3,2)
         Real*8 :: d, beta, denom, zeta_0, c0, c1, n_rho, bm_n,ee, delta_s
         Real*8, Allocatable :: zeta(:)
@@ -272,7 +272,7 @@ Contains
 		Implicit None
 		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
 		Real*8 :: x
-		Integer :: i, r, l, m, mp
+		Integer :: r, l, m, mp
 		Integer :: fcount(3,2)
 		
 		type(SphericalBuffer) :: tempfield
@@ -608,7 +608,7 @@ Contains
 		Implicit None
 		Integer :: ncombinations, i, m, r, seed(1), mp,n, l, ind1, ind2
 		Integer :: mode_count, my_mode_start, my_mode_end, fcount(3,2)
-		Real*8, Allocatable :: rand(:), rfunc1(:), rfunc2(:), lpow(:)
+		Real*8, Allocatable :: rand(:), rfunc2(:), lpow(:)
 		Real*8 :: amp, phase, lmid, alpha,x
 		Real*8, Allocatable :: new_temp(:)
 		type(SphericalBuffer) :: tempfield
@@ -734,8 +734,8 @@ Contains
 	Subroutine Benchmark_Insulating_Init()
 		Implicit None
 		Real*8, Allocatable :: rfunc1(:), rfunc2(:)
-		Real*8 :: x, nrm1, nrm2
-		Integer :: i, r, l, m, mp, roff
+		Real*8 :: nrm1, nrm2
+		Integer :: r, l, m, mp, roff
 		Integer :: fcount(3,2)
 		type(SphericalBuffer) :: tempfield
 		fcount(:,:) = 2
@@ -806,7 +806,7 @@ Contains
 		! interpolates it (using cubic splines) to the current grid, 
 		! and stores it in profile_out.
 
-      Open(unit=892, file = custom_t_file, form = 'unformatted', status = 'old')
+      Open(unit=892, file = profile_file, form = 'unformatted', status = 'old')
       Read(892)nr_in
       Allocate(profile_in(1:nr_in))
       Allocate(radius_in(1:nr_in))

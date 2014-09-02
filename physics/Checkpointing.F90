@@ -82,7 +82,7 @@ Contains
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Real*8, Intent(In) :: dt, new_dt
 		Integer, Intent(In) :: iteration
-		Integer :: mp, m, nm,nmodes, offset,nl,p,np
+		Integer :: mp, m, offset,nl,p,np
 		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
         Real*8 :: elapsed_time
@@ -430,7 +430,7 @@ Contains
 				Character*3, Intent(In) :: tag
 				Character*120 :: cfile
 
-				integer ierr, i, funit , v_offset1, v_offset2
+				integer ierr, funit , v_offset1, v_offset2
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
@@ -479,7 +479,7 @@ Contains
 				Character*3, Intent(In) :: tag
 				Character*120 :: cfile
 
-				integer ierr, i, funit , v_offset1, v_offset2
+				integer ierr, funit , v_offset1, v_offset2
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
@@ -611,12 +611,12 @@ Contains
 		! ISends and IReceives are used
 		Implicit None
 		Integer :: var_offset, offset, new_off
-		Integer :: row_rank
-		Integer :: rextra
+
+
 		Integer :: nrirq, nsirq, irq_ind, rtag, stag
 		Integer, Allocatable :: rirqs(:), sirqs(:)
 		Integer :: rone, rtwo, my_nrad, num_el
-		Integer :: i, mp, m, l, lstart, nl,p,r
+		Integer :: i, mp, m, lstart, nl,p,r
 		Integer :: indstart(2)
 		Real*8, Intent(In) :: arrin(1:,1:)
 		Real*8, Allocatable :: arr(:,:,:), tarr(:)
@@ -785,8 +785,8 @@ Contains
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Real*8, Intent(In) :: dt, new_dt
 		Integer, Intent(In) :: iteration
-		Integer :: mp, m, nm,nmodes, offset,nl,p,np
-		Integer :: dim2, lstart, i, offset_index
+		Integer :: mp, m, offset,nl,np
+		Integer :: dim2, i, offset_index
 		Real*8, Allocatable :: myarr(:,:)
 		Character*8 :: iterstring
 		Character*120 :: cfile
@@ -866,12 +866,12 @@ Contains
 
 		Implicit None
 		Integer :: var_offset, offset, new_off
-		Integer :: row_rank
-		Integer :: rextra
+
+
 		Integer :: nrirq, nsirq, irq_ind, rtag, stag
 		Integer, Allocatable :: rirqs(:), sirqs(:)
 		Integer :: rone, rtwo, my_nrad, num_el
-		Integer :: i, mp, m, l, lstart, nl,p,r
+		Integer :: i, mp, m, lstart, nl,p,r
 		Integer :: indstart(2)
 		Real*8, Intent(InOut) :: arrin(1:,1:)
 		Real*8, Allocatable :: arr(:,:,:), tarr(:)
@@ -1027,13 +1027,13 @@ Contains
 		! NEW MEMORY FRIENDLY VERSION FOR MIRA
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
-		Integer :: n_r_old, l_max_old, grid_type_old, nr_read
-		Integer :: i, ierr, nlm_total_old, m, nl,p, np, mxread
-		Integer :: maxl, dim2,offset, nl_load,lstart,mp, offset_index
+		Integer :: n_r_old, l_max_old, grid_type_old
+		Integer :: i, ierr,  m, nl
+		Integer :: dim2,offset, mp, offset_index
 		Integer :: old_pars(3)
-		Integer, Allocatable :: lmstart_old(:)
+
 		Real*8, Allocatable :: old_radius(:)
-		Real*8, Allocatable :: rowstrip(:,:), myarr(:,:), sendarr(:,:)
+		Real*8, Allocatable ::  myarr(:,:)
 		Real*8 :: dt_pars(2),dt,new_dt
 		Character*8 :: iterstring
 		Character*120 :: cfile
