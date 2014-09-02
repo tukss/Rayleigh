@@ -3,7 +3,7 @@ Module ProblemSize
 	Use Finite_Difference, Only  : Initialize_Derivatives, Rescale_Grid_FD
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
-	Use Controls, Only : Chebyshev, use_parity, read_argv
+	Use Controls, Only : Chebyshev, use_parity
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
 	Use Timers
 	Implicit None

@@ -1,6 +1,7 @@
 Module Input
 	Use ProblemSize,  Only : problemsize_namelist, nprow, npcol, n_r,n_theta, npout
-	Use Controls,     Only : controls_namelist, max_iterations, pad_alltoall
+	Use Controls,     Only : temporal_controls_namelist, numerical_controls_namelist, &
+                            & physical_controls_namelist, max_iterations, pad_alltoall
 	Use Spherical_IO, Only : output_namelist
 	Use BoundaryConditions, Only : boundary_conditions_namelist
 	Use Initial_Conditions, Only : initial_conditions_namelist, alt_check
@@ -17,7 +18,9 @@ Contains
 		! First read the main input file
 		Open(unit=20, file="main_input", status="old", position="rewind")
 		Read(unit=20, nml=problemsize_namelist)
-		Read(unit=20, nml=controls_namelist)
+		Read(unit=20, nml=numerical_controls_namelist)
+		Read(unit=20, nml=physical_controls_namelist)
+		Read(unit=20, nml=temporal_controls_namelist)
 		Read(unit=20, nml=output_namelist)
 		Read(unit=20, nml=boundary_conditions_namelist)
 		Read(unit=20, nml=initial_conditions_namelist)

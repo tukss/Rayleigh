@@ -172,7 +172,7 @@ Contains
 				! 	 This part of the equation is static (i.e. not time-evolving)
 
 				! 	 t
-				amp = -Ra/ek*( (radius/r_outer)**gpower )
+
                 amp = -ref%gravity_term_s
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
@@ -191,9 +191,7 @@ Contains
 				!				Radial Momentum Equation
 				
 				! Temperature
-				!amp = -(Ra/Ek)*( (radius/r_outer)**gpower )
-                !amp = -(Ra/Ek)*ref%gravity
-				!amp = amp/H_Laplacian
+
                 amp = -ref%gravity_term_s/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 

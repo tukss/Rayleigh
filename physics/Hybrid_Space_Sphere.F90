@@ -192,7 +192,7 @@ Contains
 		Call wsp%reform() ! move to the solve space
 		Call StopWatch(ctranspose_time)%increment()
 
-		If (test_reduce) Call Adjust_TimeStep()
+		Call Adjust_TimeStep()
 
 
 	End Subroutine rlm_spaceb

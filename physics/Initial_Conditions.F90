@@ -27,6 +27,7 @@ Contains
 	Subroutine Initialize_Fields()
 		Implicit None
 		Logical :: dbtrans, dbconfig
+        Logical :: test_reduce = .true.
 		! When coming out of this routine, the RHS of the equation set should contain the field values.
 		! This setup is consistent with the program having just completed a time step
 
