@@ -1,0 +1,24 @@
+#!/bin/csh
+
+##############################
+#  Choose a machine name 
+#  to pick the appropriate makefile.
+##setenv MACHINE Nick
+##setenv MACHINE Pleiades
+##setenv MACHINE Vesta
+setenv MACHINE LCD
+#########################3
+
+cd build
+rm *.F90
+rm Makefile
+cp ../parallel_framework/*.F90 .
+cp ../data_structures/*.F90 .
+cp ../math_layer/*.F90 .
+cp ../IO/*.F90 .
+cp ../test_suite/*.F90 .
+cp ../benchmark/*.F90 .
+cp ../Makefiles/Makefile_$MACHINE Makefile
+cp ../Makefiles/object_list .
+make clean
+make rayleigh
