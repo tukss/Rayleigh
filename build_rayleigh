@@ -10,7 +10,10 @@
 ###  ./build_rayleigh LCD
 
 ###  To use Makefile_Pleiades
-###  ./build_rayleigh_Pleiades
+###  ./build_rayleigh Pleiades
+
+###  A debugging flag may be passed to makefiles that support it.
+### ./build_rayleigh Pleiades debug  (for example)
 
 setenv MACHINE $1
 setenv RAYLEIGH_DEBUG $2
