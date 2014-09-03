@@ -160,7 +160,7 @@ Contains
 
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in)
 		Implicit None
-		Integer :: i,j, k, ind,fcount(3,2), ntot
+		Integer :: k, fcount(3,2), ntot
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
 
@@ -337,12 +337,12 @@ Contains
 		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
-		Integer :: i, j, k,ii,qq, this_id2, this_id1, i_start, i_end, j_start, j_end, k_total
-		Integer :: n, nn, this_id,this_nshell, nq_shell, shell_spectra_tag
+		Integer :: i, j, k,qq
+		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag
 
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
 		Integer :: nelem
-        Integer :: hsize, rsize, file_pos, funit, error
+        Integer :: file_pos, funit, error
         nq_shell = Shell_Slices%nq
         shell_spectra_tag = Shell_Spectra%mpi_tag
         funit = Shell_Spectra%file_unit
@@ -446,14 +446,11 @@ Contains
 		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
-		Integer :: i, j, k,ii,qq, this_id2, this_id1, i_start, i_end, j_start, j_end, k_total
-		Integer :: n, nn, this_id,this_nshell, nq_shell, shell_slice_tag
-		Character*8 :: iterstring
-		Character*120 :: shell_slice_file
-
+		Integer :: i, j, k,qq
+		Integer :: n, nn, this_nshell, nq_shell, shell_slice_tag
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
 		Integer :: nelem
-        Integer :: hsize, rsize, file_pos, funit, error
+        Integer :: file_pos, funit, error
         nq_shell = Shell_Slices%nq
         shell_slice_tag = Shell_Slices%mpi_tag
         funit = Shell_Slices%file_unit
@@ -571,8 +568,6 @@ Contains
 
 	Subroutine Add_Quantity(qty)
 		Implicit None
-		Logical :: log_exist
-		Integer :: i, this_iter, oerr
 		Real*8, Intent(In) :: qty(:,:,:)
 
 
@@ -709,7 +704,7 @@ Contains
 
 	Subroutine Get_Shell_Average()
 		Implicit None
-        Integer :: t, nq_shell, shellav_ind,qval
+        Integer :: t, nq_shell, shellav_ind
 
         nq_shell = Shell_Averages%nq
 		If (Shell_Averages%begin_output) Then		
@@ -759,14 +754,12 @@ Contains
 	Subroutine Write_Azimuthal_Average(this_iter,simtime)
 		Implicit None
 		Real*8, Allocatable :: buff(:,:,:), full_azavg(:,:,:)
-        Integer :: hsize, rsize, file_pos, funit, error
+        Integer ::  file_pos, funit, error
 		Integer :: responsible
 		Integer :: i, j, k, nq_azav
 		Integer, Intent(In) :: this_iter
 		Real*8, Intent(In) :: simtime
         Integer :: n, nn, az_avg_tag
-		Character*8 :: iterstring
-		Character*120 :: azfile	
         Integer :: your_r_min, your_r_max, your_theta_min
         Integer :: your_id, your_theta_max, your_nr, your_ntheta
         nq_azav = AZ_Averages%nq
@@ -834,8 +827,8 @@ Contains
         Real*8, Allocatable :: buff(:), full_avg(:)
 
         Integer :: responsible
-        Integer :: i,n, your_id , nq_globav, global_avg_tag, error, file_pos
-        Integer :: hsize, rsize, funit
+        Integer :: i,n, nq_globav, global_avg_tag, error, file_pos
+        Integer :: funit
         Integer, Intent(In) :: this_iter
         Real*8, Intent(In) :: simtime
 
@@ -891,10 +884,10 @@ Contains
         Integer, Intent(In) :: this_iter
 		Real*8, Intent(In) :: simtime
 		Integer :: responsible
-		Integer :: i, j, k, n, nn, nq_shellav, shell_avg_tag
+		Integer :: i, k, n, nn, nq_shellav, shell_avg_tag
         Real*8, Allocatable :: full_shellavg(:,:), buff(:,:)		
         Integer :: your_r_min, your_r_max, your_nr, your_id
-        Integer :: hsize, rsize, file_pos, funit, error
+        Integer :: funit, error
 
         shell_avg_tag = Shell_Averages%mpi_tag
         nq_shellav = Shell_Averages%nq
@@ -961,13 +954,13 @@ Contains
 		Implicit None		
 		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
 		Real*8, Allocatable :: my_shells(:,:,:), buff(:,:,:)
-		Integer :: i, j, k
+		Integer :: i, j
 		Character*2 :: qstring
 		Character*8 :: iterstring
 		Character*120 :: cfile
 
-		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
-		Integer :: np, jind, buffsize, p
+		Integer :: your_theta_min, your_theta_max, your_ntheta
+		Integer :: np, buffsize, p
 		Integer(kind=MPI_OFFSET_KIND) :: my_disp
 		Integer :: mstatus(MPI_STATUS_SIZE)
 		Integer :: funit, ierr, full_3d_tag

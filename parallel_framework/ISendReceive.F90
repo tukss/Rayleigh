@@ -338,7 +338,7 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
 		Real(8), Intent(out)  :: x(:)
 
     Integer, Optional :: source, n_elements, tag, istart
-	 Integer ::  jstart, kstart,ione
+	 Integer ::  ione
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq, status(MPI_STATUS_SIZE)
 
@@ -384,7 +384,7 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
 		Complex*16, Intent(out)  :: x(:)
 
     Integer, Optional :: source, n_elements, tag, istart
-	 Integer ::  jstart, kstart,ione
+	 Integer ::  ione
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq, status(MPI_STATUS_SIZE)
 
@@ -429,7 +429,7 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
 	Subroutine D_IReceive_2D(x, irq, n_elements, source, tag, grp, indstart)
 		Real(8), Intent(out)  :: x(:,:)
     Integer, Optional :: source, n_elements, tag, indstart(1:2)
-	 Integer :: istart, jstart, kstart, ione, jone
+	 Integer :: ione, jone
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq, status(MPI_STATUS_SIZE)
 
@@ -475,8 +475,8 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
 	Subroutine Z_IReceive_2D(x, irq, n_elements, source, tag, grp, indstart)
 		Complex*16, Intent(out)  :: x(:,:)
 
-    Integer, Optional :: source, n_elements, tag, indstart(1:3)
-	 Integer :: istart, jstart, kstart
+    Integer, Optional :: source, n_elements, tag, indstart(1:2)
+	 Integer :: istart, jstart
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2, irq, status(MPI_STATUS_SIZE)
 
@@ -504,9 +504,15 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
        tag2 = MPI_ANY_TAG
     End If
 
-
+	If (Present(indstart)) Then
+		istart = indstart(1)
+		jstart = indstart(2)
+	Else
+		istart = 1
+		jstart = 1
+	Endif
     
-    Call mpi_irecv(x(1,1), n, MPI_DOUBLE_COMPLEX, p, tag2, comm2, irq, mpi_err)
+    Call mpi_irecv(x(istart,jstart), n, MPI_DOUBLE_COMPLEX, p, tag2, comm2, irq, mpi_err)
 
     If (p == MPI_ANY_SOURCE) source = status(MPI_SOURCE)
     If (tag2 == MPI_ANY_TAG) tag = status(MPI_TAG)

@@ -67,7 +67,7 @@ Contains
     Real*8, Intent(in)  :: x(1:,1:,1:)
 
     Integer, Optional :: dest, n_elements, tag,indstart(1:3)
-	 Integer :: istart, kstart, jstart,lstart
+	 Integer ::  istart, kstart, jstart
     Type(communicator), optional :: grp
     Integer :: p, n, comm2, tag2
 

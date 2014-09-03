@@ -157,7 +157,7 @@ Contains
 		real*8, Pointer :: coefs(:,:)
 		Integer :: dorder,r,stencil_radius, stencil_size, nbpts,istart,iend, stencil_center, offset
 		Integer :: i, ii, jj, iimin, iimax, jjmin, jjmax, dmax,dmin,d
-		real*8 :: time01, time02
+
 		!************************************************************************
 		! Compute the radial derivatives along dimension 1 of a 3-D real array
 		! R is assumed to be in processor, so dimension 1 is assumed to run from 1 to n_x_fd
@@ -251,7 +251,7 @@ Contains
 		Real*8, Pointer :: coefs(:,:)
 		Integer :: dorder,r,stencil_radius, stencil_size, nbpts,istart,iend, stencil_center, offset
 		Integer :: i, ii, jj, iimin, iimax, jjmin, jjmax, dmin,d
-		Real*8 :: time01, time02
+
 		!************************************************************************
 		! Compute the radial derivatives along dimension 1 of a 3-D real array
 		! R is assumed to be in processor, so dimension 1 is assumed to run from 1 to n_x_fd
@@ -342,8 +342,7 @@ Contains
 		real*8, Pointer :: coefs(:,:)
 		Integer, Intent(In) :: ind, dind
 		Integer :: dorder,r,stencil_radius, stencil_size, nbpts,istart,iend, stencil_center, offset
-		Integer :: i, ii, jj, iimin, iimax, jjmin, jjmax, dmax,dmin,d
-		real*8 :: time01, time02
+		Integer :: i, ii, jj, iimin, iimax, jjmin, jjmax
 		!************************************************************************
 		! Compute the radial derivatives along dimension 1 of a 3-D real array
 		! R is assumed to be in processor, so dimension 1 is assumed to run from 1 to n_x_fd
@@ -495,7 +494,7 @@ Contains
 		Integer :: i,j,k, istart, iend, jstart, jend, itemp(2), nxy, ngrid
 		Integer :: n_stencil, deriv_order, stencil_center, stencil_radius
 		Integer :: boundary_accuracy, transition_type
-		Integer :: n_boundary_pts, lwork, diff_dir, this_pt, info
+		Integer :: n_boundary_pts, diff_dir, this_pt, info
 		Integer, Allocatable :: ipiv(:), boundary_pts(:), directions(:)
       ! The stencil for the (fully) interior points is assumed to be centered (i.e. odd number of points)
 		! Note that this can be done for any grid - not just radial since variables like "r" and "radius" are never used

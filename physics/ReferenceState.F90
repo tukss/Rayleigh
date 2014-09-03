@@ -78,8 +78,8 @@ Contains
 	Subroutine Polytropic_Reference()
       Real*8 :: zeta_0,  c0, c1, d
       Real*8 :: rho_c, P_c, T_c,denom
-      Real*8 :: beta, Gas_Constant, bottom_flux, test
-      Real*8, Allocatable :: zeta(:), temp(:)
+      Real*8 :: beta, Gas_Constant
+      Real*8, Allocatable :: zeta(:)
 		Real*8 :: One
       Real*8 :: InnerRadius, OuterRadius
       If (my_rank .eq. 0) write(6,*)'Initializing polytropic reference state.'
@@ -176,9 +176,9 @@ Contains
 
     Subroutine Constant_Reference_Heating()
         Implicit None
-        Real*8 :: integral, alpha, riweight, delr, val
+        Real*8 :: integral, alpha
         Real*8, Allocatable :: temp(:)
-        Integer :: i
+
         ! Luminosity is specified as an input
         ! Phi(r) is set to alpha such that 
         ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity

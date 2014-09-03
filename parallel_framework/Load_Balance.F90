@@ -174,11 +174,10 @@ Contains
 		! Handles the load balancing of modes for the implicit transpose
       Implicit None
 		Type(Load_Config), Intent(In) :: mlb
-      Integer :: nmv, nlv, l_min, lm_per, lm_remainder, l, m, p
-      Integer :: l_lm_min, l_lm_max, mp, m_count, i, ind, count_r, count_s
-      Integer :: r_min, r_max, temp_num
+      Integer :: nmv, nlv, l_min, lm_per, lm_remainder, l, m
+      Integer :: l_lm_min, l_lm_max, mp, m_count, i, ind
       Integer, Allocatable :: mv_temp(:), lv_temp(:)
-      Integer :: this_x_rank, this_y_rank, rank, mpmin,mpmax
+      Integer ::  mpmin,mpmax
 
 		!//////////////////////////////////////
 		! Things I added to make this function temporarily

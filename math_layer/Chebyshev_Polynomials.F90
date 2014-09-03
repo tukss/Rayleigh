@@ -121,7 +121,7 @@ Contains
 		Implicit None
 		Integer, Intent(In) :: dmax
 		Integer :: i, k,n,d 
-		Real*8, Allocatable :: alpha(:,:), alpha2(:,:)
+		Real*8, Allocatable :: alpha(:,:)
 
 		! sum_n (alpha_kn  c_n) = c'_k
 		Allocate(alpha(1:N_max,1:N_max))
@@ -703,14 +703,17 @@ Contains
 	Subroutine Load_Single_Row_Cheby(r,row,col,amp,dorder,mpointer, clear_row, boundary)
 		Integer, Intent(In) :: r,row, col, dorder
 		Integer :: n
-		Integer :: stencil_size
 		real*8, Intent(In) :: amp
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
 		Logical, Intent(In), Optional :: clear_row, boundary
-		Logical :: fd_ash = .true.
+		Logical :: bjunk
 		If (present(clear_row)) Then
 			! clear everything in this row
 			mpointer(r+row,:) = 0.0d0
+		Endif
+		If (present(boundary)) Then
+			! Do nothing at the moment
+			bjunk = boundary	! This is in development, but placeholder to avoid Intel compiler warnings (unused vars)
 		Endif
 		Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
 			mpointer(row+r,col+n) = mpointer(row+r,col+n)+amp*dcheby(r,n,dorder)

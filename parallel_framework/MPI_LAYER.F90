@@ -20,11 +20,11 @@ Contains
 
 	End Function Init_Main_Group
 
-	Subroutine RowColSplit(grp,rgrp,cgrp,nprow,npcol, err)
+	Subroutine RowColSplit(grp,rgrp,cgrp,nprow, err)
 		! Take one group and split it using a row/column decomposition
 		Type(communicator), Intent(InOut) :: grp, rgrp, cgrp
 		Integer, Intent(out) :: err
-		Integer, Intent(In) :: npcol, nprow
+		Integer, Intent(In) ::  nprow
 		Integer :: row_rank, col_rank
 
 		row_rank = mod(grp%rank,nprow)

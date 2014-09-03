@@ -168,10 +168,9 @@ Contains
 		! Handles send/receive disp/counts
 		Implicit None
 		Integer :: np, p
-		Integer :: report_unit = 500
 		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, piggyback, padding
 		Integer, Intent(In), Optional :: field_count(3,2)
-		Character*120 :: report_file,report_tag
+		Character*120 :: report_tag
 		Character*10 :: gtag, rtag, ctag
 		Character*3, Intent(In), Optional :: config
 		Integer :: stemp1, rtemp1
@@ -415,8 +414,8 @@ Contains
 		Logical, Optional, Intent(In) :: override
 		Logical :: free_config_memory
 		Character*3, Intent(In) :: config
-		Integer :: mn1, mn2, mn3, mn4
-		Integer :: mx1,mx2,mx3,mx4,i
+		Integer :: mn1
+		Integer :: mx1,i
 		
 		free_config_memory = .true.
 		If (.not. self%dynamic_config_buffers ) Then
@@ -731,7 +730,7 @@ Contains
 	Subroutine Transpose_2a3a(self)
 		Class(SphericalBuffer) :: self
 		!Real*8, Allocatable :: send_buff(:), recv_buff(:)
-		Integer :: send_size,np, recv_size
+		Integer :: np
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind,delf,delj
 		! This is where we we move from theta, delta_r, delta_m 
@@ -826,7 +825,7 @@ Contains
 
 	Subroutine Transpose_3b2b(self)		
 		Class(SphericalBuffer) :: self
-		Integer :: send_size,np, recv_size
+		Integer :: np
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind
 		Integer :: delf, delj
@@ -939,12 +938,12 @@ Contains
       ! share a common set of ell-m values).  
       Implicit None
 
-      Integer :: r,l,m, mp, lp, indx, rank, rrank, r_min, r_max, dr, mm, arank, cnt,i
-		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, n_lm_local, np,p
+      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i
+		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
 
 
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: send_size,recv_size, lmax, tnr, send_offset
+      Integer :: tnr, send_offset
 
         ! piggyback information
         Integer :: inext, pcurrent
@@ -1054,12 +1053,12 @@ Contains
       ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
       Implicit None
 
-      Integer :: r,l,m, mp, lp, indx, rank, rrank, r_min, r_max, dr, mm, arank, cnt,i
-		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, n_lm_local, np,p
+      Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
+		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p
 		Integer :: recv_offset, tnr
 
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: send_size,recv_size, inext, pcurrent
+      Integer :: inext, pcurrent
 
 		Class(SphericalBuffer) :: self
 
@@ -1190,7 +1189,7 @@ Contains
 			Call self%exit()
 		Endif
 
-		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,self%npcol,error)
+		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,error)
 		Call self%Init_Geometry()
 		!Write(6,*)'Hello ', self%gcomm%rank, self%rcomm%rank, self%ccomm%rank
 		!Write(6,*)'Hello: ', self%ccomm%rank, self%ccomm%rank, self%my_1p%min, self%my_1p%max, self%my_1p%delta
@@ -1247,6 +1246,8 @@ Contains
 	Subroutine Finalize_Framework(self)
 		Class(Parallel_Interface) :: self
 		Integer :: error
+		self%n1p = 0	! This line is here purely so that the intel compiler does not 
+		! throw an unused variable warning when warn-all is used.
 		Call Exit_Comm_Lib(error)	
 		STOP
 	End Subroutine Finalize_Framework

@@ -262,7 +262,7 @@ Subroutine d_dtheta_buff2arr(A,fin,arr)
 	Type(rmcontainer), Intent(InOut) :: A(1:), arr(1:)
 	Integer, Intent(In) :: fin
 	Integer :: i, m, k, l
-	Integer :: ind1, ind2
+	Integer :: ind1
 	ind1 = (fin-1)*tnrl
 	Do i = 1, nm_local
 		m = mlocal(i)
@@ -308,7 +308,7 @@ Subroutine d_sdtheta_buff2arr(A,fin,arr)
 	Type(rmcontainer), Intent(InOut) :: A(1:), arr(1:)
 	Integer, Intent(In) :: fin
 	Integer :: i, m, k, l
-	Integer :: ind1, ind2
+	Integer :: ind1
 	ind1 = (fin-1)*tnrl
 	Do i = 1, nm_local
 		m = mlocal(i)
@@ -332,8 +332,8 @@ Subroutine d_sdtheta_4dbuff2arr(A,fin,arr)
 	Type(rmcontainer4d), Intent(InOut) :: A(1:)
 	Type(rmcontainer3d), Intent(InOut) :: arr(1:)
 	Integer, Intent(In) :: fin
-	Integer :: i, m, k, l
-	Integer :: ind1, ind2
+	Integer :: i, m, l
+	Integer :: ind1
 	ind1 = (fin-1)*tnrl
 	Do i = 1, nm_local
 		m = mlocal(i)

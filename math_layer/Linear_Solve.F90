@@ -204,7 +204,7 @@ Module Linear_Solve
 
 	Subroutine Reset_Equation_Coefficients()
 		Implicit None
-		Integer :: i, j, k, ndim,link
+		Integer :: i, j, k, ndim
 		Do k = 1, n_equations
 			Do j = 1, n_modes
 				If (allocated(equation_set(j,k)%lhs)) equation_set(j,k)%lhs(:,:) = 0.0d0 
@@ -235,7 +235,7 @@ Module Linear_Solve
 
 	Subroutine Finalize_Equations()
 		Implicit None
-		Integer :: k,j, ndim, ind
+		Integer :: k,j
 	
 		! Check to see if each equation's matrix has already been allocated.
 		! If not, allocate it.  Account for linked equations.
@@ -290,7 +290,7 @@ Module Linear_Solve
 
 	Subroutine Allocate_RHS(zero_rhs)
 		Implicit None
-		Integer :: k,j, ndim, ind, indx,rstart,rend, nsub
+		Integer :: k,j, ndim, ind, indx, nsub
 		Logical, Intent(In), Optional :: zero_rhs 
 		! We use one large RHS for each set of equations, with the first mode's 
 		! equation object holding that RHS. Each mode's equation object points to
@@ -347,7 +347,7 @@ Module Linear_Solve
 	!  Matrix Solve Routine
 	Subroutine Implicit_Solve
 		Implicit None
-		Integer :: i, j, k,maxlink
+		Integer :: j, k,maxlink
 		If (band_solve) Then
 			maxlink = 1
 			Do k = 1, n_equations
@@ -380,7 +380,7 @@ Module Linear_Solve
 	End Subroutine Implicit_Solve
 	Subroutine LU_Decompose_Matrices()
 		Implicit None
-		Integer :: i, j, k
+		Integer :: j, k
 		Do k = 1, n_equations
 			Do j = 1, n_modes
 				If (equation_set(j,k)%primary .and. equation_set(j,k)%solvefor) Then
@@ -515,7 +515,7 @@ Module Linear_Solve
 
 	Subroutine Add_Implicit_RHS()
 		Implicit None
-		Integer :: i,j,k,istart,iend, ii
+		Integer :: i,j,k,istart, ii
 		Do k = 1, n_equations
 			If (equation_set(1,k)%primary) Then
 				If (equation_set(1,k)%nlinks .gt. 1) Then
@@ -541,7 +541,7 @@ Module Linear_Solve
 		Implicit None
 		Real*8, Intent(InOut) :: set_to(:,:,:)
 		Integer, Intent(In) :: eqid
-		Integer :: i,istart,iend, ind 
+		Integer :: istart,iend, ind 
 
 			
 
@@ -633,7 +633,7 @@ Module Linear_Solve
 		Implicit None
 		Real*8, Intent(InOut) :: addto(:,:,:,:), dfield(:,:,:,:)
 		Integer, Intent(In) :: eqid, varid, dorder,dind
-		Integer :: i,j,k,d,nsub, indx, djmax, ii, jj
+		Integer :: i,nsub, indx, ii, jj
 		real*8, Pointer, Dimension(:) :: coefs
 		nullify(coefs)
 		indx = 1
@@ -787,11 +787,11 @@ Subroutine LU_Solve_Band(mat, rhs, pvt, na, nb)
 
 End Subroutine LU_Solve_Band
 
-	Subroutine LU_Solve_full(mat, rhs, pvt, na, nb, dinfo)
+	Subroutine LU_Solve_full(mat, rhs, pvt, na, nb)
 		Real*8,intent(in) :: mat(:,:)
 		Real*8,Intent(inout) :: rhs(:,:,:)
 		Integer, Intent(in) :: pvt(:)
-		Integer, Optional :: na, nb, dinfo
+		Integer, Optional :: na, nb
 		Integer :: ma, mb, info
 
 		If (Present(na)) Then
@@ -894,7 +894,7 @@ End Subroutine Band_ReArrange_RHS
 Subroutine Band_Load_Single(j,k,n_upper)
 		!Equation_set(j,k)%LHS  j is equation, k is mode
       Real*8, Allocatable :: band_matrix(:,:), temp_rows(:,:)
-      Integer :: r, i, row_diag, lp, rput, iput, N_Rows,j,k
+      Integer :: r, i, row_diag, rput, N_Rows,j,k
       Integer :: istart, iend, n_upper, n_lower,nlinks,rind
 		nlinks = equation_set(j,k)%nlinks
 

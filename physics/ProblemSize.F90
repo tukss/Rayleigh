@@ -39,10 +39,10 @@ Contains
 	Subroutine Init_ProblemSize()
 		Implicit None
 		Integer :: ppars(1:10)
-		Integer :: tmp,r, l, i, ii
+		Integer :: tmp,r, l
 		Integer, Allocatable :: m_vals(:)
 		Real*8 :: ell
-		Character*10 :: arg, arg2
+
 		!rmin = (7.0d0)/13.0d0		! benchmark cluge
 		!rmax = (20.0d0)/13.0d0
 
@@ -153,7 +153,7 @@ Contains
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
 		Integer :: r
-		real*8 :: uniform_dr, tmp1, tmp2
+		real*8 :: uniform_dr
 
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))

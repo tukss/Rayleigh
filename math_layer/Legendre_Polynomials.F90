@@ -90,13 +90,10 @@ End Subroutine DeAllocate_Parity_Plms
 
 Subroutine Initialize_Legendre(nt,lmax,mval,parity_in)
 	Implicit None
-	Real*16 :: coloc_min,coloc_max, x,tmp,factorial_ratio,amp, renorm
+	Real*16 :: coloc_min,coloc_max
 	Logical, Intent(In) :: parity_in
-	Integer :: i, m, l, report_unit, max_l_test, mv
 	Integer, Intent(in) :: nt,lmax, mval(:)
 	
-	Logical :: write_legendre
-	Character*120 :: report_file = 'ylms'
 
 	parity = parity_in
 	! Set up the grid
@@ -119,11 +116,8 @@ Subroutine Compute_Plms()
 	! We feed this a list of m_values (presumably distributed across processors)
 	! And also l_max.  This is sufficient to initialize the legendre polynomials
 	Implicit None
-	Real*16 :: coloc_min,coloc_max, x,tmp,factorial_ratio,amp, renorm
-	Integer :: i, m, l, report_unit, max_l_test, mv, msp(1), ntmax
-	Logical :: write_legendre
-	Character*120 :: report_file = 'ylms'
-
+	Real*16 ::  x,tmp,factorial_ratio,amp, renorm
+	Integer :: i, m, l, mv, ntmax
 
 	n_m = size(m_values)
 	

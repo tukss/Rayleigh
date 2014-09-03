@@ -24,11 +24,10 @@ Subroutine Test_Legendre
 	Implicit None
 	Real*8, Allocatable :: theta(:),tmp(:)
 	Real*8, Allocatable :: ylm(:,:)
-	Integer :: i,l,m, nrhs, nl
+	Integer :: i,l,m, nrhs
 	Integer, Allocatable :: l_test(:), m_test(:)
 	Type(p_lm_array), Allocatable :: ans(:), ans2(:)
-	Real*8 :: st, ct, tmp2,chk, alpha, beta
-	Logical :: use_dgemm = .true.
+	Real*8 :: st, ct, chk
 	! Test the physical to spectral legendre transform
 	!  using tabulated associated legendre transforms
 	nrhs = 6
@@ -366,7 +365,7 @@ Subroutine PtS_2d_drp(data_in, data_out, nrhs)
 	Real*8, Intent(In) :: data_in(:,:) 
 	Integer, Intent(In) :: nrhs
 	Real*8, Allocatable :: feven(:,:), fodd(:,:)
-	Integer :: m,i,j,l,nt1,offset
+	Integer :: m,i,j,l,nt1
 
 	!To exploit parity, we first need
 	!to build the even and odd functions
@@ -431,7 +430,7 @@ Subroutine PtS_2d_dgp(data_in, data_out, nrhs)
 	Integer, Intent(In) :: nrhs
 	Real*8 :: alpha, beta
 	Real*8, Allocatable :: temp(:,:),fodd(:,:), feven(:,:)
-	Integer :: m,nl,nt1,i,j,l, nt2
+	Integer :: m,nt1,i,j,l, nt2
 
 
 
