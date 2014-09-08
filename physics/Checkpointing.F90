@@ -471,49 +471,50 @@ Contains
 	End Subroutine Write_Field
 
 
-	Subroutine Read_Field(arr,ind,tag,iter)
-				Implicit None
-				Integer, Intent(In) :: ind, iter
-				Real*8, Intent(In) :: arr(1:,1:)
-				Character*8 :: iterstring
-				Character*3, Intent(In) :: tag
-				Character*120 :: cfile
+    Subroutine Read_Field(arr,ind,tag,iter)
+        Implicit None
+        Integer, Intent(In) :: ind, iter
+        Real*8, Intent(InOut) :: arr(1:,1:)
+        Character*8 :: iterstring
+        Character*3, Intent(In) :: tag
+        Character*120 :: cfile
 
-				integer ierr, funit , v_offset1, v_offset2
-				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
-				Integer :: mstatus(MPI_STATUS_SIZE)
-	         write(iterstring,'(i8.8)') iter
-            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+        integer ierr, funit , v_offset1, v_offset2
+        integer(kind=MPI_OFFSET_KIND) disp1,disp2 
+        Integer :: mstatus(MPI_STATUS_SIZE)
+        write(iterstring,'(i8.8)') iter
+        cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
   
- 				v_offset1 = (ind-1)*tnr+1
-				v_offset2 = v_offset1+my_r%delta
+        v_offset1 = (ind-1)*tnr+1
+        v_offset2 = v_offset1+my_r%delta
 
-				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
-                       MPI_MODE_RDONLY, & 
-                       MPI_INFO_NULL, funit, ierr) 
-				disp1 = my_in_disp*8
-				disp2 = (my_in_disp+full_in_disp)*8
-				call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 
-                           MPI_DOUBLE_PRECISION, 'native', & 
-                           MPI_INFO_NULL, ierr) 
-				call MPI_FILE_READ(funit, arr(1,v_offset1), buffsize_in, MPI_DOUBLE_PRECISION, & 
-                        mstatus, ierr) 
+        call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
+        MPI_MODE_RDONLY, & 
+        MPI_INFO_NULL, funit, ierr) 
+        If (ierr .ne. 0) Then
+            Write(6,*)"Error reading (or file missing): ", cfile
+            ! Set the whole array to zero
+            arr(:,:) = 0.0d0
+        Else
+            disp1 = my_in_disp*8
+            disp2 = (my_in_disp+full_in_disp)*8
+            call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 
+                MPI_DOUBLE_PRECISION, 'native', & 
+                MPI_INFO_NULL, ierr) 
+            call MPI_FILE_READ(funit, arr(1,v_offset1), buffsize_in, MPI_DOUBLE_PRECISION, & 
+            mstatus, ierr) 
 
-				call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 
-                           MPI_DOUBLE_PRECISION, 'native', & 
-                           MPI_INFO_NULL, ierr) 
-				call MPI_FILE_READ(funit, arr(1,v_offset2), buffsize_in, MPI_DOUBLE_PRECISION, & 
-                        mstatus, ierr) 
+            call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 
+                MPI_DOUBLE_PRECISION, 'native', & 
+                MPI_INFO_NULL, ierr) 
+            call MPI_FILE_READ(funit, arr(1,v_offset2), buffsize_in, MPI_DOUBLE_PRECISION, & 
+            mstatus, ierr) 
 
-				call MPI_FILE_CLOSE(funit, ierr) 
-     
-				If (ind .eq. 3) then
-					if (my_rank .eq. 0) then
-						!Write(6,*)arr(1,v_offset:v_offset+tnr-1)
-					endif
-				Endif
-                                      
+            call MPI_FILE_CLOSE(funit, ierr) 
+
+
+        Endif                      
                                           
 	End Subroutine Read_Field
 

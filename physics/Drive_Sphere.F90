@@ -1,7 +1,7 @@
 Module Drive_Sphere
 	Use ClockInfo
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
-	Use Physical_Space_Sphere, Only : physical_space, coriolis_term
+	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp
 	Use Checkpointing
 	Use Controls
@@ -9,6 +9,7 @@ Module Drive_Sphere
 	Use Fields
 	Use Run_Parameters
 	Use NonDimensionalization
+    Use Legendre_Polynomials, Only : Pi
 Contains
 
 	Subroutine Initialize_TimeStepping(iter)
@@ -70,6 +71,8 @@ Contains
 		If (magnetism) Then
 			ovPm = 1.0d0/Pm
 			ovPmek = 1.0d0/(Pm*ek)
+            Allocate(ohmic_heating_coeff(1:N_R))
+            ohmic_heating_coeff = 4.0d0*pi*eta/ref%density/ref%temperature
 		Endif
 
 		Call Hybrid_Init()

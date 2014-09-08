@@ -20,6 +20,7 @@ Module Physical_Space_Sphere
 	Use NonDimensionalization
 	Implicit None
     Real*8 :: coriolis_term = 0.0d0
+    Real*8, Allocatable :: ohmic_heating_coeff(:)
 Contains
 	Subroutine physical_space()
 		Implicit None
@@ -294,7 +295,7 @@ Contains
 				wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar) &
 									 + (wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
 									 + wsp%p3a(k,r,t,jtheta)*wsp%p3a(k,r,t,jtheta) &
-									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi))*eta(r)
+									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi))*ohmic_heating_coeff(r)
 				Enddo
 			Enddo
 		Enddo				
