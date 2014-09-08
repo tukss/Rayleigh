@@ -93,7 +93,7 @@ Contains
 				call benchmark_insulating_init()
 			Endif
 			If (magnetic_init_type .eq. 7) Then
-				call random_init_MagNew()
+				call random_init_Mag()
 			Endif
 		Endif
 		! Fields are now initialized and loaded into the RHS. 
@@ -288,7 +288,7 @@ Contains
         !Call tempfield%obliterate()
 	End Subroutine Generate_Random_Field
 
-    Subroutine Random_Init_MagNew()
+    Subroutine Random_Init_Mag()
         Implicit None
         Real*8 :: ampa, ampc, dr_fiducial
         Integer :: fcount(3,2)
@@ -311,7 +311,7 @@ Contains
         Call Set_RHS(ceq,a_and_c%p1b(:,:,:,2))
         Call a_and_c%deconstruct('p1b')
         !Call a_and_c%obliterate()
-    End Subroutine Random_Init_MagNew
+    End Subroutine Random_Init_Mag
 
     !///////////////////////////////////////////////////////////
     !       Random Perturbation Initializaton Routines
@@ -440,139 +440,7 @@ Contains
 
 	End Subroutine Random_Init_Star
 
-    Subroutine Random_Init_Mag()
-        Implicit None
-        Integer :: ncombinations, i, m, r, seed(1), mp,n, l, ind1, ind2
-        Integer :: rind1, rind2, ind3, ind4
-        Integer :: mode_count, my_mode_start, my_mode_end, fcount(3,2)
-        Real*8, Allocatable :: rand(:), rfunc2(:), lpow(:)
-        Real*8 :: amp, phase, lmid, alpha,x
-        Real*8, Allocatable :: new_temp(:)
-        type(SphericalBuffer) :: tempfield
-        fcount(:,:) = 2
-        ! Random initialization to A and C magnetic potentials.
 
-
-        Allocate(rfunc2(my_r%min: my_r%max))
-
-        Do r = my_r%min, my_r%max
-            x = 2.0d0*pi*(radius(r)-r_inner)/(r_outer-r_inner)
-            rfunc2(r) = 0.5d0*(1.0d0-Cos(x))
-        Enddo
-
-
-
-        ! We put our temporary field in spectral space
-        Call tempfield%init(field_count = fcount, config = 's2b')		
-        Call tempfield%construct('s2b')		
-
-
-        !///////////////////////
-        ncombinations = 0
-        Do m = 0, l_max
-            ncombinations = ncombinations+ (l_max-m+1)
-        Enddo
-        !Set up the random phases and amplitudes
-        Allocate(rand(1:ncombinations*4))
-        If (my_rank .eq. 0) Then
-            Call system_clock(seed(1))		
-            Call random_seed()
-            Call random_number(rand)
-
-            ! random(1:ncombinations) = amplitudes for A
-            ! random(ncombinations+1:2*ncombinations) = phases for A
-            ! random(2*ncombinations+1:3*ncombinations) = amplitudes for C
-            ! random(3*ncombinations+1:4*ncombinations) = phases for C
-
-            ! Convert random numbers in the first and third "quarters" of the array to amplitudes
-            Do i = 1, ncombinations
-                rand(i) = 2*temp_amp*(rand(i)-0.5d0)		! first half of rand contains the amplitude
-            Enddo
-            Do i = 2*ncombinations+1,3*ncombinations
-                rand(i) = 2*temp_amp*(rand(i)-0.5d0)		! first half of rand contains the amplitude
-            Enddo
-
-            ! Send rand
-            Do n = 1, ncpu -1
-                Call send(rand, dest = n,tag=init_tag, grp=pfi%gcomm)
-            Enddo
-        Else
-            ! receive rand
-            Call receive(rand, source= 0,tag=init_tag,grp = pfi%gcomm)
-        Endif	
-
-        ! Everyone establishes their range of random phases		
-        mode_count = 0
-        Do mp = 1, my_mp%max		
-            if (mp .eq. my_mp%min) then
-                my_mode_start = mode_count+1
-            endif
-            m = m_values(mp)
-            mode_count = mode_count + (l_max-m+1)
-            if (mp .eq. my_mp%max) then
-                my_mode_end = mode_count
-            endif
-        Enddo
-
-        Allocate(lpow(0:l_max))
-        lmid = l_max/2.0d0
-        alpha = lmid/3.0d0
-        Do l = 0, l_max
-            lpow(l) = exp(- ((l-lmid)/alpha )**2)
-        Enddo
-
-
-        ind1 = my_mode_start
-        ind2 = ind1+ncombinations
-        ind3 = ind2+ncombinations
-        ind4 = ind3+ncombinations
-        Do mp = my_mp%min, my_mp%max
-            m = m_values(mp)			
-            Do l = m, l_max
-                tempfield%s2b(mp)%data(l,:) = 0.0d0
-
-                amp = rand(ind1)*lpow(l)
-                phase = rand(ind2)
-                ind1 = ind1+1
-                ind2 = ind2+1
-                ind3 = ind3+1
-                ind4 = ind4+1
-                ! Set A
-                Do r = my_r%min, my_r%max
-                    tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
-                    amp*rfunc2(r)*phase
-                    tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) = tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
-                    amp*rfunc2(r)*(1.0d0-phase)
-                Enddo
-                ! Now C
-                Do r = my_r%min, my_r%max
-                    rind1 = r-my_r%min+1+my_r%delta*2
-                    rind2 = rind1+my_r%delta
-                    tempfield%s2b(mp)%data(l,rind1) = tempfield%s2b(mp)%data(l,rind1) + &
-                    amp*rfunc2(r)*phase
-                    tempfield%s2b(mp)%data(l,rind2) = tempfield%s2b(mp)%data(l,rind2) + &
-                    amp*rfunc2(r)*(1.0d0-phase)
-                Enddo
-            Enddo
-        Enddo
-
-        DeAllocate(rfunc2, lpow)
-        Call tempfield%reform() ! goes to p1b
-
-        ! Set temperature.  Leave the other fields alone
-        If (chebyshev) Then
-            ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
-            Call tempfield%construct('p1a')
-            Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
-            Call tempfield%deconstruct('p1a')
-        Endif
-        Call Set_RHS(aeq,tempfield%p1b(:,:,:,1))
-        Call Set_RHS(ceq,tempfield%p1b(:,:,:,2))
-        Call tempfield%deconstruct('p1b')
-
-    End Subroutine Random_Init_Mag
-    !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
     !//////////////////////////////////////////////////////////////////////////////////
     !  Benchmark Initialization Routines
