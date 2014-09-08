@@ -182,7 +182,6 @@ Contains
         Real*8, Intent(In), Optional :: rprofile(my_r%min:)
 		Real*8, Allocatable :: rand(:), rfunc(:), lpow(:)
 		Real*8 :: amp, phase, lmid, alpha,x
-		Real*8, Allocatable :: new_temp(:)
 
         type(SphericalBuffer), Intent(InOut) :: infield
 		type(SphericalBuffer) :: tempfield
