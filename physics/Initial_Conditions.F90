@@ -283,7 +283,7 @@ Contains
                 If (present(ell0_profile)) Then
                     ! replace the ell = 0 profile
 				    Do r = my_r%min, my_r%max
-					    tempfield%s2b(mp)%data(0,r-my_r%min+1) = ell0_profile(r)
+					    tempfield%s2b(mp)%data(0,r-my_r%min+1) = ell0_profile(r)*sqrt(4.0d0*pi)
 				    Enddo
                 Endif
             Endif
