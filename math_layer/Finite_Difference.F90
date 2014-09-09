@@ -45,15 +45,30 @@ Contains
 
 
 
-	Subroutine Initialize_Derivatives(xin) ! also includes other geometrical quantities
+	Subroutine Initialize_Derivatives(xin, integration_weights) ! also includes other geometrical quantities
 		Real*8, Intent(In) :: xin(1:)
+        Real*8, Intent(InOut) :: integration_weights(1:)
+        Integer :: i
+        Real*8 :: delr, int_sum
 		n_x_fd = size(xin)
 		Allocate(x_fd(1:n_x_fd))
 		x_fd(1:n_x_fd) = xin(1:n_x_fd)
 
 		Call Initialize_dcoefs()
 
- 
+        integration_weights(:) = 0.0d0
+        Do i = 2, n_x_fd-1
+            delr = (xin(i-1)-xin(i+1))/2.0d0
+            integration_weights(i) = delr*xin(i)**2
+        Enddo
+        delr = ( xin(1)-xin(2) )/ 2.0d0
+        integration_weights(1) = delr*xin(1)**2
+
+        delr = (xin(n_x_fd-1)-xin(n_x_fd))/2.0d0
+        integration_weights(n_x_fd) = delr*xin(n_x_fd)**2
+
+        int_sum = sum(integration_weights)
+        integration_weights = integration_weights/int_sum
 	End Subroutine Initialize_Derivatives
 
 

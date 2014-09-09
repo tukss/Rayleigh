@@ -30,7 +30,7 @@ Module ProblemSize
 	Real*8              :: rmin, rmax, r_inner, r_outer
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
-	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:)
+	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
 	Type(Load_Config)   :: my_r
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout
@@ -157,9 +157,10 @@ Contains
 
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))
+        Allocate(Radial_Integral_Weights(1:N_R))
 		If (chebyshev) Then
 			grid_type = 2
-			Call Initialize_Chebyshev(radius,rmin,rmax)
+			Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights)
 			Delta_r(1) = radius(1)-radius(2)
 			Do r = 2, N_R
 				Delta_r(r) = radius(r)-radius(r-1)
@@ -200,22 +201,23 @@ Contains
       OneOverRSquared = (1.0d0)/r_Squared
 
 
-		If (.not. chebyshev) Call Initialize_Derivatives(Radius)
+		If (.not. chebyshev) Call Initialize_Derivatives(Radius,radial_integral_weights)
 	End Subroutine Initialize_Radial_Grid
-	Subroutine Rescale_Grid_and_Derivatives(length_scale)
-		Implicit None
-		Real*8, Intent(In) :: length_scale
-		Radius = radius/length_scale
-		R_squared       = Radius**2
-      One_Over_R      = (1.0d0)/Radius
-      Two_Over_R      = (2.0d0)/Radius
-      OneOverRSquared = (1.0d0)/r_Squared
-		ovr_repeated = ovr_repeated*length_scale
-		ovrsq_repeated = ovrsq_repeated*length_scale
-		If (chebyshev) Then
-			Call Rescale_Grid_CP(length_scale)
-		Else
-			Call Rescale_Grid_FD(length_scale)
-		Endif
-	End Subroutine 
+    Subroutine Rescale_Grid_and_Derivatives(length_scale)
+        Implicit None
+        Real*8, Intent(In) :: length_scale
+        Radius = radius/length_scale
+        R_squared       = Radius**2
+        One_Over_R      = (1.0d0)/Radius
+        Two_Over_R      = (2.0d0)/Radius
+        OneOverRSquared = (1.0d0)/r_Squared
+        ovr_repeated = ovr_repeated*length_scale
+        ovrsq_repeated = ovrsq_repeated*length_scale
+        If (chebyshev) Then
+            Call Rescale_Grid_CP(length_scale)
+        Else
+            Call Rescale_Grid_FD(length_scale)
+        Endif
+        ! We need to think about how to rescale the radial integration weights
+    End Subroutine 
 End Module ProblemSize

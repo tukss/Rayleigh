@@ -79,13 +79,13 @@ Contains
         Endif
 		If (magnetism) Then
             If (magnetic_init_type .eq. -1) Then
-                Call restart_from_checkpointMag(restart_iter)
+                !Call restart_from_checkpointMag(restart_iter)
             Else
                 If (init_type .eq. -1) Then
                     ! We are restarting from a checkpoint, but using a new magnetic field configuration,
                     ! so we zero out the magnetic AB terms (which would be inconsistent with the new field).
-                    wsp%p1b(:,:,:,cvar) = 0.0d0
-                    wsp%p1b(:,:,:,avar) = 0.0d0
+                   ! wsp%p1b(:,:,:,cvar) = 0.0d0
+                    !wsp%p1b(:,:,:,avar) = 0.0d0
                 Endif
             Endif
 
@@ -149,7 +149,7 @@ Contains
 
 		    Call tempfield%init(field_count = fcount, config = 'p1a')
 		    Call tempfield%construct('p1a')
-
+            Call tempfield%construct('p1b')
 		    tempfield%p1b(:,:,:,:) = 0.0d0
 		    tempfield%p1a(:,:,:,:) = 0.0d0
 

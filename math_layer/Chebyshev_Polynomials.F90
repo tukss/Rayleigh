@@ -27,31 +27,46 @@ Module Chebyshev_Polynomials
 
 Contains
 
-	Subroutine Initialize_Chebyshev(grid, xmin,xmax)
+	Subroutine Initialize_Chebyshev(grid, xmin,xmax, integration_weights)
 		Implicit None
 		Real*8, Intent(InOut) :: grid(:)
 		Real*8, Intent(In), Optional :: xmin, xmax
-		Real*8 ::delta, gmin
+		Real*8 ::delta, gmin, tmp, xx
+        Real*8, Intent(InOut) :: integration_weights(1:)
+        Integer :: r
 		If (.not. initialized) Then
-		N_max = size(grid)
-		Call gen_colocation_points()
-		grid(:) = x(:)
-		Call Gen_Tn()
-		Call Gen_Tn_Deriv_Arrays(3)
-		If (present(xmin)) Then
-			delta = xmax-xmin
-			scaling = (x(1)-x(N_max))/delta
-			dcheby(:,:,1) = dcheby(:,:,1)*scaling
-			dcheby(:,:,2) = dcheby(:,:,2)*(scaling**2)
-			dcheby(:,:,3) = dcheby(:,:,3)*(scaling**3)
-			grid(:) = grid(:)/scaling
-			gmin = grid(N_max)
-			grid(:) = grid(:)-gmin+xmin
-		Endif
-		initialized = .true.
+		    N_max = size(grid)
+		    Call gen_colocation_points()
+		    grid(:) = x(:)
+		    Call Gen_Tn()
+		    Call Gen_Tn_Deriv_Arrays(3)
+		    If (present(xmin)) Then
+			    delta = xmax-xmin
+			    scaling = (x(1)-x(N_max))/delta
+			    dcheby(:,:,1) = dcheby(:,:,1)*scaling
+			    dcheby(:,:,2) = dcheby(:,:,2)*(scaling**2)
+			    dcheby(:,:,3) = dcheby(:,:,3)*(scaling**3)
+			    grid(:) = grid(:)/scaling
+			    gmin = grid(N_max)
+			    grid(:) = grid(:)-gmin+xmin
+		    Endif
+		    initialized = .true.
 		Else
 			grid(:) = x(:)
 		Endif
+
+
+        integration_weights(1:n_max) = 0.0d0
+
+
+		tmp = 1.5d0*Pi * (grid(1)-grid(N_max)) / &
+			& ( (grid(1)**3 - grid(N_max)**3) * N_max )
+		Do r=1,N_max
+			xx = (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
+			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
+		Enddo
+
+
 	End Subroutine Initialize_Chebyshev
 
 	Subroutine Rescale_Grid_CP(length_scale)

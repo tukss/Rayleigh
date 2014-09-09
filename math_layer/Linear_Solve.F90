@@ -261,6 +261,32 @@ Module Linear_Solve
 		Enddo
 	End Subroutine Finalize_Equations
 
+	Subroutine DeAllocate_LHS(mode_ind)
+		Implicit None
+        Integer, Intent(In) :: mode_ind
+		Integer :: k,j, ndim, ind
+	
+        j = mode_ind
+		Do k = 1, n_equations
+            If (equation_set(j,k)%solvefor) Then        
+                ! Only DeAllocate matrix information for modes we actually solve for
+				If (equation_set(j,k)%primary) Then
+					ndim = ndim1*equation_set(j,k)%nlinks
+					If (allocated(equation_set(j,k)%lhs)) Then
+                        DeAllocate(equation_set(j,k)%lhs)
+                    Endif
+					If (allocated(equation_set(j,k)%pivot)) Then
+                        DeAllocate(equation_set(j,k)%pivot)
+                    Endif
+					nullify(equation_set(j,k)%mpointer)
+				Else
+					nullify(equation_set(j,k)%mpointer)
+				Endif
+            Endif
+		Enddo
+
+	End Subroutine DeAllocate_LHS
+
 	Subroutine Allocate_LHS(mode_ind)
 		Implicit None
         Integer, Intent(In) :: mode_ind
@@ -273,7 +299,9 @@ Module Linear_Solve
             If (equation_set(j,k)%solvefor) Then        ! Only Allocate matrix information for modes we actually solve for
 				If (equation_set(j,k)%primary) Then
 					ndim = ndim1*equation_set(j,k)%nlinks
-					Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
+					If (.not. allocated(equation_set(j,k)%lhs)) Then
+                        Allocate(equation_set(j,k)%lhs(1:ndim,1:ndim))
+                    Endif
                     equation_set(j,k)%lhs(1:ndim,1:ndim) = 0.0d0
 					If (.not. allocated(equation_set(j,k)%pivot)) Then
                         Allocate(equation_set(j,k)%pivot(1:ndim))

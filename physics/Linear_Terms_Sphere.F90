@@ -11,13 +11,32 @@ Module Linear_Terms_Sphere
 	Use ReferenceState
 	Use TransportCoefficients
 	Use NonDimensionalization
-	Implicit None
+    Implicit None
+    Real*8, Allocatable :: Lconservation_weights(:)
+	
 Contains	
 	Subroutine Linear_Init()
 		Implicit None
-
+        Real*8 :: amp, T,arg
+        Integer :: n, r
 		Call Initialize_Benchmark_Equations()
-		
+		If (strict_L_conservation) Then
+            Allocate(Lconservation_weights(1:N_R))
+            Lconservation_weights(1:N_R) = 0.0d0
+            If (chebyshev) Then
+                            
+                amp = Pi / (N_R*1.0d0) 
+                do n = 1, N_R
+                    do r = 1, N_R
+                        arg = (n-1.d0) * (r-1.d0+0.5d0) * amp
+                        T = Cos(arg) 
+                        Lconservation_weights(n) = Lconservation_weights(n) + radial_integral_weights(r) * T
+                    enddo
+                enddo
+            Else
+                Lconservation_weights(1:N_R) = radial_integral_weights(1:N_R)
+            Endif
+        Endif
 	End Subroutine Linear_Init
 
 	Subroutine Reset_Linear_Equations()
@@ -145,6 +164,7 @@ Contains
 		Allocate(amp(1:N_R))
 		Allocate(H_Laplacian(1:N_R))
 		Do lp = 1, my_nl_lm
+            If (band_solve) Call DeAllocate_LHS(lp)
             Call Allocate_LHS(lp)
 			l = my_lm_lval(lp)		
 
@@ -474,25 +494,24 @@ Contains
                 If (no_slip_boundaries) Then		
 				! No Slip Top and Bottom
 				! Z and dWdr vanish at the boundaries
-                r = 1
-                !If ((l .eq. 1) .and. (Conserve_L) ) then
-                !    write(6,*)'Conserving Angular Momentum'
-    				!Call Load_BC(lp,r,zeq,zvar,one,0,integral = rweights)
-                !Else
+                    r = 1
+
                     Call Load_BC(lp,r,zeq,zvar,one,0)
-                !Endif
-				Call Load_BC(lp,r,peq,wvar,one,1)
-				r = N_R
-				Call Load_BC(lp,r,peq,wvar,one,1)
-				Call Load_BC(lp,r,zeq,zvar,one,0)
+				    Call Load_BC(lp,r,peq,wvar,one,1)
+				    r = N_R
+				    Call Load_BC(lp,r,peq,wvar,one,1)
+				    Call Load_BC(lp,r,zeq,zvar,one,0)
                 Else
                     ! stress-free boundaries
                     r = 1
                     samp = -(2.0d0/radius(r)+ref%dlnrho(r))
                     Call Load_BC(lp,r,peq,wvar,one,2)
                     Call Load_BC(lp,r,peq,wvar,samp,1)
+
+
                     Call Load_BC(lp,r,zeq,zvar,one,1)
                     Call Load_BC(lp,r,zeq,zvar,samp,0)
+
 
                     r = N_R
                     samp = -(2.0d0/radius(r)+ref%dlnrho(r))
@@ -501,7 +520,11 @@ Contains
                     Call Load_BC(lp,r,zeq,zvar,one,1)
                     Call Load_BC(lp,r,zeq,zvar,samp,0)
                 Endif
-
+                If ((l .eq. 1) .and. (strict_L_Conservation) ) then
+                   !    write(6,*)'Conserving Angular Momentum'
+                    Call Clear_Row(zeq,lp,1)
+    			    Call Load_BC(lp,1,zeq,zvar,one,0,integral = Lconservation_weights)
+                Endif
 
 
 				!*******************************************************

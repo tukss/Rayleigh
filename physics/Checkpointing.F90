@@ -474,6 +474,7 @@ Contains
     Subroutine Read_Field(arr,ind,tag,iter)
         Implicit None
         Integer, Intent(In) :: ind, iter
+
         Real*8, Intent(InOut) :: arr(1:,1:)
         Character*8 :: iterstring
         Character*3, Intent(In) :: tag
@@ -492,11 +493,8 @@ Contains
         call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
         MPI_MODE_RDONLY, & 
         MPI_INFO_NULL, funit, ierr) 
-        If (ierr .ne. 0) Then
-            Write(6,*)"Error reading (or file missing): ", cfile
-            ! Set the whole array to zero
-            arr(:,:) = 0.0d0
-        Else
+
+        If (ierr .eq. 0) Then
             disp1 = my_in_disp*8
             disp2 = (my_in_disp+full_in_disp)*8
             call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 
@@ -511,11 +509,14 @@ Contains
             call MPI_FILE_READ(funit, arr(1,v_offset2), buffsize_in, MPI_DOUBLE_PRECISION, & 
             mstatus, ierr) 
 
-            call MPI_FILE_CLOSE(funit, ierr) 
 
-
-        Endif                      
-                                          
+        Else
+            If (my_rank .eq. 0) Then
+                Write(6,*)'File read error.  Associated array will contain only zeroes: ', cfile
+            Endif
+        Endif                     
+        call MPI_FILE_CLOSE(funit, ierr)    
+                           
 	End Subroutine Read_Field
 
 
