@@ -28,6 +28,7 @@ Module ReferenceState
         Real*8, Allocatable :: heating(:)
 		Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
 	End Type ReferenceInfo
+    Real*8, Allocatable :: s_conductive(:)
 
 	Integer :: reference_type
     Integer :: heating_type = 0 ! 0 means no reference heating.  > 0 selects optional reference heating
@@ -80,8 +81,9 @@ Contains
       Real*8 :: rho_c, P_c, T_c,denom
       Real*8 :: beta, Gas_Constant
       Real*8, Allocatable :: zeta(:)
-		Real*8 :: One
+		Real*8 :: One, ee
       Real*8 :: InnerRadius, OuterRadius
+      Integer :: r
       If (my_rank .eq. 0) write(6,*)'Initializing polytropic reference state.'
       ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
       ! The following parameters are read from the input file.
@@ -149,6 +151,16 @@ Contains
       Ref%dsdr = 0.d0
 
       Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat*ref%density
+
+      !We initialize s_conductive (modulo delta_s, specified by the boundary conditions)
+      Allocate(s_conductive(1:N_R))
+      s_conductive(:) = 0.0d0
+      ee = -1.d0*poly_n
+      denom = zeta(1)**ee - zeta(N_R)**ee
+      Do r = 1, N_R
+          s_conductive(r) = (zeta(1)**ee - zeta(r)**ee) / denom
+      Enddo
+
       Deallocate(zeta)
 
       Call Initialize_Reference_Heating()

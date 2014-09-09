@@ -9,6 +9,7 @@ Module Initial_Conditions
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Use Timers
+    Use ReferenceState, Only : s_conductive
     Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom, fix_dtdr_top, fix_dtdr_bottom
 	Implicit None
 	Logical :: alt_check = .false.
@@ -19,9 +20,10 @@ Module Initial_Conditions
 	Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
 	Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0, mag_amp = 1.0d0
 	Logical :: custom_t
+    Logical :: conductive_profile = .false.
 	Character*120 :: custom_t_file
 	Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter, &
-			magnetic_init_type,alt_check, mag_amp
+			magnetic_init_type,alt_check, mag_amp, conductive_profile
 Contains
 	
 	Subroutine Initialize_Fields()
@@ -75,7 +77,7 @@ Contains
 			call abenchmark_init_hydro()
 		Endif
         If (init_Type .eq. 7) Then
-            call random_init_star()
+            call random_init_star2()
         Endif
 		If (magnetism) Then
             If (magnetic_init_type .eq. -1) Then
@@ -173,13 +175,14 @@ Contains
 
     !///////////////////////////////////////////////////////////
     !       Random Perturbation Initializaton Routines
-	Subroutine Generate_Random_Field(rand_amp, field_ind, infield,rprofile)
+	Subroutine Generate_Random_Field(rand_amp, field_ind, infield,rprofile, &
+                & ell0_profile)
 		Implicit None
 		Integer :: ncombinations, i, m, r, seed(1), mp,n, l, ind1, ind2
 		Integer :: mode_count, my_mode_start, my_mode_end, fcount(3,2)
         Integer, Intent(In) :: field_ind
         Real*8, Intent(In) :: rand_amp
-        Real*8, Intent(In), Optional :: rprofile(my_r%min:)
+        Real*8, Intent(In), Optional :: rprofile(my_r%min:), ell0_profile(1:)
 		Real*8, Allocatable :: rand(:), rfunc(:), lpow(:)
 		Real*8 :: amp, phase, lmid, alpha,x
 
@@ -267,10 +270,23 @@ Contains
 				Do r = my_r%min, my_r%max
 					tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
                         amp*rfunc(r)*phase
-					tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) = tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
-                        amp*rfunc(r)*(1.0d0-phase)
+					tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) =  &
+                         & tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
+                         & amp*rfunc(r)*(1.0d0-phase)
 				Enddo
 			Enddo
+            if (m .eq. 0) Then
+                ! Ell = 0 modes have no imaginary component
+				Do r = my_r%min, my_r%max
+					tempfield%s2b(mp)%data(0,r-my_r%min+1+my_r%delta) = 0.0d0
+                Enddo
+                If (present(ell0_profile)) Then
+                    ! replace the ell = 0 profile
+				    Do r = my_r%min, my_r%max
+					    tempfield%s2b(mp)%data(0,r-my_r%min+1) = ell0_profile(r)
+				    Enddo
+                Endif
+            Endif
 		Enddo
 		DeAllocate(rfunc, lpow)
 
@@ -291,6 +307,7 @@ Contains
     Subroutine Random_Init_Mag()
         Implicit None
         Real*8 :: ampa, ampc, dr_fiducial
+        Real*8, Allocatable :: zero_profile(:)
         Integer :: fcount(3,2)
         type(SphericalBuffer) :: a_and_c
         fcount(:,:) = 2
@@ -303,15 +320,62 @@ Contains
         Call a_and_c%init(field_count = fcount, config = 'p1b')		
         Call a_and_c%construct('p1b')		
 
+        Allocate(zero_profile(1:N_R))
+        zero_profile = 0.0d0
         ! Randomize each field
-        Call Generate_Random_Field(ampa, 1, a_and_c)
-        Call Generate_Random_Field(ampc, 2, a_and_c)
-
+        ! neither of the magnetic potentials has an ell=0 component (zero it out)
+        Call Generate_Random_Field(ampa, 1, a_and_c,ell0_profile = zero_profile)
+        Call Generate_Random_Field(ampc, 2, a_and_c,ell0_profile = zero_profile)
+        DeAllocate(zero_profile)
         Call Set_RHS(aeq,a_and_c%p1b(:,:,:,1))
         Call Set_RHS(ceq,a_and_c%p1b(:,:,:,2))
         Call a_and_c%deconstruct('p1b')
         !Call a_and_c%obliterate()
     End Subroutine Random_Init_Mag
+
+    Subroutine Random_Init_Star2()
+        ! Generates random initial thermal perturbations
+        Implicit None
+        Real*8 :: amp
+        Real*8, Allocatable :: profile0(:)
+        Integer :: fcount(3,2)
+        type(SphericalBuffer) :: sbuffer
+        fcount(:,:) = 1
+
+        amp = temp_amp
+
+        ! Construct the streamfunction field buffer
+        Call sbuffer%init(field_count = fcount, config = 'p1b')		
+        Call sbuffer%construct('p1b')		
+
+        If (conductive_profile) Then
+            Allocate(profile0(1:N_R))
+            profile0(:) = 0.0d0
+            If (allocated(s_conductive)) Then
+                profile0(:) = t_bottom*s_conductive(:)
+            Else
+                If (my_rank .eq. 0) Then 
+                    Write(6,*)'No conductive profile found.'
+                    Write(6,*)'Ell = 0 entropy perturbations will be zero.'
+                Endif
+            Endif
+            ! Randomize the entropy
+            Call Generate_Random_Field(amp, 1, sbuffer,ell0_profile = profile0)            
+            DeAllocate(profile0)
+
+        Else    
+
+
+
+            ! Randomize the entropy
+            Call Generate_Random_Field(amp, 1, sbuffer)
+        Endif
+
+        Call Set_RHS(teq,sbuffer%p1b(:,:,:,1))
+        Call sbuffer%deconstruct('p1b')
+
+    End Subroutine Random_Init_Star2
+
 
     !///////////////////////////////////////////////////////////
     !       Random Perturbation Initializaton Routines
@@ -323,6 +387,7 @@ Contains
 		Real*8 :: amp, phase, lmid, alpha,x
 		Real*8, Allocatable :: new_temp(:)
 		type(SphericalBuffer) :: tempfield
+        
 		fcount(:,:) = 1
         ! Random initialization with no ell=0 entropy perturbation.
 
