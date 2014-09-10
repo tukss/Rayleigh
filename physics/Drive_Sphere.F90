@@ -71,6 +71,8 @@ Contains
 		If (magnetism) Then
 			ovPm = 1.0d0/Pm
 			ovPmek = 1.0d0/(Pm*ek)
+            Write(6,*)'OvPm: ', ovPm
+            Write(6,*)'OvPmEk', ovPmEk
             Allocate(ohmic_heating_coeff(1:N_R))
             ohmic_heating_coeff = 4.0d0*pi*eta/ref%density/ref%temperature
 		Endif

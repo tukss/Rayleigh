@@ -581,9 +581,9 @@ Contains
 			! Check on alfven speed as well
 			Do r = my_r%min, my_r%max
 				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
-								*OneOverRSquared(r)*l_l_plus1(l_max) ! horizontal
+								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r)*4.0d0*pi) ! horizontal
 				ovt2  = Max(ovt2, ovht2)
-				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)	! radial
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r)*4.0d0*pi)	! radial
 				ovt2  = Max(ovt2,ovrt2)
 			Enddo
 		Endif
