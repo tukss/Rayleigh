@@ -33,6 +33,9 @@ Contains
                         Lconservation_weights(n) = Lconservation_weights(n) + radial_integral_weights(r) * T
                     enddo
                 enddo
+                Lconservation_weights(1) = Lconservation_weights(1)*0.5d0
+                Lconservation_weights(N_R) = Lconservation_weights(N_r)*0.5d0
+                Lconservation_weights( (2*N_R)/3+1: ) = 0.0d0  ! De-Alias here for now
             Else
                 Lconservation_weights(1:N_R) = radial_integral_weights(1:N_R)
             Endif
