@@ -363,7 +363,7 @@ Contains
         Real*8, Allocatable :: sendbuffer(:,:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
 		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
-        Integer :: rone, rwo, p, ncount, counter, nf
+        Integer :: rone,  p, ncount, counter, nf
 		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag
 
 		Integer :: your_mp_min, your_mp_max, your_nm, your_id
