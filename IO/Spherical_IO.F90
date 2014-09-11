@@ -220,7 +220,7 @@ Contains
             & 58,values = shellslice_values, levels = shellslice_levels)
 
         Call       Shell_Spectra%Init(averaging_level,compute_q,myid, &
-            & 58,values = shellspectra_values, levels = shellspectra_levels)
+            & 59,values = shellspectra_values, levels = shellspectra_levels)
 
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
@@ -493,7 +493,7 @@ Contains
                     Call Shell_Spectra%update_position() ! important to do after header has been written
                 Endif
                 file_pos = Shell_Spectra%file_position
-                Write(funit, POS = file_pos)(((((all_spectra(k,j,i,qq,p),k=0,lmax), &
+                Write(funit)(((((all_spectra(k,j,i,qq,p),k=0,lmax), &
                 & j=0,lmax),i=1,Shell_Spectra%nlevels),qq=1,Shell_Spectra%nq),p=1,2)
                 Write(funit)simtime
                 Write(funit)this_iter

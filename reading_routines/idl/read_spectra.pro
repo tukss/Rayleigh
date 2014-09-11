@@ -76,7 +76,7 @@ PRO READ_SPECTRA, file, res
         ENDFOR
 
 	
-	res = {vals:vals, radius:radius, costheta:costheta,qvals:qvals, shell_inds:shell_inds, time:time, $
+	res = {vals:vals, radius:radius, qvals:qvals, shell_inds:shell_inds, time:time, $
 			iter:iter, version:version, lut:lut}
 
 END
