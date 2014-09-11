@@ -486,11 +486,10 @@ Contains
             Call Shell_Spectra%OpenFile(this_iter, error)
             If (error .eq. 0) Then
                 If (Shell_Spectra%current_rec .eq. 1) Then            
-                    Write(funit)ntheta,Shell_Spectra%nlevels,Shell_Spectra%nq
+                    Write(funit)lmax,Shell_Spectra%nlevels,Shell_Spectra%nq
                     Write(funit)(Shell_Spectra%oqvals(i),i=1,Shell_Spectra%nq)
                     Write(funit)(radius(Shell_Spectra%levels(i)),i=1,Shell_Spectra%nlevels)
                     Write(funit)(Shell_Spectra%levels(i),i=1,Shell_Spectra%nlevels)
-                    Write(funit)(costheta(j),j=1,ntheta)
                     Call Shell_Spectra%update_position() ! important to do after header has been written
                 Endif
                 file_pos = Shell_Spectra%file_position
