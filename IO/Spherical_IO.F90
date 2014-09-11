@@ -2,6 +2,7 @@ Module Spherical_IO
 	Use Parallel_Framework
 	Use SendReceive
     Use Fourier_Transform
+    Use Legendre_Transforms, Only : Legendre_Transform
 	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
@@ -111,7 +112,7 @@ Module Spherical_IO
         & full3d_values, &
         & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
         & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency, &
-        & shellspectra_nrec, shellspectra_frequency
+        & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values
 
 
 
@@ -137,7 +138,7 @@ Module Spherical_IO
     ! We store some redundant information just to keep the IO level as independent of the Physics level as possible
     ! These variables are all private.
     Real*8, Allocatable,Private :: theta_integration_weights(:), r_integration_weights(:)
-    Integer, Private :: my_theta_min, my_theta_max, my_rmin, my_rmax
+    Integer, Private :: my_theta_min, my_theta_max, my_rmin, my_rmax, my_mp_max, my_mp_min
     Integer, Private :: nr, nphi, ntheta
     Integer, Private :: nproc1, nproc2, myid, nproc, my_row_rank, my_column_rank, my_nr
     Real*8, Allocatable, Private :: radius(:),sintheta(:),costheta(:) 
@@ -152,7 +153,7 @@ Contains
         Call Shell_Averages%reset()
         Call AZ_Averages%reset()
         Call Shell_Slices%reset()
-        !Call Shell_Spectra%reset()
+        Call Shell_Spectra%reset()
 
         Allocate(f_of_r_theta(my_rmin:my_rmax,my_theta_min:my_theta_max))
         Allocate(f_of_r(my_rmin:my_rmax))
@@ -160,7 +161,7 @@ Contains
 
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in)
 		Implicit None
-		Integer :: k, fcount(3,2), ntot
+		Integer :: k, fcount(3,2), ntot, fcnt
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
 
@@ -170,6 +171,10 @@ Contains
 		my_theta_max = pfi%my_2p%max
 		my_rmin = pfi%my_1p%min
 		my_rmax = pfi%my_1p%max
+        
+        my_mp_min = pfi%my_3s%min
+        my_mp_max = pfi%my_3s%max
+
 		my_nr = pfi%my_1p%delta
         nproc  = pfi%gcomm%np
 		nproc1 = pfi%ccomm%np		! processor's per column (radius split among these)
@@ -199,12 +204,23 @@ Contains
 
         !Numbers here are the mpi_tags used in communication for each output
         !In theory they can be the same, but it's probably a good idea to keep them unique
-        Call            Full_3D%Init(averaging_level,compute_q,myid,54,values = full3d_values)
-        Call    Global_Averages%Init(averaging_level,compute_q,myid,55,avg_level = 3,values = globalavg_values)
-		Call        AZ_Averages%Init(averaging_level,compute_q,myid,56,avg_level = 1,values = azavg_values)
-        Call     Shell_Averages%Init(averaging_level,compute_q,myid,57,avg_level = 2,values = shellavg_values)
-        Call       Shell_Slices%Init(averaging_level,compute_q,myid,58,values = shellslice_values, levels = shellslice_levels)
-        Call       Shell_Spectra%Init(averaging_level,compute_q,myid,58,values = shellspectra_values, levels = shellspectra_levels)
+        Call            Full_3D%Init(averaging_level,compute_q,myid, &
+            & 54,values = full3d_values)
+
+        Call    Global_Averages%Init(averaging_level,compute_q,myid, &
+            & 55,avg_level = 3,values = globalavg_values)
+
+		Call        AZ_Averages%Init(averaging_level,compute_q,myid, &
+            & 56,avg_level = 1,values = azavg_values)
+
+        Call     Shell_Averages%Init(averaging_level,compute_q,myid, &
+            & 57,avg_level = 2,values = shellavg_values)
+
+        Call       Shell_Slices%Init(averaging_level,compute_q,myid, &
+            & 58,values = shellslice_values, levels = shellslice_levels)
+
+        Call       Shell_Spectra%Init(averaging_level,compute_q,myid, &
+            & 58,values = shellspectra_values, levels = shellspectra_levels)
 
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
@@ -215,11 +231,12 @@ Contains
             !Initialize the buffer object that we use for transposing spectra
             !Some row ranks might have no buffer initialized.
             ntot = Shell_Spectra%nq*Shell_Spectra%my_nlevels
-            fcount = ntot/my_nr
+            fcnt = ntot/my_nr
             k = Mod(ntot,my_nr)
-            if (k .gt. 0) fcount = fcount+1
-            If (maxval(fcount) .gt. 0) Then
-           		!Call spectra_buffer%init(field_count = fcount, config = 'p3b')		
+            if (k .gt. 0) fcnt = fcnt+1
+            If (fcnt .gt. 0) Then
+                fcount(:,:) = fcnt
+           		Call spectra_buffer%init(field_count = fcount, config = 'p3b')		
             Endif	
         Endif 
         !Next, provide the file directory, frequency info, output versions etc.
@@ -243,7 +260,6 @@ Contains
         ! Shell Spectra
         fdir = 'Shell_Spectra/'
         Call Shell_Spectra%set_file_info(shellspectra_version,shellspectra_nrec,shellspectra_frequency,fdir) 
-
 
 
         ! Full 3D (special because it only cares about the frequency, not nrec)
@@ -279,7 +295,8 @@ Contains
 		      Do j = 1, Shell_Slices%nlevels
 		        ilocal = Shell_Slices%levels(j)-my_rmin+1
 		        If (Shell_Slices%have_shell(j) .eq. 1) Then ! my processor has this radius
-				    shell_slice_outputs(:,my_theta_min:my_theta_max,shell_lev_ind,shell_ind) = qty(:,ilocal,my_theta_min:my_theta_max)
+				    shell_slice_outputs(:,my_theta_min:my_theta_max,shell_lev_ind,shell_ind) = &
+                        &  qty(:,ilocal,my_theta_min:my_theta_max)
 				    shell_lev_ind = shell_lev_ind +1
 		        Endif
 		      Enddo
@@ -293,7 +310,8 @@ Contains
 
 	Subroutine Get_Shell_Spectra(qty)
 		Implicit None
-		Integer :: j, ilocal, shell_lev_ind, shell_ind, field_ind, rind
+		Integer :: j, ilocal, shell_lev_ind, shell_ind, field_ind, rind, counter
+        Integer :: k, jj
 		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
 
         If (Shell_Spectra%nlevels .gt. 0) Then
@@ -314,14 +332,20 @@ Contains
 		        shell_lev_ind =1
 		        Do j = 1, Shell_Spectra%nlevels
 
-                    field_ind = (shell_lev_ind-1)/my_nr+1
-                    rind = shell_lev_ind-(field_ind-1)*my_nr
+                    counter = (shell_ind-1)*Shell_Spectra%nlevels+shell_lev_ind
+
+                    field_ind = (counter-1)/my_nr+1
+                    rind = counter-(field_ind-1)*my_nr +my_rmin-1
 
 		            ilocal = Shell_Slices%levels(j)-my_rmin+1
 		            If (Shell_Spectra%have_shell(j) .eq. 1) Then ! my processor has this radius
 
-				        spectra_buffer%p3b(1:nphi,my_theta_min:my_theta_max,rind,field_ind) = &
-                        & qty(1:nphi,ilocal,my_theta_min:my_theta_max)
+                        Do k = 1, nphi
+                        Do jj = my_theta_min, my_theta_max
+				        spectra_buffer%p3b(k,rind,jj,field_ind) = &
+                        & qty(k, ilocal, jj)
+                        Enddo
+                        Enddo
 				        shell_lev_ind = shell_lev_ind +1
 		            Endif
 		        Enddo
@@ -335,15 +359,17 @@ Contains
 		Implicit None
 		Real*8, Intent(in) :: simtime
 		Integer, Intent(in) :: this_iter
-		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
+		Real*8, Allocatable :: buff(:,:,:,:,:), all_spectra(:,:,:,:,:)
+        Real*8, Allocatable :: sendbuffer(:,:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
-		Integer :: i, j, k,qq
+		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
+        Integer :: rone, rwo, p, ncount, counter, nf
 		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag
 
-		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
-		Integer :: nelem
+		Integer :: your_mp_min, your_mp_max, your_nm, your_id
+		Integer :: nelem, m_ind, m_val
         Integer :: file_pos, funit, error
-        nq_shell = Shell_Slices%nq
+        nq_shell = Shell_Spectra%nq
         shell_spectra_tag = Shell_Spectra%mpi_tag
         funit = Shell_Spectra%file_unit
 		! Later, we may want to generalize this, but for now just assume the process 0 handles the output
@@ -354,87 +380,137 @@ Contains
         ! First thing we do is FFT/reform the buffer/Legendre Transform
         !
         If (Shell_Spectra%my_nlevels .gt. 1) Then
-            !Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
-            !Call spectra_buffer%reform()
-    		!Call spectra_buffer%construct('s2b')
-            !Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
-            !Call spectra_buffer%deconstruct('p2b')
+            Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
+            spectra_buffer%config ='p3b'
+            Call spectra_buffer%reform()
+    		Call spectra_buffer%construct('s2b')
+            Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
+            Call spectra_buffer%deconstruct('p2b')
         Endif
 
-        ! I should replace this with a call to a method like Shell_Slices%comm
-		If (responsible .eq. 1) Then
-			! Responsible node receives  all the pieces of the shell slices from the other nodes
-
-		
-			Allocate(all_shell_slices(1:nphi,1:ntheta,Shell_Slices%nlevels,Shell_Slices%nq))
-			all_shell_slices(:,:,:,:) = 0.0d0
-			current_shell = 1
-			Do n = 1, Shell_Slices%nshell_r_ids  
-				 this_rid = Shell_Slices%shell_r_ids(n)
-				 this_nshell = Shell_Slices%nshells_at_rid(n)		
-				 s_start = current_shell
-				 s_end = s_start+this_nshell-1 
+        
+        !/////////////
+        If (Shell_Spectra%my_nlevels .gt. 0) Then
 
 
-				 Do nn = 0, nproc2-1
-					your_id = nn+this_rid*nproc2
-
-					your_ntheta    = pfi%all_2p(nn)%delta
-					your_theta_min = pfi%all_2p(nn)%min
-					your_theta_max = pfi%all_2p(nn)%max
-
-				 	Allocate(buff(1:nphi,1:your_ntheta,1:this_nshell,1:Shell_Slices%nq))
+       
+            !Do mp = my_mp_min, my_mp_max
+            !    m = pfi%inds_3s(mp)
+            !    mode_count = mode_count+(l_max-m)+1
+            !Enddo
 
 
-					nelem = nphi*your_ntheta*this_nshell*nq_shell
-				 	If (your_id .ne. io_node) then
-						! Receive and copy
+            
+            lmax = maxval(pfi%inds_3s)
+            Allocate(sendbuffer(0:lmax,my_mp_min:my_mp_max,shell_spectra%my_nlevels,shell_spectra%nq,2))
+            
 
-             		Call receive(buff, source= your_id,tag=shell_spectra_tag,grp = pfi%gcomm)
+            ! Do one pass of s2b to get the real parts
+            ncount = Shell_Spectra%my_nlevels*Shell_Spectra%nq
+            
+            nf = spectra_buffer%nf2b
+            counter = 1
+            Do mp = my_mp_min,my_mp_max
+                m = pfi%inds_3s(mp)
+                Do p = 1, 2
+                    Do f = 1, nf
+                        rone = (f-1)*2*my_nr+1+(p-1)*my_nr
+                        Do r = rone,rone+my_nr-1
+                            If (counter .le. ncount) Then
+                                field_ind = (counter-1)/shell_spectra%my_nlevels+1
+                                rind = counter-(field_ind-1)*shell_spectra%my_nlevels
+                                !write(6,*)counter,field_ind,rind
+                                sendbuffer(m:lmax,mp,rind,field_ind,p) = &
+                                    spectra_buffer%s2b(mp)%data(m:lmax,r)
+                            Endif
+                        Enddo
+                    Enddo
+                Enddo
 
-						all_shell_slices(1:nphi,your_theta_min:your_theta_max,s_start:s_end,1:nq_shell) = &
-							& buff(1:nphi , 1:your_ntheta, 1:this_nshell, 1:nq_shell)
-					Else
-						If (Shell_Slices%my_nlevels .gt. 0) Then
-							! Copy my shells into the main output array
+            Enddo
+            call spectra_buffer%deconstruct('s2b')
 
-							all_shell_slices(1:nphi,your_theta_min:your_theta_max,s_start:s_end,1:nq_shell) &
-								& = shell_slice_outputs(:,:,:,:)
-						Endif			
-					Endif
-					DeAllocate(buff)
- 				Enddo
-				current_shell = s_end+1
-				!DeAllocate(buff)	! lot of allocation/de-allocation here.  Probably doesn't matter, but can optimize later.
-			Enddo
-            Call Shell_Slices%OpenFile(this_iter, error)
+
+        Endif
+    !///////////
+    ! I should replace this with a call to a method like Shell_Slices%comm
+        If (responsible .eq. 1) Then
+            ! Responsible node receives  all the pieces of the shell slices from the other nodes
+
+
+            Allocate(all_spectra(0:lmax,0:lmax,Shell_Spectra%nlevels,Shell_Spectra%nq,1:2))
+            all_spectra(:,:,:,:,:) = 0.0d0
+            current_shell = 1
+            Do n = 1, Shell_Spectra%nshell_r_ids  
+                this_rid = Shell_Spectra%shell_r_ids(n)
+                this_nshell = Shell_Spectra%nshells_at_rid(n)		
+                s_start = current_shell
+                s_end = s_start+this_nshell-1 
+
+
+                Do nn = 0, nproc2-1
+                    your_id = nn+this_rid*nproc2
+
+                    your_nm     = pfi%all_3s(nn)%delta
+                    your_mp_min = pfi%all_3s(nn)%min
+                    your_mp_max = pfi%all_3s(nn)%max
+
+                    Allocate(buff(1:lmax+1,1:your_nm,1:this_nshell,1:Shell_Spectra%nq,1:2))
+
+
+                    nelem = nphi*your_nm*this_nshell*nq_shell
+                    If (your_id .ne. io_node) then
+                        ! Receive and copy
+
+
+                        Call receive(buff, source= your_id,tag=shell_spectra_tag,grp = pfi%gcomm)
+                        Do m_ind = 1, your_nm
+                            m_val = pfi%inds_3s(your_mp_min+m_ind-1)
+                            all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) = &
+                                & buff(m_val+1:lmax+1 , m_ind, 1:this_nshell, 1:nq_shell,1:2)
+                        Enddo
+                    Else
+                        If (Shell_Spectra%my_nlevels .gt. 0) Then
+                        ! Copy my shells into the main output array
+                            Do m_ind = 1, your_nm
+                                m_val = pfi%inds_3s(your_mp_min+m_ind)
+                                all_spectra(m_val:lmax,m_ind,s_start:s_end,1:nq_shell,1:2) &
+                                    & = sendbuffer(m_val:lmax,m_ind,1:this_nshell,1:nq_shell,1:2)
+                            Enddo
+                        Endif			
+                    Endif
+                    DeAllocate(buff)
+                Enddo
+                current_shell = s_end+1
+            Enddo
+            Call Shell_Spectra%OpenFile(this_iter, error)
             If (error .eq. 0) Then
-                If (Shell_Slices%current_rec .eq. 1) Then            
-                    Write(funit)ntheta,Shell_Slices%nlevels,Shell_Slices%nq
-                    Write(funit)(Shell_Slices%oqvals(i),i=1,Shell_Slices%nq)
-                    Write(funit)(radius(Shell_Slices%levels(i)),i=1,Shell_Slices%nlevels)
-                    Write(funit)(Shell_Slices%levels(i),i=1,Shell_Slices%nlevels)
+                If (Shell_Spectra%current_rec .eq. 1) Then            
+                    Write(funit)ntheta,Shell_Spectra%nlevels,Shell_Spectra%nq
+                    Write(funit)(Shell_Spectra%oqvals(i),i=1,Shell_Spectra%nq)
+                    Write(funit)(radius(Shell_Spectra%levels(i)),i=1,Shell_Spectra%nlevels)
+                    Write(funit)(Shell_Spectra%levels(i),i=1,Shell_Spectra%nlevels)
                     Write(funit)(costheta(j),j=1,ntheta)
-                    Call Shell_Slices%update_position() ! important to do after header has been written
+                    Call Shell_Spectra%update_position() ! important to do after header has been written
                 Endif
-                file_pos = Shell_Slices%file_position
-                Write(funit, POS = file_pos)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
-                    & j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
+                file_pos = Shell_Spectra%file_position
+                Write(funit, POS = file_pos)(((((all_spectra(k,j,i,qq,p),k=0,lmax), &
+                & j=0,lmax),i=1,Shell_Spectra%nlevels),qq=1,Shell_Spectra%nq),p=1,2)
                 Write(funit)simtime
                 Write(funit)this_iter
-                Call Shell_Slices%CloseFile()
+                Call Shell_Spectra%CloseFile()
             Endif
 
-			DeAllocate(all_shell_slices)
+            DeAllocate(all_spectra)
 
-		Else
+        Else
 			!  Non responsible nodes send their info
-			If (Shell_Slices%my_nlevels .gt. 0) Then
-				Call send(shell_slice_outputs, dest = 0,tag=shell_spectra_tag, grp = pfi%gcomm)
+			If (Shell_Spectra%my_nlevels .gt. 0) Then
+				Call send(sendbuffer, dest = 0,tag=shell_spectra_tag, grp = pfi%gcomm)
 			Endif
 		Endif
-		If (Shell_Slices%my_nlevels .gt. 0) Then
-			DeAllocate(shell_slice_outputs)
+		If (Shell_Spectra%my_nlevels .gt. 0) Then
+			DeAllocate(sendbuffer)
 		Endif
 
 	End Subroutine Write_Shell_Spectra
@@ -546,6 +622,7 @@ Contains
             ! While doing so, we modify the averaging level
             Call Full_3D%getq_now(yesno)
             Call Shell_Slices%getq_now(yesno)
+            Call Shell_Spectra%getq_now(yesno)
             Call AZ_Averages%getq_now(yesno)
             Call Shell_Averages%getq_now(yesno)
             Call Global_Averages%getq_now(yesno)
@@ -560,7 +637,7 @@ Contains
 
          If (Mod(iter,Global_Averages%Frequency) .eq. 0) yesno = .true.
          If (Mod(iter,Shell_Averages%Frequency) .eq. 0) yesno = .true.        
-          
+         If (Mod(iter,Shell_Spectra%Frequency) .eq. 0) yesno = .true.            
          If (Mod(iter,AZ_Averages%Frequency) .eq. 0) yesno = .true.
          If (Mod(iter,Shell_Slices%Frequency) .eq. 0) yesno = .true. 
          If (Mod(iter,Full_3D%Frequency) .eq. 0) yesno = .true.
@@ -572,7 +649,7 @@ Contains
 
 
 		If (Shell_Slices%grab_this_q) Call get_shell_slice(qty)
-
+		If (Shell_Spectra%grab_this_q) Call get_shell_spectra(qty)
         Call Get_Averages(qty)
 
 		If (full_3d%grab_this_q) Call write_full_3d(qty)
@@ -588,6 +665,7 @@ Contains
 		Real*8, Intent(In) :: sim_time
 
 	    If (Mod(iter,Shell_Slices%frequency) .eq. 0 ) Call Write_Shell_Slices(iter,sim_time)
+	    If (Mod(iter,Shell_Spectra%frequency) .eq. 0 ) Call Write_Shell_Spectra(iter,sim_time)
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
 	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
