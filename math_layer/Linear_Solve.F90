@@ -264,7 +264,7 @@ Module Linear_Solve
 	Subroutine DeAllocate_LHS(mode_ind)
 		Implicit None
         Integer, Intent(In) :: mode_ind
-		Integer :: k,j, ndim, ind
+		Integer :: k,j, ndim
 	
         j = mode_ind
 		Do k = 1, n_equations
