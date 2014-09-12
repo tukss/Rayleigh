@@ -16,7 +16,7 @@ Module SendReceive
 Contains
 
 	Subroutine D_Send_5D(x, n_elements, dest, tag, grp, indstart)
-    Real*8, Intent(in)  :: x(:,:,:,:,:)
+    Real*8, Intent(in)  :: x(1:,1:,1:,1:,1:)
 
     Integer, Optional :: dest, n_elements, tag,indstart(1:5)
 	 Integer :: istart, kstart, jstart,lstart, mstart
@@ -245,7 +245,7 @@ Contains
 
 
 	Subroutine D_Receive_5D(x, n_elements, source, tag, grp,indstart)
-		Real*8, Intent(out)  :: x(:,:,:,:,:)
+		Real*8, Intent(out)  :: x(1:,1:,1:,1:,1:)
 
     Integer, Optional :: source, n_elements, tag,indstart(1:5)
 	 Integer :: istart,jstart,kstart,lstart, mstart

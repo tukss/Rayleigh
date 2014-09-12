@@ -403,16 +403,18 @@ Contains
             
             lmax = maxval(pfi%inds_3s)
             Allocate(sendbuffer(0:lmax,my_mp_min:my_mp_max,shell_spectra%my_nlevels,shell_spectra%nq,2))
-            
+            sendbuffer = -1.0d0 !Comment this out later
 
             ! Do one pass of s2b to get the real parts
             ncount = Shell_Spectra%my_nlevels*Shell_Spectra%nq
             
             nf = spectra_buffer%nf2b
-            counter = 1
+            Do p = 1, 2
+            !counter = 1
             Do mp = my_mp_min,my_mp_max
                 m = pfi%inds_3s(mp)
-                Do p = 1, 2
+                !Do p = 1, 2
+                    counter = 1
                     Do f = 1, nf
                         rone = (f-1)*2*my_nr+1+(p-1)*my_nr
                         Do r = rone,rone+my_nr-1
@@ -421,7 +423,9 @@ Contains
                                 rind = counter-(field_ind-1)*shell_spectra%my_nlevels
                                 !write(6,*)counter,field_ind,rind
                                 sendbuffer(m:lmax,mp,rind,field_ind,p) = &
-                                    spectra_buffer%s2b(mp)%data(m:lmax,r)
+                                    & spectra_buffer%s2b(mp)%data(m:lmax,r)
+
+                                counter = counter+1
                             Endif
                         Enddo
                     Enddo
@@ -468,14 +472,23 @@ Contains
                             m_val = pfi%inds_3s(your_mp_min+m_ind-1)
                             all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) = &
                                 & buff(m_val+1:lmax+1 , m_ind, 1:this_nshell, 1:nq_shell,1:2)
+                            !if (m_val .eq. 47) Then
+                             !   write(6,*)buff(: , m_ind, 1, 1,1:2)
+                            !Endif
                         Enddo
                     Else
                         If (Shell_Spectra%my_nlevels .gt. 0) Then
                         ! Copy my shells into the main output array
-                            Do m_ind = 1, your_nm
-                                m_val = pfi%inds_3s(your_mp_min+m_ind)
-                                all_spectra(m_val:lmax,m_ind,s_start:s_end,1:nq_shell,1:2) &
+                            Write(6,*)'Doing a copy..', maxval(sendbuffer),minval(sendbuffer)
+                            Do m_ind = my_mp_min, my_mp_max
+                                m_val = pfi%inds_3s(m_ind)
+                                Write(6,*)'Grabbing m_val: ', m_val
+                                all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) &
                                     & = sendbuffer(m_val:lmax,m_ind,1:this_nshell,1:nq_shell,1:2)
+                                !if (m_val .eq. 55) Then
+                                 !   write(6,*)sendbuffer(:,m_ind,1,1,1)
+                                !    write(6,*)sendbuffer(:,m_ind,1,1,2)
+                                !Endif
                             Enddo
                         Endif			
                     Endif
