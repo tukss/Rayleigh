@@ -310,7 +310,7 @@ Contains
 
 	Subroutine Get_Shell_Spectra(qty)
 		Implicit None
-		Integer :: j, ilocal, shell_lev_ind, shell_ind, field_ind, rind, counter
+		Integer :: j, ilocal, shell_ind, field_ind, rind, counter
         Integer :: k, jj
 		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
 
@@ -329,25 +329,24 @@ Contains
 		        Endif
 
                             
-		        shell_lev_ind =1
-		        Do j = 1, Shell_Spectra%nlevels
 
-                    counter = (shell_ind-1)*Shell_Spectra%nlevels+shell_lev_ind
+		        Do j = 1, Shell_Spectra%my_nlevels
+
+
+
+		            ilocal = Shell_Spectra%my_shell_levs(j)-my_rmin+1
+
+                    counter = (shell_ind-1)*Shell_Spectra%my_nlevels+ j 
 
                     field_ind = (counter-1)/my_nr+1
                     rind = counter-(field_ind-1)*my_nr +my_rmin-1
-
-		            ilocal = Shell_Slices%levels(j)-my_rmin+1
-		            If (Shell_Spectra%have_shell(j) .eq. 1) Then ! my processor has this radius
-
-                        Do k = 1, nphi
-                        Do jj = my_theta_min, my_theta_max
+                    Do k = 1, nphi
+                    Do jj = my_theta_min, my_theta_max
 				        spectra_buffer%p3b(k,rind,jj,field_ind) = &
                         & qty(k, ilocal, jj)
-                        Enddo
-                        Enddo
-				        shell_lev_ind = shell_lev_ind +1
-		            Endif
+                    Enddo
+                    Enddo
+
 		        Enddo
             Endif
             Call Shell_Spectra%AdvanceInd()
@@ -376,22 +375,21 @@ Contains
 		responsible = 0
 		If (myid .eq. io_node) responsible = 1
 
-        !//////////////////////
-        ! First thing we do is FFT/reform the buffer/Legendre Transform
-        !
-        If (Shell_Spectra%my_nlevels .gt. 1) Then
-            Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
-            spectra_buffer%config ='p3b'
-            Call spectra_buffer%reform()
-    		Call spectra_buffer%construct('s2b')
-            Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
-            Call spectra_buffer%deconstruct('p2b')
-        Endif
+
+
 
         
         !/////////////
         If (Shell_Spectra%my_nlevels .gt. 0) Then
-
+            !//////////////////////
+            ! First thing we do is FFT/reform the buffer/Legendre Transform
+            !
+            Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
+            spectra_buffer%config ='p3b'
+            Call spectra_buffer%reform()
+            Call spectra_buffer%construct('s2b')
+            Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
+            Call spectra_buffer%deconstruct('p2b')
 
        
             !Do mp = my_mp_min, my_mp_max
@@ -421,7 +419,7 @@ Contains
                             If (counter .le. ncount) Then
                                 field_ind = (counter-1)/shell_spectra%my_nlevels+1
                                 rind = counter-(field_ind-1)*shell_spectra%my_nlevels
-                                !write(6,*)counter,field_ind,rind
+
                                 sendbuffer(m:lmax,mp,rind,field_ind,p) = &
                                     & spectra_buffer%s2b(mp)%data(m:lmax,r)
 
@@ -472,23 +470,20 @@ Contains
                             m_val = pfi%inds_3s(your_mp_min+m_ind-1)
                             all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) = &
                                 & buff(m_val+1:lmax+1 , m_ind, 1:this_nshell, 1:nq_shell,1:2)
-                            !if (m_val .eq. 47) Then
-                             !   write(6,*)buff(: , m_ind, 1, 1,1:2)
-                            !Endif
+                            if (m_val .eq. 47) Then
+
+                            Endif
                         Enddo
                     Else
                         If (Shell_Spectra%my_nlevels .gt. 0) Then
                         ! Copy my shells into the main output array
-                            Write(6,*)'Doing a copy..', maxval(sendbuffer),minval(sendbuffer)
+
                             Do m_ind = my_mp_min, my_mp_max
                                 m_val = pfi%inds_3s(m_ind)
-                                Write(6,*)'Grabbing m_val: ', m_val
+
                                 all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) &
                                     & = sendbuffer(m_val:lmax,m_ind,1:this_nshell,1:nq_shell,1:2)
-                                !if (m_val .eq. 55) Then
-                                 !   write(6,*)sendbuffer(:,m_ind,1,1,1)
-                                !    write(6,*)sendbuffer(:,m_ind,1,1,2)
-                                !Endif
+
                             Enddo
                         Endif			
                     Endif
@@ -505,7 +500,8 @@ Contains
                     Write(funit)(Shell_Spectra%levels(i),i=1,Shell_Spectra%nlevels)
                     Call Shell_Spectra%update_position() ! important to do after header has been written
                 Endif
-                file_pos = Shell_Spectra%file_position
+
+
                 Write(funit)(((((all_spectra(k,j,i,qq,p),k=0,lmax), &
                 & j=0,lmax),i=1,Shell_Spectra%nlevels),qq=1,Shell_Spectra%nq),p=1,2)
                 Write(funit)simtime
