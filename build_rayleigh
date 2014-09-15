@@ -16,7 +16,9 @@
 ### ./build_rayleigh Pleiades debug  (for example)
 
 setenv MACHINE $1
-setenv RAYLEIGH_DEBUG $2
+setenv RAYLEIGH_OPT1 $2
+setenv RAYLEIGH_OPT2 $3
+setenv RAYLEIGH_OPT3 $4
 mkdir build
 cd build
 rm *.F90

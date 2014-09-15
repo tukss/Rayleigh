@@ -1,0 +1,88 @@
+&problemsize_namelist
+ n_r = 128
+ n_theta = 192
+ nprow = 2
+ npcol = 3
+ rmin = 2.45d9
+ rmax = 7.0d9
+/
+&numerical_controls_namelist
+ chebyshev = .true.
+/
+&physical_controls_namelist
+ rotation = .true.
+ magnetism = .true.
+/
+&temporal_controls_namelist
+ max_time_step = 200.0d0
+ max_iterations = 5000000
+ alpha_implicit = 0.51d0
+ check_frequency = 10000
+ cflmin = 0.4d0
+ cflmax = 0.6d0
+/
+&output_namelist
+shellslice_levels = 64,65
+shellslice_values = 1,4,3,202
+shellslice_frequency = 1000
+shellslice_nrec = 10
+
+azavg_values = 1,3,4,13,14
+azavg_frequency = 2500
+azavg_nrec = 2
+
+shellavg_values = 1,2,3,4,7,8,9,10,11,208,209,210
+shellavg_frequency = 100
+shellavg_nrec = 100
+
+globalavg_values = 1,2,3,4,7,8,9,10,11,208,209,210
+globalavg_frequency = 100
+globalavg_nrec = 100
+
+full3d_values = 4
+full3d_frequency = 9000000
+/
+
+&Boundary_Conditions_Namelist
+no_slip_boundaries = .false.
+strict_L_Conservation = .true.
+dtdr_bottom = 0.0d0
+T_Top    = 0.0d0
+T_Bottom = 774268.3d0
+fix_tvar_top = .true.
+fix_tvar_bottom = .true.
+/
+&Initial_Conditions_Namelist
+init_type = 7
+magnetic_init_type = 7
+mag_amp = 1.0d0
+temp_amp = 1.0d1
+temp_w = 0.01d4
+restart_iter = 5000000
+conductive_profile = .true.
+/
+&Test_Namelist
+test_mode = .false.
+test_legendre = .false.
+test_chebyshev = .false.
+ntest_legendre = 2
+/
+&Reference_Namelist
+reference_type = 2
+poly_n = 2.0d0
+poly_Nrho = 3.0d0
+poly_mass = 1.9D30
+poly_rho_i = 1.1d0 
+pressure_specific_heat = 1.0509d8
+/
+&NonDimensionalization_Namelist
+dimensional = .true.
+angular_velocity = 1.76d-4
+nd_index = 64
+entropy_bottom = 774268.3d0
+/
+&Transport_Namelist
+nu_top    = 7.28728d12
+kappa_top = 7.28728d12
+eta_top = 1.457456d11
+/
