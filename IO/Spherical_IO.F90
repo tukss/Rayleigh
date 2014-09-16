@@ -378,7 +378,7 @@ Contains
 
 
 
-        
+        lmax = maxval(pfi%inds_3s)
         !/////////////
         If (Shell_Spectra%my_nlevels .gt. 0) Then
             !//////////////////////
@@ -399,7 +399,7 @@ Contains
 
 
             
-            lmax = maxval(pfi%inds_3s)
+
             Allocate(sendbuffer(0:lmax,my_mp_min:my_mp_max,shell_spectra%my_nlevels,shell_spectra%nq,2))
             sendbuffer = -1.0d0 !Comment this out later
 
@@ -470,9 +470,6 @@ Contains
                             m_val = pfi%inds_3s(your_mp_min+m_ind-1)
                             all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) = &
                                 & buff(m_val+1:lmax+1 , m_ind, 1:this_nshell, 1:nq_shell,1:2)
-                            if (m_val .eq. 47) Then
-
-                            Endif
                         Enddo
                     Else
                         If (Shell_Spectra%my_nlevels .gt. 0) Then
