@@ -39,7 +39,7 @@ Contains
         Integer :: i
         Real*8 :: delr
         Real*8, Allocatable :: tweights(:)
-        over_eight_pi = 8.0d0/pi
+        over_eight_pi = 1.0d0/(8.0d0*pi)
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
 
