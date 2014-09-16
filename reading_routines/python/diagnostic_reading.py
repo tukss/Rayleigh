@@ -3,14 +3,23 @@ import os
 class ReferenceState:
     """Rayleigh Reference State Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.n_r         : number of radial points
+    self.radius      : radial coordinates
+    self.density     : density
+    self.dlnrho      : logarithmic derivative of density
+    self.d2lnrho     : d_by_dr of dlnrho
+    self.pressure    : pressure
+    self.temperature : temperature
+    self.dlnt        : logarithmic derivative of temperature
+    self.dsdr        : entropy gradient (radial)
+    self.entropy     : entropy
+    self.gravity     : gravity
     """
 
-    def __init__(self,filename='none',path='./',esize=8):
+    def __init__(self,filename='none',path='./'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'reference'
         else:
@@ -40,14 +49,20 @@ class ReferenceState:
 class GlobalAverage:
     """Rayleigh GlobalAverage Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.niter                  : number of time steps
+    self.nq                     : number of diagnostic quantities output
+    self.qv[0:nq-1]             : quantity codes for the diagnostics output
+    self.vals[0:niter-1,0:nq-1] : The globally averaged diagnostics 
+    self.iters[0:niter-1]       : The time step numbers stored in this output file
+    self.time[0:niter-1]        : The simulation time corresponding to each time step
+    self.version                : The version code for this particular output (internal use)
+    self.lut                    : Lookup table for the different diagnostics output
     """
 
-    def __init__(self,filename='none',path='Shell_Avgs/',esize=8):
+    def __init__(self,filename='none',path='G_Avgs/'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
@@ -78,16 +93,23 @@ class GlobalAverage:
         fd.close()
 
 class ShellAverage:
-    """Rayleigh GlobalAverage Structure
+    """Rayleigh Shell Average Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.niter                         : number of time steps
+    self.nq                            : number of diagnostic quantities output
+    self.nr                            : number of radial points
+    self.qv[0:nq-1]                    : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                : radial grid
+    self.vals[0:nr-1,0:nq-1,0:niter-1] : The spherically averaged diagnostics 
+    self.iters[0:niter-1]              : The time step numbers stored in this output file
+    self.time[0:niter-1]               : The simulation time corresponding to each time step
+    self.version                       : The version code for this particular output (internal use)
+    self.lut                           : Lookup table for the different diagnostics output
     """
-
-    def __init__(self,filename='none',path='Shell_Avgs/',esize=8):
+    def __init__(self,filename='none',path='Shell_Avgs/'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
@@ -124,16 +146,28 @@ class ShellAverage:
         fd.close()
 
 class AzAverage:
-    """Rayleigh GlobalAverage Structure
+    """Rayleigh AzAverage Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.niter                                    : number of time steps
+    self.nq                                       : number of diagnostic quantities output
+    self.nr                                       : number of radial points
+    self.ntheta                                   : number of theta points
+    self.qv[0:nq-1]                               : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                           : radial grid
+    self.costheta[0:ntheta-1]                     : cos(theta grid)
+    self.sintheta[0:ntheta-1]                     : sin(theta grid)
+    self.vals[0:nr-1,0:ntheta-1,0:nq-1,0:niter-1] : The phi-averaged diagnostics 
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.version                                  : The version code for this particular output (internal use)
+    self.lut                                      : Lookup table for the different diagnostics output
     """
 
-    def __init__(self,filename='none',path='Shell_Avgs/',esize=8):
+
+    def __init__(self,filename='none',path='AZ_Avgs/'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
@@ -173,16 +207,30 @@ class AzAverage:
         fd.close()
 
 class ShellSlice:
-    """Rayleigh GlobalAverage Structure
+    """Rayleigh Shell Slice Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.niter                                    : number of time steps
+    self.nq                                       : number of diagnostic quantities output
+    self.nr                                       : number of shell slices output
+    self.ntheta                                   : number of theta points
+    self.nphi                                     : number of phi points
+    self.qv[0:nq-1]                               : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                           : radii of the shell slices output
+    self.inds[0:nr-1]                             : radial indices of the shell slices output
+    self.costheta[0:ntheta-1]                     : cos(theta grid)
+    self.sintheta[0:ntheta-1]                     : sin(theta grid)
+    self.vals[0:nphi-1,0:ntheta-1,0:nr-1,0:nq-1,0:niter-1] 
+                                                  : The shell slices 
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.version                                  : The version code for this particular output (internal use)
+    self.lut                                      : Lookup table for the different diagnostics output
     """
 
-    def __init__(self,filename='none',path='Shell_Avgs/',esize=8):
+    def __init__(self,filename='none',path='Shell_Slices/'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
@@ -192,7 +240,6 @@ class ShellSlice:
         bs = check_endian(fd,314,'int32')
         version = swapread(fd,dtype='int32',count=1,swap=bs)
         nrec = swapread(fd,dtype='int32',count=1,swap=bs)
-        print bs, version, nrec
         ntheta = swapread(fd,dtype='int32',count=1,swap=bs)
         nphi = 2*ntheta
         nr = swapread(fd,dtype='int32',count=1,swap=bs)
@@ -227,16 +274,30 @@ class ShellSlice:
         fd.close()
 
 class ShellSpectra:
-    """Rayleigh Shell Spectra Structure
+    """Rayleigh Shell Spectrum Structure
     ----------------------------------
-    self.n_r     : number of radial points
-    self.radius  : radial coordinates
+    self.niter                                    : number of time steps
+    self.nq                                       : number of diagnostic quantities output
+    self.nr                                       : number of shell slices output
+    self.nell                                     : number of ell values
+    self.nm                                       : number of m values
+    self.lmax                                     : maximum spherical harmonic degree l
+    self.mmax                                     : maximum spherical harmonic degree m
+    self.qv[0:nq-1]                               : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                           : radii of the shell slices output
+    self.inds[0:nr-1]                             : radial indices of the shell slices output
+    self.vals[0:lmax,0:mmax,0:nr-1,0:nq-1,0:niter-1] 
+                                                  : The complex spectra of the shells output 
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.version                                  : The version code for this particular output (internal use)
+    self.lut                                      : Lookup table for the different diagnostics output
     """
-
-    def __init__(self,filename='none',path='Shell_Spectra/',esize=8):
-        """filename  : The reference state file to read.
+    def __init__(self,filename='none',path='Shell_Spectra/'):
+        """
+           filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
-           esize     : The size of each data element in bytes (default 8-byte doubles)"""
+        """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
@@ -246,32 +307,37 @@ class ShellSpectra:
         bs = check_endian(fd,314,'int32')
         version = swapread(fd,dtype='int32',count=1,swap=bs)
         nrec = swapread(fd,dtype='int32',count=1,swap=bs)
-        print bs, version, nrec
-        ntheta = swapread(fd,dtype='int32',count=1,swap=bs)
-        ntheta = ntheta+1   #quick coding - ntheta is really lmax
-        nphi = ntheta
+        nell = swapread(fd,dtype='int32',count=1,swap=bs)
+        nm = nell
+        lmax = nell-1   
+        mmax = nm-1
         nr = swapread(fd,dtype='int32',count=1,swap=bs)
         nq = swapread(fd,dtype='int32',count=1,swap=bs)
 
         self.niter = nrec
         self.nq = nq
         self.nr = nr
-        self.ntheta = ntheta
-        self.nphi = nphi
+        self.nell = nell
+        self.nm   = nm
+        self.lmax = lmax
+        self.mmax = mmax
 
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
         self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
 
-        self.vals  = np.zeros((nphi,ntheta,nr,nq,2,nrec),dtype='float64')
+        self.vals  = np.zeros((nm,nell,nr,nq,2,nrec),dtype='float64')
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
         self.version = version
         for i in range(nrec):
-            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta*nphi,swap=bs),(nphi,ntheta,nr,nq), order = 'F')
-            self.vals[:,:,:,:,0,i] = tmp
-            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta*nphi,swap=bs),(nphi,ntheta,nr,nq), order = 'F')
-            self.vals[:,:,:,:,1,i] = tmp
+
+            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*nell*nm,swap=bs),(nm,nell,nr,nq), order = 'F')
+            self.vals[:,:,:,:,i].real = tmp
+
+            tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr*nell*nm,swap=bs),(nm,nell,nr,nq), order = 'F')
+            self.vals[:,:,:,:,i].imag = tmp2
+
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
         maxq = 250
@@ -362,7 +428,6 @@ def Compile_GlobalAverages(file_list,ofile):
     icount[0] = 0
     for i in range(nfiles):
         the_file = file_list[i]
-        print the_file
         a = GlobalAverage(the_file,path='')
         nrec = a.niter
         for j in range(nrec):
@@ -399,7 +464,6 @@ def TimeAvg_AZAverages(file_list,ofile):
     t0 = a.time[0]
     for i in range(0,nfiles):
         the_file = file_list[i]
-        print the_file
         b = AzAverage(the_file,path='')
         nrec = b.niter
         for j in range(nrec):
@@ -409,7 +473,6 @@ def TimeAvg_AZAverages(file_list,ofile):
             ifinal[0] = b.iters[j]
             icount[0] = icount[0]+1
     div = np.float(icount[0])
-    print div
     tmp = tmp/div
 
     # We open the file that we want to store the compiled time traces into and write a header

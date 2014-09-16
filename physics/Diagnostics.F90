@@ -39,7 +39,7 @@ Contains
         Integer :: i
         Real*8 :: delr
         Real*8, Allocatable :: tweights(:)
-        over_eight_pi = 1.0d0/pi
+        over_eight_pi = 8.0d0/pi
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
 
@@ -222,7 +222,7 @@ Contains
 
 
 			If (compute_quantity(thermalE_flux_radial)) Then
-                Write(6,*)'hmmm'
+                
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)*buffer(1:n_phi,:,:,pvar)   !pvar is temperature/r
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
