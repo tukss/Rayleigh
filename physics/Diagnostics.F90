@@ -17,7 +17,7 @@ Module Diagnostics
     Integer, Parameter, Private :: vol_heating = 12
 
 	Integer, Parameter, Private :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
-    Integer, Parameter, Private :: thermalE_flux_radial = 16
+    Integer, Parameter, Private :: thermalE_flux_radial = 16, radial_ke = 17
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -204,7 +204,17 @@ Contains
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
 				Call Add_Quantity(qty)
 			Endif	
-
+			If (compute_quantity(radial_ke)) Then
+				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						    qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
+						Enddo
+					Enddo
+				Enddo  
+				Call Add_Quantity(qty)
+			Endif	
 			If (compute_quantity(kinetic_energy)) Then
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
 				qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
