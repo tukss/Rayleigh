@@ -55,7 +55,7 @@ PRO READ_SPECTRA, file, res
 				if (im eq 0) THEN BEGIN
 					vals[*,*,j,k,i] = dcomplex(tmp,0)
 				endif else begin
-					vals[*,*,j,k,i] = dcomplex(0,tmp)
+					vals[*,*,j,k,i] = vals[*,*,j,k,i]+dcomplex(0,tmp)
 				endelse
 			ENDFOR
 		ENDFOR
@@ -75,8 +75,10 @@ PRO READ_SPECTRA, file, res
                 lut[qvals[i]] =	 i
         ENDFOR
 
+	pt = abs(vals)^2
+	power = total(pt,2)
 	
 	res = {vals:vals, radius:radius, qvals:qvals, shell_inds:shell_inds, time:time, $
-			iter:iter, version:version, lut:lut}
+			iter:iter, version:version, lut:lut,power:power}
 
 END

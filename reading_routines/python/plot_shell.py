@@ -1,10 +1,15 @@
+import pylab as p 
+import numpy as np
+
 from diagnostic_reading import ShellSlice
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-a = ShellSlice(filename='00280010',path='Shell_Slices/')
+a = ShellSlice(filename='01330000',path='Shell_Slices/')
 
-var_inds = [0,2,3]
+var_inds = [0,1,2]
 rad_inds = [1,2,4]
+tind = 0
+print a.qv
 #Tex can be enclosed in dollar signs within a string.  The r in front of the string is necessary for strings enclosing Tex
 units = [r'cm s$^{-1}$', r'cm s$^{-1}$', r'erg g$^{-1}$ K$^{-1}$']  
 vnames = [r'v$_r$', r'v$_\phi$', "S'"]
@@ -14,14 +19,11 @@ nplots = ncol*nrow
         
 
 
-import pylab as p 
-import numpy as np
 ind = 1
 f1 = p.figure(figsize=(5.5*3, 5*3), dpi=80)
-
 for  j in range(nrow):
     for i in range(ncol):
-        slice = a.vals[:,:,rad_inds[j],var_inds[i]].reshape(a.nphi,a.ntheta)
+        slice = a.vals[:,:,rad_inds[j],var_inds[i],tind].reshape(a.nphi,a.ntheta)
         slice = slice-np.mean(slice)
         slice = np.transpose(slice)
         
@@ -74,6 +76,6 @@ for i in range(ncol):
     ypos = ptop
     xpos = pleft+cspace*0.47+i*cspace 
     f1.text(xpos,ypos,vnames[i],fontsize=20)
-p.savefig('shell_test.png')  
+p.savefig('shell_slice.png')  
 #plt.show()
 
