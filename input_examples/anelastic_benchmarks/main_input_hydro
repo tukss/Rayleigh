@@ -7,7 +7,7 @@
  rmax = 7.0d9
 /
 &numerical_controls_namelist
- chebyshev = .true.
+ chebyshev = .true.  ! set to false to use finite differences in radius
 /
 &physical_controls_namelist
  rotation = .true.
@@ -15,17 +15,20 @@
 /
 &temporal_controls_namelist
  max_time_step = 30.0d0
- max_iterations = 5000000
- alpha_implicit = 0.51d0
+ max_iterations = 10	! Maximum number of time steps to take within a single job submission
  check_frequency = 10000
- cflmin = 0.4d0
- cflmax = 0.6d0
 /
 &output_namelist
-shellslice_levels = 64,65
-shellslice_values = 1,4,3
+shellslice_levels = 64,65	! Output two slices near mid-domain (all we need for anelastic bench)
+shellslice_values = 1,4,3       ! We might also want to output more levels, see spectra for example
 shellslice_frequency = 1000
 shellslice_nrec = 10
+
+shellslice_levels = 16,32,48,64,80,96,112       ! Output slices so that we relatively uniformly
+shellslice_values = 1,4,3                       ! sample the domain 
+shellslice_frequency = 1000
+shellslice_nrec = 10
+
 
 azavg_values = 1,3,4,13,14
 azavg_frequency = 5000
@@ -40,7 +43,7 @@ globalavg_frequency = 100
 globalavg_nrec = 100
 
 full3d_values = 4
-full3d_frequency = 9000000
+full3d_frequency = 9000000  !Set this to something smaller if you want 3-D output
 /
 
 &Boundary_Conditions_Namelist
@@ -53,22 +56,23 @@ fix_tvar_top = .true.
 fix_tvar_bottom = .true.
 /
 &Initial_Conditions_Namelist
-init_type = 6
+init_type = 6           ! anelastic benchmark init
 magnetic_init_type = -1
-mag_amp = 1.0d0
-temp_amp = 1.0d1
+mag_amp = 1.0d0         ! amplitutde (G) of random magnetic perturbations (when using type 7)
+temp_amp = 1.0d1        ! amplitude of random entropy perturbations (when using type 7)
 temp_w = 0.01d4
 restart_iter = 5000000
-conductive_profile = .true.
+conductive_profile = .true.  ! For init_type 7, this replace random perturbation in the ell=0 entropy
+                             ! with a profile that is carrying all flux via conduction
 /
 &Test_Namelist
-test_mode = .false.
+test_mode = .false.   ! Leave this off (unit testing)
 test_legendre = .false.
 test_chebyshev = .false.
 ntest_legendre = 2
 /
 &Reference_Namelist
-reference_type = 2
+reference_type = 2   ! Type two is a polytrope
 poly_n = 2.0
 poly_Nrho = 5.0d0
 poly_mass = 1.9D30
@@ -76,12 +80,12 @@ poly_rho_i = 1.1d0
 pressure_specific_heat = 1.0509d8
 /
 &NonDimensionalization_Namelist
-dimensional = .true.
+dimensional = .true.    ! Leave these alone except for angular velocity
 angular_velocity = 1.76d-4
 nd_index = 64
-entropy_bottom = 851225.7d0
+entropy_bottom = 851225.7d0  !Ignore this - meaningless
 /
 &Transport_Namelist
-nu_top    = 3.64364d12
+nu_top    = 3.64364d12   ! Value of nu and kappa at the top of the domain
 kappa_top = 3.64364d12
 /

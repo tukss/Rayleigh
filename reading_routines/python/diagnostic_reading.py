@@ -307,9 +307,9 @@ class ShellSpectra:
         bs = check_endian(fd,314,'int32')
         version = swapread(fd,dtype='int32',count=1,swap=bs)
         nrec = swapread(fd,dtype='int32',count=1,swap=bs)
-        nell = swapread(fd,dtype='int32',count=1,swap=bs)
-        nm = nell
-        lmax = nell-1   
+        lmax = swapread(fd,dtype='int32',count=1,swap=bs)
+        nell = lmax+1
+        nm = nell   
         mmax = nm-1
         nr = swapread(fd,dtype='int32',count=1,swap=bs)
         nq = swapread(fd,dtype='int32',count=1,swap=bs)
@@ -326,7 +326,7 @@ class ShellSpectra:
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
         self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
 
-        self.vals  = np.zeros((nm,nell,nr,nq,2,nrec),dtype='float64')
+        self.vals  = np.zeros((nm,nell,nr,nq,nrec),dtype='complex128')
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
         self.version = version
