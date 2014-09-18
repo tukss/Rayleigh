@@ -52,10 +52,11 @@ PRO READ_SPECTRA, file, res
 		FOR k = 0, nq -1 DO BEGIN
 			FOR j = 0, nr -1 DO BEGIN
 				READU,13,tmp
+				print,min(tmp),max(tmp)
 				if (im eq 0) THEN BEGIN
-					vals[*,*,j,k,i] = dcomplex(tmp,0)
+					vals[*,*,j,k,i] = dcomplex(tmp,tmp*0)					
 				endif else begin
-					vals[*,*,j,k,i] = dcomplex(0,tmp)
+					vals[*,*,j,k,i] =vals[*,*,j,k,i]+ dcomplex(0*tmp,tmp)
 				endelse
 			ENDFOR
 		ENDFOR
@@ -75,8 +76,10 @@ PRO READ_SPECTRA, file, res
                 lut[qvals[i]] =	 i
         ENDFOR
 
-	
+
+	tmp = abs(vals)^2
+	pow = total(tmp,2)	
 	res = {vals:vals, radius:radius, qvals:qvals, shell_inds:shell_inds, time:time, $
-			iter:iter, version:version, lut:lut}
+			iter:iter, version:version, lut:lut,pow:pow}
 
 END
