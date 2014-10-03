@@ -9,7 +9,7 @@ Module Drive_Sphere
 	Use Fields
 	Use Run_Parameters
 	Use NonDimensionalization
-    Use Legendre_Polynomials, Only : Pi
+
 Contains
 
 	Subroutine Initialize_TimeStepping(iter)
