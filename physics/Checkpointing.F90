@@ -323,24 +323,24 @@ Contains
 			    Allocate( rowstrip(1:nlm_total_old, 1:tnr*numfields*2))	
 			    rowstrip(:,:) = 0
                 
-			    Call Read_Field(rowstrip,1,wchar, iteration,nr_read)
-			    Call Read_Field(rowstrip,2,pchar, iteration,nr_read)
-			    Call Read_Field(rowstrip,3,tchar, iteration,nr_read)
-			    Call Read_Field(rowstrip,4,zchar, iteration,nr_read)
+			    Call Read_Field(rowstrip,1,wchar, iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,2,pchar, iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,3,tchar, iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,4,zchar, iteration,nr_read,nlm_total_old)
 			    offset_index = 4
 			    If (magnetism) Then
-				    Call Read_Field(rowstrip,5,cchar, iteration,nr_read)
-				    Call Read_Field(rowstrip,6,achar, iteration,nr_read)
+				    Call Read_Field(rowstrip,5,cchar, iteration,nr_read,nlm_total_old)
+				    Call Read_Field(rowstrip,6,achar, iteration,nr_read,nlm_total_old)
 				    offset_index = 6
 			    Endif
 
-			    Call Read_Field(rowstrip,offset_index+1,'WAB', iteration,nr_read)
-			    Call Read_Field(rowstrip,offset_index+2,'PAB', iteration,nr_read)
-			    Call Read_Field(rowstrip,offset_index+3,'TAB', iteration,nr_read)
-			    Call Read_Field(rowstrip,offset_index+4,'ZAB', iteration,nr_read)			
+			    Call Read_Field(rowstrip,offset_index+1,'WAB', iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,offset_index+2,'PAB', iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,offset_index+3,'TAB', iteration,nr_read,nlm_total_old)
+			    Call Read_Field(rowstrip,offset_index+4,'ZAB', iteration,nr_read,nlm_total_old)			
 			    If (magnetism) Then
-				    Call Read_Field(rowstrip,offset_index+5,'CAB', iteration,nr_read)
-				    Call Read_Field(rowstrip,offset_index+6,'AAB', iteration,nr_read)
+				    Call Read_Field(rowstrip,offset_index+5,'CAB', iteration,nr_read,nlm_total_old)
+				    Call Read_Field(rowstrip,offset_index+6,'AAB', iteration,nr_read,nlm_total_old)
 			    Endif
 
 			    ! Now the head of each row owns all modes of each field at the
@@ -536,9 +536,9 @@ Contains
 	End Subroutine Write_Field
 
 
-    Subroutine Read_Field(arr,ind,tag,iter,nread)
+    Subroutine Read_Field(arr,ind,tag,iter,nread,nlm)
         Implicit None
-        Integer, Intent(In) :: ind, iter,nread
+        Integer, Intent(In) :: ind, iter,nread, nlm
 
         Real*8, Intent(InOut) :: arr(1:,1:)
         Character*8 :: iterstring
@@ -559,7 +559,7 @@ Contains
         MPI_MODE_RDONLY, & 
         MPI_INFO_NULL, funit, ierr) 
 
-        bsize_in = nread*nlm_total
+        bsize_in = nread*nlm
         If (ierr .eq. 0) Then
        ! If (nread .gt. 0) Then     !!! SET_VIEW OR _READ ARE BLOCKING APPRENTLY?...
             disp1 = my_in_disp*8
