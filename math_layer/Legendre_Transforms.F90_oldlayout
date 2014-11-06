@@ -17,7 +17,6 @@ Module Legendre_Transforms
 	Implicit None
 	Interface Legendre_Transform
 		Module Procedure PtS_2d_dgpv2, StP_2d_dgp
-        Module Procedure PtS_4d_dgpv2
 	End Interface
 Contains
 
@@ -701,125 +700,6 @@ Subroutine PtS_2d_dr3(data_in, data_out, nrhs)
 	Enddo		
 	
 End Subroutine PtS_2d_dr3
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!////////////////////
-!//////   4-D routines
-Subroutine PtS_4d_dgpv2(data_in, data_out)
-	! Physical-to_Spectral ..2D...DGEMM.... Parity
-	! Data_in is a simple 2-d array (theta is first index)
-	! version 2 --- data_in is a 3D array (ntheta,nrhs,n_m)
-	Implicit None
-	! data in is dimensioned (theta,nrhs)
-	!Type(hybrid_m), Intent(InOut) :: data_in(:)
-	!Type(spectral_m), Intent(InOut) :: data_out(:)
-	Type(rmcontainer4D), Intent(InOut) :: data_out(1:)
-	Real*8, Intent(In) :: data_in(:,:,:) 
-	Integer  :: nrhs
-	Real*8 :: alpha, beta
-	Real*8, Allocatable :: temp(:,:),fodd(:,:,:), feven(:,:,:)
-	Integer :: m,nl,nt1,i,j,l, nt2,ddims(3),k 
-    Integer :: oddims(4), nfield
-    Integer :: rmn, rmx, nr, f, imi, istart, iend
-
-    oddims = shape(data_out(1)%data)
-    nfield = oddims(4)
-    rmn = LBOUND(data_out(1)%data,2)
-    rmx = UBOUND(data_out(1)%data,2)
-    nr = rmx-rmn+1
-
-	ddims = shape(data_in)
-	n_m = ddims(3)
-	nrhs = ddims(2)
-	alpha = 1.0d0
-	beta = 0.0d0
-	if (.not. parity) then
-		Do m =1, n_m
-			nl = l_max-m_values(m)+1
-			
-			CALL DGEMM('T','N',nl,nrhs,n_theta, alpha, ip_lm(m)%data, &
-				n_theta,data_in(:,:,m) , n_theta, beta,data_out(m)%data,nl)
-		Enddo
-	else
-	!To exploit parity, we first need
-	!to build the even and odd functions
-	Allocate(feven(1:n_theta/2,1:nrhs,1:n_m))
-	Allocate(fodd(1:n_theta/2,1:nrhs,1:n_m))
-	feven(1:n_theta/2,:,:) = data_in(1:n_theta/2,:,:)
-	fodd(1:n_theta/2,:,:) = data_in(1:n_theta/2,:,:)
-	nt1 = n_theta+1
-	nt2 = n_theta/2
-	Do k = 1, n_m
-	Do i = 1, nrhs
-		Do j = 1, n_theta/2
-			feven(j,i,k) = feven(j,i,k)+data_in(nt1-j,i,k)
-			 fodd(j,i,k) =  fodd(j,i,k)-data_in(nt1-j,i,k)
-		Enddo
-	enddo
-	Enddo
-
-
-
-	Do m = 1, n_m
-
-			If (n_l_even(m) .gt. 0) then
-				Allocate(temp(1:n_l_even(m),1:nrhs))
-				CALL DGEMM('T','N',n_l_even(m),nrhs,nt2, alpha, ip_lm_even(m)%data, nt2,feven(:,:,m) , nt2, beta,temp,n_l_even(m))
-				!Do i =1, nrhs
-				!Do j = 1, n_l_even(m)
-				!	l = lvals(m)%even(j)
-				!	data_out(m)%data(l,i) = temp(j,i)
-				!Enddo
-				!Enddo
-
-				istart = 1
-				iend = nr
-				Do f = 1, nfield
-				Do imi =1, 2
-				Do j = 1, n_l_even(m)
-					l = lvals(m)%even(j)
-					data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
-				Enddo
-				istart = istart+nr
-				iend = iend+nr
-				Enddo
-				Enddo
-
-
-				DeAllocate(temp)
-			Endif
-
-			If (n_l_odd(m) .gt. 0) then
-				Allocate(temp(1:n_l_odd(m),1:nrhs))
-				CALL DGEMM('T','N',n_l_odd(m),nrhs,nt2, alpha, ip_lm_odd(m)%data, nt2,fodd(:,:,m) , nt2, beta,temp,n_l_odd(m))
-				!Do i = 1, nrhs
-				!Do j = 1, n_l_odd(m)
-				!	l = lvals(m)%odd(j)
-				!	data_out(m)%data(l,i) = temp(j,i)
-				!Enddo
-				!Enddo
-				istart = 1
-				iend = nr
-				Do f = 1, nfield
-				Do imi =1, 2
-				Do j = 1, n_l_odd(m)
-					l = lvals(m)%odd(j)
-					data_out(m)%data(l,1:nr,imi,f) = temp(j,istart:iend)
-				Enddo
-				istart = istart+nr
-				iend = iend+nr
-				Enddo
-				Enddo
-				DeAllocate(temp)
-			Endif
-
-			
-	Enddo
-
-	DeAllocate(feven)
-	DeAllocate(fodd)
-	endif
-End Subroutine PtS_4d_dgpv2		
 
 
 

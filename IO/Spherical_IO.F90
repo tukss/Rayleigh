@@ -421,7 +421,7 @@ Contains
                                 rind = counter-(field_ind-1)*shell_spectra%my_nlevels
 
                                 sendbuffer(m:lmax,mp,rind,field_ind,p) = &
-                                    & spectra_buffer%s2b(mp)%data(m:lmax,r)
+                                    & spectra_buffer%s2b(mp)%data(m:lmax,r,p,f)
 
                                 counter = counter+1
                             Endif

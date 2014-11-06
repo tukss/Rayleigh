@@ -52,7 +52,7 @@ Module Parallel_Framework
 		! The buffer object for buffer moving between spaces
 		! The buffer can advance configurations
 
-		Type(rmcontainer), Allocatable :: s2b(:),s2a(:)
+		Type(rmcontainer4D), Allocatable :: s2b(:),s2a(:)
 
 		Real*8, Allocatable :: p2b(:,:,:),p2a(:,:,:)		! for dgemm
 		Real*8, Allocatable :: p3a(:,:,:,:)  ! m/r/delta_theta/field
@@ -595,16 +595,11 @@ Contains
 					Allocate(self%s2a(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-					!/////////////////////////////////
 
-
-					mx3 = self%nf2a*2*pfi%my_1p%delta
-
-					!////////////////////////////////
 
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
-						Allocate(self%s2a(i)%data(mn2:mx2,1:mx3))
+                        Allocate(self%s2a(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))
 					Enddo
 				Endif
 			Case('s2b')
@@ -622,22 +617,18 @@ Contains
 					Allocate(self%s2b(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-					!/////////////////////////////////
-
-
-					mx3 = self%nf2b*2*pfi%my_1p%delta
-
-					!////////////////////////////////
-
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
-						Allocate(self%s2b(i)%data(mn2:mx2,1:mx3))
+						Allocate(self%s2b(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))
 					Enddo
 
 				Endif
 		End Select
 
 	End Subroutine Allocate_Spherical_Buffer
+
+
+
 
 	Subroutine Advance_Configuration(self)
 		Class(SphericalBuffer) :: self		
@@ -938,9 +929,8 @@ Contains
       ! share a common set of ell-m values).  
       Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i
+      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi
 		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
-
 
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
       Integer :: tnr, send_offset
@@ -972,34 +962,67 @@ Contains
 		Allocate(send_buff(1:self%send_size21))
 
 
-      pcurrent = 0
-      inext = num_lm(0)
-		send_offset = 0
-      Do i = 1, lm_count
-         mp = mp_lm_values(i)
-         l = l_lm_values(i)
-			offset = 0 
+    !//  pcurrent = 0
+    !//  inext = num_lm(0)
+	!//	send_offset = 0
+    !//  Do i = 1, lm_count
+    !//     mp = mp_lm_values(i)
+    !//     l = l_lm_values(i)
+	!//		offset = 0 
 
-			Do n = 1, nfields
+	!//		Do n = 1, nfields
 
-         	Do r = rmin,rmax
-					send_buff(send_offset+r) = self%s2b(mp)%data(l,offset+r)
-         	End Do
-				send_offset = send_offset+tnr
-				offset = offset+tnr
-			Enddo
-			If (i .eq. inext) Then
-	        If (self%do_piggy) Then
-            ! load the piggyback value into the next buffer slot.
+    !//     	Do r = rmin,rmax
+	!//				send_buff(send_offset+r) = self%s2b(mp)%data(l,offset+r)
+    !//     	End Do
+	!//			send_offset = send_offset+tnr
+	!//			offset = offset+tnr
+	!//		Enddo
+	!//		If (i .eq. inext) Then
+	!//        If (self%do_piggy) Then
+    !//        ! load the piggyback value into the next buffer slot.
+    !//            send_buff(send_offset+1) = self%mrv
+    !//            send_offset = send_offset+1            
+	!//        	Endif
+	!//			pcurrent = pcurrent+1
+    !//        inext = self%istop(pcurrent)
+	!//			if (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
+	!//		Endif
+    !//  Enddo
+
+    !///////////////////////////////////////
+    ! New way (for new layout)
+        r_min = pfi%my_1p%min
+        r_max = pfi%my_1p%max
+        pcurrent = 0
+        inext = num_lm(0)
+        send_offset = 0
+        Do i = 1, lm_count
+            mp = mp_lm_values(i)
+            l = l_lm_values(i)
+            offset = 0 
+
+            Do n = 1, nfields
+              Do imi = 1, 2
+                Do r = rmin,rmax
+                  send_buff(send_offset+r) = self%s2b(mp)%data(l,r,imi,n)
+                End Do
+                send_offset = send_offset+delta_r
+              Enddo
+            Enddo
+            If (i .eq. inext) Then
+              If (self%do_piggy) Then
+                ! load the piggyback value into the next buffer slot.
                 send_buff(send_offset+1) = self%mrv
                 send_offset = send_offset+1            
-	        	Endif
-				pcurrent = pcurrent+1
-            inext = self%istop(pcurrent)
-				if (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
-			Endif
-      Enddo
+              Endif
+              pcurrent = pcurrent+1
+              inext = self%istop(pcurrent)
+              If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
+            Endif
+        Enddo
 
+    !///////////////////////////////////////
 
 
 		Call self%deconstruct('s2b')
@@ -1019,35 +1042,33 @@ Contains
 		! We may want to modify this later on to mesh with linear equation structure
       
 		
-      Do p = 0, np - 1
-			indx = self%rdisp21(p)+1
-         !r_min = 1 + p*n1/np
-			r_min = pfi%all_1p(p)%min
-			r_max = pfi%all_1p(p)%max
-         !r_max = (p+1)*n1/np
-         dr = r_max - r_min
-         ! Each processor in the radial group will have given me the same number of 
-         ! l-m combos in the same (correct) order
-         cnt = 1
-         Do lp = 1, my_num_lm
-				Do n = 1, nfields
-					self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-					self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-				Enddo
-				cnt = cnt+1
-			Enddo
-        if (self%do_piggy) then
-            self%mrv = max(self%mrv,recv_buff(indx))
-            indx = indx+1
-        endif
-      End Do
+        Do p = 0, np - 1
+            indx = self%rdisp21(p)+1
+
+            r_min = pfi%all_1p(p)%min
+            r_max = pfi%all_1p(p)%max
+
+            dr = r_max - r_min
+            ! Each processor in the radial group will have given me the same number of 
+            ! l-m combos in the same (correct) order
+            cnt = 1
+            Do lp = 1, my_num_lm
+                Do n = 1, nfields
+                    self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                    self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                Enddo
+                cnt = cnt+1
+            Enddo
+            if (self%do_piggy) then
+                self%mrv = max(self%mrv,recv_buff(indx))
+                indx = indx+1
+            endif
+        End Do
 
 		self%config='p1b'
       Deallocate(recv_buff)
 		
     End Subroutine Transpose_2b1b
-
-
 
     Subroutine Transpose_1a2a(self)
       ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
@@ -1056,7 +1077,7 @@ Contains
       Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
 		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p
 		Integer :: recv_offset, tnr
-
+        Integer :: imi
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
       Integer :: inext, pcurrent
 
@@ -1126,26 +1147,51 @@ Contains
 		pcurrent = 0
 		inext = num_lm(0)
 		recv_offset = 0
-      Do i = 1, lm_count
-         mp = mp_lm_values(i)
-         l = l_lm_values(i)
-			
-			offset = 0
-			Do n = 1, nfields
-         Do r = rmin,rmax 
-            !self%s2a(mp)%data(l,r,n) = Cmplx(recv_buff(offset+indx),recv_buff(offset+indx+delta_r)) !  I am keeping this here as a reminder  ,Precision)
-				!indx = indx+1
-				self%s2a(mp)%data(l,offset+r) = recv_buff(recv_offset+r)
-         End Do
-			offset = offset+tnr
-			recv_offset = recv_offset+tnr
-			Enddo
-			If (i .eq. inext) Then
-				pcurrent = pcurrent+1
-            inext = self%istop(pcurrent)
-				if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
-			Endif
-      Enddo
+        !Old way
+        !//Do i = 1, lm_count
+            !//mp = mp_lm_values(i)
+            !//l = l_lm_values(i)
+
+            !//offset = 0
+            !//Do n = 1, nfields
+            !//Do r = rmin,rmax 
+
+            !//self%s2a(mp)%data(l,offset+r) = recv_buff(recv_offset+r)
+            !//End Do
+            !//offset = offset+tnr
+            !//recv_offset = recv_offset+tnr
+            !//Enddo
+            !//If (i .eq. inext) Then
+            !//			pcurrent = pcurrent+1
+            !//      inext = self%istop(pcurrent)
+            !//			if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
+            !//		Endif
+        !//Enddo
+        !///////////////////////////////
+      ! New way for new data_layout
+        r_min = pfi%my_1p%min
+        r_max = pfi%my_1p%max
+        Do i = 1, lm_count
+            mp = mp_lm_values(i)
+            l = l_lm_values(i)
+
+
+            Do n = 1, nfields
+              Do imi = 1, 2
+                Do r = rmin,rmax 
+	              self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset+r)
+                EndDo
+                recv_offset = recv_offset+delta_r
+              Enddo
+            Enddo
+            If (i .eq. inext) Then
+	            pcurrent = pcurrent+1
+                inext = self%istop(pcurrent)
+	            if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
+            Endif
+        Enddo
+
+
 		!////
 		!Write(6,*)'maxval recv : ', maxval(abs(recv_buff))
 		self%config='s2a'
