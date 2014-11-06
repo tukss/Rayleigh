@@ -25,6 +25,7 @@ Module Controls
 	Logical :: Rotation = .false.           ! Rotate or not
 	Logical :: lorentz_forces = .true.     ! Turn Lorentz forces on or off
     Logical :: viscous_heating = .true.     ! Turns viscous heating on/off
+    Logical :: ohmic_heating = .true.
 
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
                 & viscous_heating

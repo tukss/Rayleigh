@@ -792,12 +792,14 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 			If (n_l_even(m) .gt. 0) then
 				Allocate(temp(1:n_l_even(m),1:nrhs))
 				CALL DGEMM('T','N',n_l_even(m),nrhs,nt2, alpha, ip_lm_even(m)%data, nt2,feven(:,:,m) , nt2, beta,temp,n_l_even(m))
-				Do i =1, nrhs
-				Do j = 1, n_l_even(m)
-					l = lvals(m)%even(j)
-					data_out(m)%data(l,i) = temp(j,i)
-				Enddo
-				Enddo
+
+                ! OLD DATA FORMAT FOR REFERENCE
+				!Do i =1, nrhs
+				!Do j = 1, n_l_even(m)
+				!	l = lvals(m)%even(j)
+				!	data_out(m)%data(l,i) = temp(j,i)
+				!Enddo
+				!Enddo
 
 				istart = 1
 				iend = nr
@@ -805,7 +807,7 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 				Do im =1, 2
 				Do j = 1, n_l_even(m)
 					l = lvals(m)%even(j)
-					data_out(m)%data(l,im,1:nr,f) = temp(j,istart:iend)
+					data_out(m)%data(l,1:nr,im,f) = temp(j,istart:iend)
 				Enddo
 				istart = istart+nr
 				iend = iend+nr
@@ -817,12 +819,26 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 			If (n_l_odd(m) .gt. 0) then
 				Allocate(temp(1:n_l_odd(m),1:nrhs))
 				CALL DGEMM('T','N',n_l_odd(m),nrhs,nt2, alpha, ip_lm_odd(m)%data, nt2,fodd(:,:,m) , nt2, beta,temp,n_l_odd(m))
-				Do i = 1, nrhs
+	            ! AGAIN, for reference
+			    !Do i = 1, nrhs
+				!Do j = 1, n_l_odd(m)
+				!	l = lvals(m)%odd(j)
+				!	data_out(m)%data(l,i) = temp(j,i)
+				!Enddo
+				!Enddo
+				istart = 1
+				iend = nr
+				Do f = 1, nfield
+				Do im =1, 2
 				Do j = 1, n_l_odd(m)
 					l = lvals(m)%odd(j)
-					data_out(m)%data(l,i) = temp(j,i)
+					data_out(m)%data(l,1:nr,im,f) = temp(j,istart:iend)
+				Enddo
+				istart = istart+nr
+				iend = iend+nr
 				Enddo
 				Enddo
+
 				DeAllocate(temp)
 			Endif
 

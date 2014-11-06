@@ -3,16 +3,17 @@ Module Hybrid_Space_Sphere
 	Use Parallel_Framework
 	Use Controls
 	Use ProblemSize
-	Use Legendre_Polynomials, Only : p_lm_array, pi
+	Use Legendre_Polynomials, Only : p_lm_array
 	Use Legendre_Transforms, Only : Legendre_Transform 
 	Use Spectral_Derivatives
 	Use Fields
 	Use Timers
 	Use ClockInfo
 	Use ReferenceState
+    Use Equation_Coefficients
 	Implicit None
 	Real*8, Allocatable :: rho_rep(:), dlnrho_rep(:)
-    Real*8 :: jfactor
+
 	Type(rmcontainer), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 Contains
 !///// TODO
@@ -33,8 +34,7 @@ Contains
 		dlnrho_rep(1:my_r%delta)              = ref%dlnrho(my_r%min:my_r%max)
 		dlnrho_rep(my_r%delta+1:2*my_r%delta) = ref%dlnrho(my_r%min:my_r%max)
 
-        !jfactor = 1.0d0 ! For Boussinesq benchmark
-        jfactor = 1.0d0/(4.0d0*pi)
+
 	End Subroutine Hybrid_Init
 
 	Subroutine rlm_spacea()
@@ -404,7 +404,7 @@ Contains
 			Do r = rmn, rmx
 				rind = r +roff 
             rind2 = r+roff2
-				wsp%s2a(mp)%data(m:l_max,r) = jfactor*l_l_plus1(m:l_max) &
+				wsp%s2a(mp)%data(m:l_max,r) = alf_const*l_l_plus1(m:l_max) &
                     *wsp%s2a(mp)%data(m:l_max,rind2)*ovrsq_repeated(rind)
 			Enddo
 		Enddo     
@@ -451,7 +451,7 @@ Contains
 			Do r = rmn, rmx
 				rind = r+ roff 
 				wsp%s2a(mp)%data(m:l_max,r) = wsp%s2a(mp)%data(m:l_max,r)+ftemp2(mp)%data(m:l_max,rind)
-                wsp%s2a(mp)%data(m:l_max,r) = jfactor*wsp%s2a(mp)%data(m:l_max,r)
+                wsp%s2a(mp)%data(m:l_max,r) = alf_const*wsp%s2a(mp)%data(m:l_max,r)
 			Enddo
         Enddo
 
@@ -466,7 +466,7 @@ Contains
 			m = m_values(mp)
 			Do r = rmn, rmx
 				rind = r+ roff 
-				wsp%s2a(mp)%data(m:l_max,r) = jfactor*(ftemp1(mp)%data(m:l_max,rind)-ftemp2(mp)%data(m:l_max,rind))
+				wsp%s2a(mp)%data(m:l_max,r) = alf_const*(ftemp1(mp)%data(m:l_max,rind)-ftemp2(mp)%data(m:l_max,rind))
 			Enddo
         Enddo
 

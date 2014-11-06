@@ -7,7 +7,6 @@ Module Drive_Sphere
 	Use Controls
 	Use Timers
 	Use Fields
-	Use Run_Parameters
 	Use NonDimensionalization
 
 Contains
@@ -51,7 +50,7 @@ Contains
 		! Care needs to be taken at init to ensure fields (W,Z,P,T) are stored
 		! in the RHS (they are copied out upon entry into the loop).
 
-		!Call Initialize_Timers()
+
 
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1
@@ -60,22 +59,8 @@ Contains
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
-		If (rotation) Then
-            If (dimensional) Then
-                coriolis_term = 2.0d0*Angular_velocity
-                !Write(6,*)'Angular velocity: ', angular_velocity
-            Else
-    			coriolis_term = 2.0d0/ek
-            Endif
-		Endif
-		If (magnetism) Then
-			ovPm = 1.0d0/Pm
-			ovPmek = 1.0d0/(Pm*ek)
-            !Write(6,*)'OvPm: ', ovPm
-            !Write(6,*)'OvPmEk', ovPmEk
-            Allocate(ohmic_heating_coeff(1:N_R))
-            ohmic_heating_coeff = 4.0d0*pi*eta/ref%density/ref%temperature
-		Endif
+
+
 
 		Call Hybrid_Init()
 		Call StopWatch(loop_time)%StartClock()

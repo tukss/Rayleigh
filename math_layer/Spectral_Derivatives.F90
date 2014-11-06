@@ -10,15 +10,18 @@ Module Spectral_Derivatives
 	!These routines compute sin(theta)dA_by_dtheta
 	Interface d_by_dtheta
 		Module Procedure d_dtheta_single,d_dtheta_buffer, d_dtheta_buff2arr
+        Module Procedure d_dtheta_single3D,d_dtheta_buffer4d, d_dtheta_4dbuff2arr
 	End Interface
 
 	!These routines compute 1/sin(theta) d(sin^2(theta) A)_by_dtheta
 	Interface d_by_sdtheta
 		Module Procedure d_sdtheta_single,d_sdtheta_buffer, d_sdtheta_buff2arr
+        Module Procedure d_sdtheta_single3D,d_sdtheta_buffer4d, d_sdtheta_4dbuff2arr
 	End Interface
 
 	Interface d_by_dphi
 		Module Procedure d_by_dphi3D, d_by_dphi_buff2arr, d_by_dphi_rlmbuff, d_by_dphi3Dbuff
+        Module Procedure d_by_dphi_4dbuff2arr, d_by_dphi_rlmbuff4d
 	End Interface
 
 Contains
@@ -240,9 +243,7 @@ subroutine d_sdtheta_buffer4d(A,fin,fout)
 	Type(rmcontainer4d), Intent(InOut) :: A(1:)
 	Integer, Intent(In) :: fin, fout
 	Integer :: i, m, l
-	Integer :: ind1, ind2
-	ind1 = (fin-1)*tnrl
-	ind2 = (fout-1)*tnrl
+
 	Do i = 1, nm_local
 		m = mlocal(i)
 		If (m .ne. lmax) Then
@@ -333,8 +334,7 @@ Subroutine d_sdtheta_4dbuff2arr(A,fin,arr)
 	Type(rmcontainer3d), Intent(InOut) :: arr(1:)
 	Integer, Intent(In) :: fin
 	Integer :: i, m, l
-	Integer :: ind1
-	ind1 = (fin-1)*tnrl
+
 	Do i = 1, nm_local
 		m = mlocal(i)
 		if (m .ne. lmax) then

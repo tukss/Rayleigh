@@ -13,18 +13,17 @@ Module Physical_Space_Sphere
 	Use Diagnostics
 	Use General_MPI, Only : global_max
 	Use Timers
-	Use Run_Parameters
+    Use Equation_Coefficients
 	Use ClockInfo
 	Use ReferenceState
 	Use TransportCoefficients
 	Use NonDimensionalization
+    Use Math_Constants
 	Implicit None
-    Real*8 :: coriolis_term = 0.0d0
-    Real*8, Allocatable :: ohmic_heating_coeff(:)
+
 Contains
 	Subroutine physical_space()
 		Implicit None
-		!write(6,*)'MAX: ', maxval(wsp%p3a(:,:,:,jphi))
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
 		Call StopWatch(dphi_time)%startclock()
@@ -88,7 +87,7 @@ Contains
 		Call Momentum_Advection_Phi()
 
 		If (magnetism) Then
-			Call Ohmic_Heating()
+			Call Compute_Ohmic_Heating()
 			Call Compute_EMF()		
 		Endif
 
@@ -174,8 +173,8 @@ Contains
 		Implicit None
 		Integer :: t,r,k
 		Real*8 :: tmp, tmp2
-		Real*8, Allocatable :: htemp(:,:,:), heating_coef(:)
-        Real*8 :: one_third
+		Real*8, Allocatable :: htemp(:,:,:)
+
 		Allocate(htemp(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
 
 		! Need to optimize these loops later, but for now, let's write this in
@@ -205,7 +204,7 @@ Contains
 					tmp = (wsp%p3a(IDX,dvrdp)*csctheta(t)- wsp%p3a(IDX,vphi))*one_over_r(r) &
 							+wsp%p3a(IDX,dvpdr) ! 2*e_r_phi
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0  ! +2 e_r_phi**2
+					htemp(IDX) = htemp(IDX)+tmp*tmp*Half  ! +2 e_r_phi**2
 					
 				Enddo
 			Enddo
@@ -221,7 +220,7 @@ Contains
 					tmp = (wsp%p3a(IDX,dvrdt)-wsp%p3a(IDX,vtheta))*one_over_r(r) &
 							+wsp%p3a(IDX,dvtdr) ! 2*e_r_theta
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0   ! + 2+e_r_theta**2
+					htemp(IDX) = htemp(IDX)+tmp*tmp*Half   ! + 2+e_r_theta**2
 					
 				Enddo
 			Enddo
@@ -238,14 +237,14 @@ Contains
 							+wsp%p3a(IDX,dvtdp)*csctheta(t) &
 							-wsp%p3a(IDX,vphi)*cottheta(t) )*one_over_r(r)		! 2*e_phi_theta
 					
-					htemp(IDX) = htemp(IDX)+tmp*tmp*0.5d0   ! + 2*e_phi_theta**2
+					htemp(IDX) = htemp(IDX)+tmp*tmp*Half   ! + 2*e_phi_theta**2
 					
 				Enddo
 			Enddo
 		Enddo			
 		!$OMP END PARALLEL DO
 
-        one_third = 1.0d0/3.0d0
+
         ! -1/3 (div dot v )**2
 		!$OMP PARALLEL DO PRIVATE(t,r,k,tmp)
 		Do t = my_theta%min, my_theta%max
@@ -259,17 +258,14 @@ Contains
 		Enddo			
 		!$OMP END PARALLEL DO
 
-		! Allocate heating_coeff
-		! Heating coeff is 2*nu/T_bar
-		Allocate(heating_coef(1:N_R))
-		heating_coef(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)
+
 
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
 
-					wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar)+heating_coef(r)*htemp(k,r,t)
+					wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar)+viscous_heating_coeff(r)*htemp(k,r,t)
 					
 				Enddo
 			Enddo
@@ -277,31 +273,32 @@ Contains
 		!$OMP END PARALLEL DO
 
 		DeAllocate(htemp)
-		DeAllocate(heating_coef)
+
 
 	End Subroutine Compute_Viscous_Heating
 
 
-	Subroutine Ohmic_Heating()
+	Subroutine Compute_Ohmic_Heating()
 		Implicit None
 		Integer :: t,r,k
+        If (Ohmic_Heating) Then
+		    !We need a prefactor here for nondimensionalization
 
-		!We need a prefactor here for nondimensionalization
+		    !$OMP PARALLEL DO PRIVATE(t,r,k)
+		    Do t = my_theta%min, my_theta%max
+			    Do r = my_r%min, my_r%max
+				    Do k =1, n_phi
+				    wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar) &
+									     + (wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
+									     + wsp%p3a(k,r,t,jtheta)*wsp%p3a(k,r,t,jtheta) &
+									     + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi))*ohmic_heating_coeff(r)
+				    Enddo
+			    Enddo
+		    Enddo				
+		    !$OMP END PARALLEL DO
 
-		!$OMP PARALLEL DO PRIVATE(t,r,k)
-		Do t = my_theta%min, my_theta%max
-			Do r = my_r%min, my_r%max
-				Do k =1, n_phi
-				wsp%p3b(k,r,t,tvar) = wsp%p3b(k,r,t,tvar) &
-									 + (wsp%p3a(k,r,t,jr)*wsp%p3a(k,r,t,jr) &
-									 + wsp%p3a(k,r,t,jtheta)*wsp%p3a(k,r,t,jtheta) &
-									 + wsp%p3a(k,r,t,jphi)*wsp%p3a(k,r,t,jphi))*ohmic_heating_coeff(r)
-				Enddo
-			Enddo
-		Enddo				
-		!$OMP END PARALLEL DO
-
-	End Subroutine Ohmic_Heating
+        Endif
+	End Subroutine Compute_Ohmic_Heating
 
 	Subroutine Momentum_Advection_Radial()
 		Implicit None
@@ -343,7 +340,7 @@ Contains
 			! Add r_squared [JxB]_r
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ovPmEk* &
+				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*Lorentz_Coefficient* &
 					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
 			END_DO
 			!$OMP END PARALLEL DO
@@ -451,7 +448,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
-					- ovPmEk*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
+					- Lorentz_Coefficient*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -509,7 +506,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar)= RHSP(IDX,zvar) - &
-					ovPmEk*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
+					Lorentz_Coefficient*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -581,9 +578,9 @@ Contains
 			! Check on alfven speed as well
 			Do r = my_r%min, my_r%max
 				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
-								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r)*4.0d0*pi) ! horizontal
+								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r)*alf_const) ! horizontal
 				ovt2  = Max(ovt2, ovht2)
-				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r)*4.0d0*pi)	! radial
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r)*alf_const)	! radial
 				ovt2  = Max(ovt2,ovrt2)
 			Enddo
 		Endif

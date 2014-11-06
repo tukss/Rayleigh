@@ -8,7 +8,7 @@ Program Main
 	Use Diagnostics
 	Use TestSuite
 	Use Checkpointing
-
+    Use Equation_Coefficients
 	Use Linear_Terms_Sphere
 	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Use Timers
@@ -31,12 +31,14 @@ Contains
 	Subroutine Main_Initialization()
 		Implicit None
 		Character*120 :: ndrf='reference_nd'
+        Call Set_Math_Constants()
 		Call Init_ProblemSize()
 		Call Initialize_Reference()
 		
 		Call Initialize_Transport_Coefficients()
 		Call NonDimensionalize()
         Call Compute_Diffusion_Coefs()
+        Call Init_Equation_Coefficients()
 		Call Write_Reference(ndrf)
 		
 		Call Initialize_Diagnostics()
