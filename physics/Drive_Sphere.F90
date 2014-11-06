@@ -8,7 +8,7 @@ Module Drive_Sphere
 	Use Timers
 	Use Fields
 	Use NonDimensionalization
-
+    !This is another comment for git - testing merge
 Contains
 
 	Subroutine Initialize_TimeStepping(iter)
