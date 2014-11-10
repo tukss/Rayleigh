@@ -335,6 +335,7 @@ Contains
 			    Call Read_Field(rowstrip,1,wchar, iteration,nr_read,nlm_total_old)
 			    Call Read_Field(rowstrip,2,pchar, iteration,nr_read,nlm_total_old)
 			    Call Read_Field(rowstrip,3,tchar, iteration,nr_read,nlm_total_old)
+                Write(6,*)"TMAX READ: ", maxval(rowstrip(:,tnr*2+1:tnr*3))
 			    Call Read_Field(rowstrip,4,zchar, iteration,nr_read,nlm_total_old)
 			    offset_index = 4
 			    If (magnetism) Then
@@ -427,7 +428,7 @@ Contains
 				    m = m_values(mp)
 				    nl = l_max-m+1
                         ind = 1
-                    Do f = 1, numfields
+                    Do f = 1, numfields*2
                     Do imi = 1, 2
                     Do r = my_r%min, my_r%max
 				        chktmp%s2b(mp)%data(m:l_max,r,imi,f) = myarr(offset:offset+nl-1,ind)

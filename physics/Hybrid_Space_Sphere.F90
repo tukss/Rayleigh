@@ -46,7 +46,7 @@ Contains
 
 	Subroutine rlm_spacea()
 		Implicit None
-		Integer :: mp
+		Integer :: mp,r,imi,m,l, ind_top
 		Call StopWatch(rlma_time)%startclock()
 
 				! Zero out l_max mode
@@ -59,9 +59,25 @@ Contains
 		Call Allocate_rlm_Field(ftemp1)
 		Call Allocate_rlm_Field(ftemp2)
 
-		Call Velocity_Components()	
-		Call Velocity_Derivatives()
-		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
+        !//////DEBUG ---- UNCOMMENT THESE THREE LINES!
+		!Call Velocity_Components()	
+		!Call Velocity_Derivatives()
+		!Call d_by_dtheta(wsp%s2a,tvar,dtdt)
+        
+        !delete below when done
+        ind_top = wsp%nf2a ! UBOUND(wsp%s2a(1)%data,4)
+        DO_IDX2
+            !Do l = m, l_max
+            !SBUFFA(IDX2,vr) = l_l_plus1(m:l_max)* &
+            !    & SBUFFA(IDX2,vr)*Over_RhoRSQ(r)
+            !SBUFFA(IDX2,vr) = SBUFFA(IDX2,tvar)
+            SBUFFA(IDX2,2:ind_top) = 0.0d0
+            !SBUFFA(l,r,imi,vr) = l_l_plus1(l)* &
+            !    & SBUFFA(l,r,imi,vr)/radius(r)
+            !Enddo
+        END_DO
+
+        !/////////// END_DEBUG
 
 		If (magnetism) Call compute_BandJ()
 

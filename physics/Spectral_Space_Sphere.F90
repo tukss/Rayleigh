@@ -276,8 +276,12 @@ Contains
 		Call Add_Derivative(weq,tvar,0, wsp%p1b,wsp%p1a,tvar)	! gravity
 
 		! Convert temperature to temperature/r (will take derivatives of this for advection)
+        Write(6,*)"Don't forget to remove this bit!!!!!!"
 		Do m = 1, my_num_lm
 			Do i = 1, 2
+                !DEBUGDEBUG
+                wsp%p1a(:,i,m,wvar) = wsp%p1a(:,i,m,tvar)
+                !DEBUGDEBUG
 				wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)/radius(:)
 			Enddo
 		Enddo

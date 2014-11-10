@@ -776,12 +776,12 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 				iend = nr
 				Do f = 1, nfield
 				Do imi =1, 2
-				Do j = 1, n_l_even(m)
-					l = lvals(m)%even(j)
-					data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
-				Enddo
-				istart = istart+nr
-				iend = iend+nr
+				    Do j = 1, n_l_even(m)
+					    l = lvals(m)%even(j)
+					    data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+				    Enddo
+				    istart = istart+nr
+				    iend = iend+nr
 				Enddo
 				Enddo
 
@@ -802,12 +802,12 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 				iend = nr
 				Do f = 1, nfield
 				Do imi =1, 2
-				Do j = 1, n_l_odd(m)
-					l = lvals(m)%odd(j)
-					data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
-				Enddo
-				istart = istart+nr
-				iend = iend+nr
+				    Do j = 1, n_l_odd(m)
+					    l = lvals(m)%odd(j)
+					    data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+				    Enddo
+				    istart = istart+nr
+				    iend = iend+nr
 				Enddo
 				Enddo
 				DeAllocate(temp)
@@ -842,6 +842,7 @@ Subroutine StP_4d_dgp(data_in, data_out)
 
     oddims = shape(data_in(1)%data)
     nfield = oddims(4)
+    
     rmn = LBOUND(data_in(1)%data,2)
     rmx = UBOUND(data_in(1)%data,2)
     nr = rmx-rmn+1
@@ -882,13 +883,13 @@ Subroutine StP_4d_dgp(data_in, data_out)
 			iend = nr
 			Do f = 1, nfield
 			Do imi =1, 2
-			Do j = 1, n_l_even(m)
-				l = lvals(m)%even(j)
-				!!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
-                temp(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
-			Enddo
-			istart = istart+nr
-			iend = iend+nr
+			    Do j = 1, n_l_even(m)
+				    l = lvals(m)%even(j)
+				    !!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+                    temp2(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
+			    Enddo
+			    istart = istart+nr
+			    iend = iend+nr
 			Enddo
 			Enddo
 
@@ -917,13 +918,13 @@ Subroutine StP_4d_dgp(data_in, data_out)
 			iend = nr
 			Do f = 1, nfield
 			Do imi =1, 2
-			Do j = 1, n_l_odd(m)
-				l = lvals(m)%odd(j)
-				!!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
-                temp2(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
-			Enddo
-			istart = istart+nr
-			iend = iend+nr
+			    Do j = 1, n_l_odd(m)
+				    l = lvals(m)%odd(j)
+				    !!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+                    temp2(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
+			    Enddo
+			    istart = istart+nr
+			    iend = iend+nr
 			Enddo
 			Enddo
 
