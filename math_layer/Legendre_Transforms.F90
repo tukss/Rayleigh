@@ -17,7 +17,7 @@ Module Legendre_Transforms
 	Implicit None
 	Interface Legendre_Transform
 		Module Procedure PtS_2d_dgpv2, StP_2d_dgp
-        Module Procedure PtS_4d_dgpv2
+        Module Procedure PtS_4d_dgpv2, StP_4d_dgp
 	End Interface
 Contains
 
@@ -804,7 +804,7 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 				Do imi =1, 2
 				Do j = 1, n_l_odd(m)
 					l = lvals(m)%odd(j)
-					data_out(m)%data(l,1:nr,imi,f) = temp(j,istart:iend)
+					data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
 				Enddo
 				istart = istart+nr
 				iend = iend+nr
@@ -822,6 +822,128 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 End Subroutine PtS_4d_dgpv2		
 
 
+Subroutine StP_4d_dgp(data_in, data_out)
+	! Physical-to_Spectral ..2D...DGEMM.... Parity
+	! Data_in is a spectral structure data_in(m)%data(l,i) ! i is radius or what have you
+	Implicit None
+	! data in is dimensioned (theta,nrhs)
+	!Type(hybrid_m), Intent(InOut) :: data_in(:)
+	!Type(spectral_m), Intent(InOut) :: data_out(:)
+	Type(rmcontainer4d), Intent(In) :: data_in(:)
+	Real*8, Intent(InOut) :: data_out(:,:,:) 
+	Real*8 :: alpha, beta
+	Real*8, Allocatable :: temp(:,:),temp2(:,:)
+	Integer :: m,nl,nt1,i,j,l, nt2, ddims(3), nrhs
+    Integer :: nfield, rmn, rmx, nr, oddims(4),imi,f,iend,istart
 
+	ddims = shape(data_out)
+	n_m = ddims(3)
+	nrhs = ddims(2)
+
+    oddims = shape(data_in(1)%data)
+    nfield = oddims(4)
+    rmn = LBOUND(data_in(1)%data,2)
+    rmx = UBOUND(data_in(1)%data,2)
+    nr = rmx-rmn+1
+
+
+	alpha = 1.0d0
+	beta = 0.0d0
+	if (.not. parity) then
+		! unsure if this works with the 4d layout, but it should
+		Do m = 1, n_m
+			nl = l_max-m_values(m)+1
+			CALL DGEMM('T','N',n_theta,nrhs,nl, alpha, p_lm(m)%data,  &
+				nl,data_in(m)%data , nl, beta,data_out,n_theta)
+		Enddo
+
+	else
+	!////////////////////////////////////
+	! In progress
+	nt1 = n_theta+1
+	nt2 = n_theta/2
+	data_out(:,:,:) = 0.0d0
+	Allocate(temp(1:nt2,1:nrhs))
+	! Solve for odd and even functions
+	Do m = 1, n_m
+
+		If (n_l_even(m) .gt. 0) then
+			! This feels unnecessarily clunky.  Might want to consider storing spectral data as even/odd modes.
+			! Just get it running for now
+			Allocate(temp2(1:n_l_even(m),1:nrhs))
+			!Do i =1, nrhs
+			!Do j = 1, n_l_even(m)
+			!	l = lvals(m)%even(j)
+			!	temp2(j,i) = data_in(m)%data(l,i)
+			!Enddo
+			!Enddo
+
+			istart = 1
+			iend = nr
+			Do f = 1, nfield
+			Do imi =1, 2
+			Do j = 1, n_l_even(m)
+				l = lvals(m)%even(j)
+				!!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+                temp(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
+			Enddo
+			istart = istart+nr
+			iend = iend+nr
+			Enddo
+			Enddo
+
+
+			CALL DGEMM('T','N',nt2,nrhs,n_l_even(m), alpha, p_lm_even(m)%data, n_l_even(m),temp2 , n_l_even(m), beta,temp,nt2)				
+			data_out(1:nt2,:,m) = temp	! store symmetric part in data_out
+			Do i = 1, nrhs
+				Do j = 1, nt2
+					data_out(nt1-j,i,m) = temp(j,i)	! reflect even modes about equator
+				Enddo
+			Enddo
+			DeAllocate(temp2)
+		Endif
+
+		If (n_l_odd(m) .gt. 0) then
+			Allocate(temp2(1:n_l_odd(m),1:nrhs))
+			!Do i =1, nrhs
+			!Do j = 1, n_l_odd(m)
+			!	l = lvals(m)%odd(j)
+			!	temp2(j,i) = data_in(m)%data(l,i)
+			!Enddo
+			!Enddo
+
+
+			istart = 1
+			iend = nr
+			Do f = 1, nfield
+			Do imi =1, 2
+			Do j = 1, n_l_odd(m)
+				l = lvals(m)%odd(j)
+				!!data_out(m)%data(l,rmn:rmx,imi,f) = temp(j,istart:iend)
+                temp2(j,istart:iend) = data_in(m)%data(l,rmn:rmx,imi,f)
+			Enddo
+			istart = istart+nr
+			iend = iend+nr
+			Enddo
+			Enddo
+
+
+			CALL DGEMM('T','N',nt2,nrhs,n_l_odd(m), alpha, p_lm_odd(m)%data, n_l_odd(m),temp2 , n_l_odd(m), beta,temp,nt2)				
+			Do i = 1, nrhs
+				Do j = 1, nt2
+					data_out(j,i,m) = data_out(j,i,m)+temp(j,i)
+					data_out(nt1-j,i,m) = data_out(nt1-j,i,m)-temp(j,i)	! antisymmetric about equator
+				Enddo
+			Enddo
+			DeAllocate(temp2)
+		Endif
+	Enddo
+
+
+	! Note - not sure if it's faster to make a variable named nt2j1 = nt2-j+1 or just let it compute on the fly
+	DeAllocate(temp)
+	Endif
+	
+End Subroutine StP_4d_dgp	
 
 End Module Legendre_Transforms

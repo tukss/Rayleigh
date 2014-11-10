@@ -262,28 +262,28 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)			
 			Do l = m, l_max
-				tempfield%s2b(mp)%data(l,:) = 0.0d0
+				tempfield%s2b(mp)%data(l,:,:,:) = 0.0d0
 				amp = rand(ind1)*lpow(l)
 				phase = rand(ind2)
 				ind1 = ind1+1
 				ind2 = ind2+1
 				Do r = my_r%min, my_r%max
-					tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
-                        amp*rfunc(r)*phase
-					tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) =  &
-                         & tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
-                         & amp*rfunc(r)*(1.0d0-phase)
+					tempfield%s2b(mp)%data(l,r,1,1) = tempfield%s2b(mp)%data(l,r,1,1) + &
+                        amp*rfunc(r)*phase  ! real part
+					tempfield%s2b(mp)%data(l,r,2,1) =  &
+                         & tempfield%s2b(mp)%data(l,r,2,1) + &
+                         & amp*rfunc(r)*(1.0d0-phase) ! imaginary part
 				Enddo
 			Enddo
             if (m .eq. 0) Then
                 ! Ell = 0 modes have no imaginary component
 				Do r = my_r%min, my_r%max
-					tempfield%s2b(mp)%data(0,r-my_r%min+1+my_r%delta) = 0.0d0
+					tempfield%s2b(mp)%data(0,r,:,1) = 0.0d0
                 Enddo
                 If (present(ell0_profile)) Then
                     ! replace the ell = 0 profile
 				    Do r = my_r%min, my_r%max
-					    tempfield%s2b(mp)%data(0,r-my_r%min+1) = ell0_profile(r)*sqrt(4.0d0*pi)
+					    tempfield%s2b(mp)%data(0,r,1,1) = ell0_profile(r)*sqrt(4.0d0*pi)
 				    Enddo
                 Endif
             Endif
@@ -473,17 +473,17 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)			
 			Do l = m, l_max
-				tempfield%s2b(mp)%data(l,:) = 0.0d0
+				tempfield%s2b(mp)%data(l,:,:,:) = 0.0d0
 
 				amp = rand(ind1)*lpow(l)
 				phase = rand(ind2)
 				ind1 = ind1+1
 				ind2 = ind2+1
 				Do r = my_r%min, my_r%max
-					tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
-                        amp*rfunc2(r)*phase
-					tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) = tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
-                        amp*rfunc2(r)*(1.0d0-phase)
+					tempfield%s2b(mp)%data(l,r,1,1) = tempfield%s2b(mp)%data(l,r,1,1) + &
+                        amp*rfunc2(r)*phase ! real part
+					tempfield%s2b(mp)%data(l,r,2,1) = tempfield%s2b(mp)%data(l,r,2,1) + &
+                        amp*rfunc2(r)*(1.0d0-phase) !imaginary part
 				Enddo
 			Enddo
 		Enddo
@@ -535,17 +535,17 @@ Contains
 		! Set the ell = 0 temperature and the real part of Y44		
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			tempfield%s2b(mp)%data(:,:,:,:) = 0.0d0			
 			Do l = m, l_max
 				if ( (l .eq. 4) .and. (m .eq. 4) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc1(r)
 					Enddo
 				endif
 
 				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc2(r)*sqrt(4.0d0*pi)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc2(r)*sqrt(4.0d0*pi)
 					Enddo
 				endif
 			Enddo
@@ -622,21 +622,21 @@ Contains
 		! Set the ell = 0 temperature and the real part of Y_19^19	and Y_1_1	
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			tempfield%s2b(mp)%data(:,:,:,:) = 0.0d0			
 			Do l = m, l_max
 				if ( (l .eq. 19) .and. (m .eq. 19) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc1(r)
 					Enddo
 				endif
 				if ( (l .eq. 1) .and. (m .eq. 1) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)*0.1d0
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc1(r)*0.1d0
 					Enddo
 				endif
 				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc2(r)*sqrt(4.0d0*pi)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc2(r)*sqrt(4.0d0*pi)
 					Enddo
 				endif
 			Enddo
@@ -685,7 +685,7 @@ Contains
 		! Set the ell = 0 temperature and the real part of Y44		
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			tempfield%s2b(mp)%data(:,:,:,:) = 0.0d0			
 			Do l = m, l_max
 				if ( (l .eq. 4) .and. (m .eq. 4) ) Then
 					Do r = my_r%min, my_r%max
@@ -695,7 +695,7 @@ Contains
 
 				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc2(r)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc2(r)
 					Enddo
 				endif
 			Enddo
@@ -839,14 +839,14 @@ Contains
 			Do l = m, l_max
 				if ( (l .eq. 4) .and. (m .eq. 4) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
+						tempfield%s2b(mp)%data(l,r,1,1) = tempfield%s2b(mp)%data(l,r,1,1) + &
                             temp_amp*rfunc1(r)
 					Enddo
 				endif
 
 				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1)+ &
+						tempfield%s2b(mp)%data(l,r,1,1) = tempfield%s2b(mp)%data(l,r,1,1)+ &
                             & rfunc2(r)*sqrt(4.0d0*pi)
 					Enddo
 				endif
@@ -957,10 +957,10 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)			
 			Do l = m, l_max
-				tempfield%s2b(mp)%data(l,:) = 0.0d0
+				tempfield%s2b(mp)%data(l,:,:,:) = 0.0d0
 				if ( (l .eq. 0) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc2(r)*sqrt(4.0d0*pi)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc2(r)*sqrt(4.0d0*pi)
 					Enddo
 				endif
 					amp = rand(ind1)*lpow(l)
@@ -968,10 +968,10 @@ Contains
 					ind1 = ind1+1
 					ind2 = ind2+1
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = tempfield%s2b(mp)%data(l,r-my_r%min+1) + &
-                            amp*rfunc1(r)*phase
-						tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) = tempfield%s2b(mp)%data(l,r-my_r%min+1+my_r%delta) + &
-                            amp*rfunc1(r)*(1.0d0-phase)
+						tempfield%s2b(mp)%data(l,r,1,1) = tempfield%s2b(mp)%data(l,r,1,1) + &
+                            amp*rfunc1(r)*phase ! real part
+						tempfield%s2b(mp)%data(l,r,2,1) = tempfield%s2b(mp)%data(l,r,2,1) + &
+                            amp*rfunc1(r)*(1.0d0-phase) ! imaginary part
 					Enddo
 			Enddo
 		Enddo
@@ -1029,17 +1029,17 @@ Contains
 		! Set the ell = 0 temperature and the real part of Y44		
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)
-			tempfield%s2b(mp)%data(:,:) = 0.0d0			
+			tempfield%s2b(mp)%data(:,:,:,:) = 0.0d0			
 			Do l = m, l_max
 				if ( (l .eq. 1) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1) = rfunc1(r)
+						tempfield%s2b(mp)%data(l,r,1,1) = rfunc1(r)
 					Enddo
 				endif
 
 				if ( (l .eq. 2) .and. (m .eq. 0) ) Then
 					Do r = my_r%min, my_r%max
-						tempfield%s2b(mp)%data(l,r-my_r%min+1+roff) = rfunc2(r)
+						tempfield%s2b(mp)%data(l,r,1,2) = rfunc2(r)
 					Enddo
 				endif
 			Enddo

@@ -31,13 +31,16 @@ Contains
 	!      theta derivatives and loads them into
 	!		 the buffer.
 	Subroutine Hybrid_Init()
+        Integer :: r1, r2
         !Allocate a few useful arrays that prevent extra mult/adds
         Allocate(over_rhor(my_r%min:my_r%max))
         Allocate(over_rhorsq(my_r%min:my_r%max))
         Allocate(drho_term(my_r%min:my_r%max))
-        over_rhor(:) = one_over_r(:)/ref%density(:)
-        over_rhorsq(:) = OneOverRSquared(:)/ref%density(:)
-        drho_term(:) = ref%dlnrho(:)+one_over_r(:)
+        r1 = my_r%min
+        r2 = my_r%max
+        over_rhor(r1:r2) = one_over_r(r1:r2)/ref%density(r1:r2)
+        over_rhorsq(r1:r2) = OneOverRSquared(r1:r2)/ref%density(r1:r2)
+        drho_term(r1:r2) = ref%dlnrho(r1:r2)+one_over_r(r1:r2)
 
 	End Subroutine Hybrid_Init
 
@@ -168,7 +171,7 @@ Contains
 
 		! Zero out l_max mode
 		Do mp = my_mp%min, my_mp%max
-			SBUFFB(l_max,:) = 0.0d0
+			SBUFFB(l_max,:,:,:) = 0.0d0
 		Enddo
 
 		Call StopWatch(rlmb_time)%increment()
@@ -199,7 +202,7 @@ Contains
 		Call d_by_dphi(wsp%s2a,zvar,	ftemp2)	  			
 
         DO_IDX2
-            ftemp1(IDX2) = ftemp1(IDX2)+ftemp2(IDX2)
+            ftemp1(mp)%data(IDX2) = ftemp1(mp)%data(IDX2)+ftemp2(mp)%data(IDX2)
         END_DO
 
         DO_IDX2	
@@ -210,7 +213,7 @@ Contains
 		Call   d_by_dphi(wsp%s2a,dwdr,	ftemp1) 
 		Call d_by_dtheta(wsp%s2a,zvar,ftemp2)
         DO_IDX2
-            ftemp1(IDX2) = ftemp1(IDX2)-ftemp2(IDX2)
+            ftemp1(mp)%data(IDX2) = ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2)
         END_DO
 
         DO_IDX2	
@@ -230,7 +233,7 @@ Contains
 
 
         DO_IDX2
-            ftemp1(IDX2) = ftemp1(IDX2)+ftemp2(IDX2)
+            ftemp1(mp)%data(IDX2) = ftemp1(mp)%data(IDX2)+ftemp2(mp)%data(IDX2)
         END_DO
 
         DO_IDX2			
@@ -252,7 +255,7 @@ Contains
 		Call d_by_dtheta(wsp%s2a,dzdr,	ftemp2)	   ! Will overwrite this with dTdtheta shortly			
 
         DO_IDX2
-            ftemp1(IDX2) = ftemp1(IDX2)-ftemp2(IDX2)
+            ftemp1(mp)%data(IDX2) = ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2)
         END_DO
 
         DO_IDX2		
@@ -269,17 +272,20 @@ Contains
 		!dvrdr	overwrites dwdr	
 
         DO_IDX2
-            SBUFFA(IDX2,dvrdr) = l_l_plus1(m:l_max)*SBUFFA(IDX2,dvrdr)*Over_RhoRSQ(r)
+            SBUFFA(IDX2,dvrdr) = l_l_plus1(m:l_max)* & 
+                & SBUFFA(IDX2,dvrdr)*Over_RhoRSQ(r)
         END_DO
 
 
         DO_IDX2
-            SBUFFA(IDX2,dvrdr) = SBUFFA(IDX2,dvrdr)-SBUFFA(IDX2,vr)*Two_Over_R(r)
+            SBUFFA(IDX2,dvrdr) = SBUFFA(IDX2,dvrdr)- &
+                & SBUFFA(IDX2,vr)*Two_Over_R(r)
         END_DO
 
 		!.... Small correction for density variation  :  - u_r*dlnrhodr
         DO_IDX2	
-            SBUFFA(IDX2,dvrdr) = SBUFFA(IDX2,dvrdr)-SBUFFA(IDX2,vr)*ref%dlnrho(r)
+            SBUFFA(IDX2,dvrdr) = SBUFFA(IDX2,dvrdr)- &
+                & SBUFFA(IDX2,vr)*ref%dlnrho(r)
         END_DO	
 
 
@@ -321,7 +327,7 @@ Contains
         !////////// J _PHI //////////////////////////
         ! overwrite d_a_dr with d_d_phi(d_a_dr)
         DO_IDX2
-            SBUFFA(m:l_max,dadr) = ftemp2(mp)%data(IDX2)
+            SBUFFA(IDX2,dadr) = ftemp2(mp)%data(IDX2)
         END_DO
         !overwrite ftemp2 with d_d_theta (d2cdr2-br)
         Call d_by_dtheta(  wsp%s2a,d2cdr2,ftemp2)
@@ -337,7 +343,7 @@ Contains
 
         ! Combine with ftemp1 to build J_theta (overwrites d2cdr2)
         DO_IDX2
-            SBUFFA(m:l_max,jtheta) = alf_const*(ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
+            SBUFFA(IDX2,jtheta) = alf_const*(ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
         END_DO
 
 
@@ -365,7 +371,7 @@ Contains
 
         ! Combine with ftemp1 to build rsintheta B_phi
         DO_IDX2
-            SBUFFA(m:l_max,dcdr) = ftemp2(mp)%data(IDX2)-ftemp1(mp)%data(IDX2)
+            SBUFFA(IDX2,dcdr) = ftemp2(mp)%data(IDX2)-ftemp1(mp)%data(IDX2)
         END_DO
 
 

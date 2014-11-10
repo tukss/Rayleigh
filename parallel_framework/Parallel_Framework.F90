@@ -929,7 +929,7 @@ Contains
       ! share a common set of ell-m values).  
       Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi
+      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi, rind
 		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
 
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
@@ -996,7 +996,7 @@ Contains
         r_max = pfi%my_1p%max
         pcurrent = 0
         inext = num_lm(0)
-        send_offset = 0
+        send_offset = 1
         Do i = 1, lm_count
             mp = mp_lm_values(i)
             l = l_lm_values(i)
@@ -1004,8 +1004,9 @@ Contains
 
             Do n = 1, nfields
               Do imi = 1, 2
-                Do r = rmin,rmax
-                  send_buff(send_offset+r) = self%s2b(mp)%data(l,r,imi,n)
+                Do r = r_min,r_max
+                  rind = r-r_min
+                  send_buff(send_offset+rind) = self%s2b(mp)%data(l,r,imi,n)
                 End Do
                 send_offset = send_offset+delta_r
               Enddo
@@ -1075,7 +1076,7 @@ Contains
       Implicit None
 
       Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
-		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p
+		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p,rind
 		Integer :: recv_offset, tnr
         Integer :: imi
 		Real*8, Allocatable :: send_buff(:),recv_buff(:)
@@ -1169,6 +1170,7 @@ Contains
         !//Enddo
         !///////////////////////////////
       ! New way for new data_layout
+        recv_offset = 1
         r_min = pfi%my_1p%min
         r_max = pfi%my_1p%max
         Do i = 1, lm_count
@@ -1178,8 +1180,9 @@ Contains
 
             Do n = 1, nfields
               Do imi = 1, 2
-                Do r = rmin,rmax 
-	              self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset+r)
+                Do r = r_min,r_max
+                  rind = r-r_min 
+	              self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset+rind)
                 EndDo
                 recv_offset = recv_offset+delta_r
               Enddo
