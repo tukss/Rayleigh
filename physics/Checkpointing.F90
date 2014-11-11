@@ -336,7 +336,6 @@ Contains
 			    Call Read_Field(rowstrip,1,wchar, iteration,nr_read,nlm_total_old)
 			    Call Read_Field(rowstrip,2,pchar, iteration,nr_read,nlm_total_old)
 			    Call Read_Field(rowstrip,3,tchar, iteration,nr_read,nlm_total_old)
-                Write(6,*)"TMAX READ: ", maxval(rowstrip(:,tnr*2+1:tnr*3))
 			    Call Read_Field(rowstrip,4,zchar, iteration,nr_read,nlm_total_old)
 			    offset_index = 4
 			    If (magnetism) Then
@@ -443,16 +442,11 @@ Contains
             !Endif
 		Endif
 
-        mxvp = 0.0d0
-        Do mp = my_mp%min, my_mp%max
-            mxvt = maxval(chktmp%s2b(mp)%data(:,:,:,3))
-            mxvp = max(mxvp,mxvt)
-        Enddo
-        Write(6,*)'MAZ PRE: ', mxvp
+
 
 		Call chktmp%reform()	! move to p1b
 
-        Write(6,*)'MAX POST: ', maxval(chktmp%p1b(:,:,:,3))
+
 
 		! NOW, if n_r_old and grid_type_old are the same, we can copy chtkmp%p1b into abterms and 
 		! fields.  Otherwise, we need to interpolate onto the current grid

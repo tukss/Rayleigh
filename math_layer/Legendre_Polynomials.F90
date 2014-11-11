@@ -16,6 +16,10 @@ Module Legendre_Polynomials
 		Real*8, Allocatable :: even(:)
 		Real*8, Allocatable :: odd(:)
 	End Type even_odd_sep
+	Type, Public :: even_odd_sepi
+		Integer, Allocatable :: even(:)
+		Integer, Allocatable :: odd(:)
+	End Type even_odd_sepi
 	Type, Public :: p_lm_array 
 		Real*8, Allocatable :: data(:,:)
 	End Type p_lm_array
@@ -29,6 +33,7 @@ Module Legendre_Polynomials
 	Type(p_lm_array), Allocatable :: p_lm_odd(:), p_lm_even(:)
 	Type(p_lm_array), Allocatable :: ip_lm_odd(:), ip_lm_even(:) ! i means 'integration weights included'
 	Type(even_odd_sep), Allocatable :: lvals(:)
+    Type(even_odd_sepi), Allocatable :: lvalsi(:)
 Contains
 
 Subroutine Finalize_Legendre()
@@ -86,6 +91,14 @@ Subroutine DeAllocate_Parity_Plms()
 		Enddo
 		DeAllocate(lvals)
 	Endif
+	If (allocated(lvalsi)) Then
+		Do m = 1, n_m
+			If (allocated(lvalsi(m)%even)) DeAllocate(lvalsi(m)%even)
+			If (allocated(lvalsi(m)%odd)) DeAllocate(lvalsi(m)%odd)
+		Enddo
+		DeAllocate(lvalsi)
+	Endif
+
 End Subroutine DeAllocate_Parity_Plms
 
 Subroutine Initialize_Legendre(nt,lmax,mval,parity_in)
@@ -139,6 +152,7 @@ Subroutine Compute_Plms()
 	    Allocate(n_l_even(1:n_m))
 	    Allocate(n_l_odd(1:n_m))
 	    Allocate(lvals(1:n_m))
+        Allocate(lvalsi(1:n_m))
         ntmax = n_theta/2
     Endif
 
@@ -248,18 +262,21 @@ Subroutine Parity_Resort(m)
 			Allocate(ip_lm_even(m)%data(1:n_theta/2,1:n_l_even(m)))
 			Allocate(p_lm_even(m)%data(1:n_l_even(m),1:n_theta/2))
 			Allocate(lvals(m)%even(1:n_l_even(m)))
+			Allocate(lvalsi(m)%even(1:n_l_even(m)))
 		Endif
 		If (n_l_odd(m) .gt. 0) Then
 			Allocate(ip_lm_odd(m)%data(1:n_theta/2,1:n_l_odd(m)))
 			Allocate(p_lm_odd(m)%data(1:n_l_odd(m),1:n_theta/2))
 			Allocate(lvals(m)%odd(1:n_l_odd(m)))
+			Allocate(lvalsi(m)%odd(1:n_l_odd(m)))
 		Endif
 		indeven = 1
 		indodd = 1
 		Do l = m_values(m), l_max
 			partest = l-m_values(m)
 			If (Mod(partest,2) .eq. 1) Then
-				lvals(m)%odd(indodd) = l
+				 lvals(m)%odd(indodd) = l
+				lvalsi(m)%odd(indodd) = l
                 Do i = 1, n_theta/2
                     renorm = 2.0q0*pi*gl_weights(i)
                     tmp = p_lmq(m)%data(i,l)*renorm
@@ -269,7 +286,8 @@ Subroutine Parity_Resort(m)
 				indodd = indodd +1
                 
 			Else
-				lvals(m)%even(indeven) = l
+				 lvals(m)%even(indeven) = l
+				lvalsi(m)%even(indeven) = l
                 Do i = 1, n_theta/2
                     renorm = 2.0q0*pi*gl_weights(i)
                     tmp = p_lmq(m)%data(i,l)*renorm

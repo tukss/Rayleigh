@@ -126,7 +126,7 @@ Contains
 		Call StopWatch(cread_time)%Increment()
 
 		Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
-        write(6,*)"TMAX: ", maxval(tempfield%p1a(:,:,:,tvar))
+
 		Call Set_All_RHS(tempfield%p1a)
 		Call tempfield%deconstruct('p1a')
 

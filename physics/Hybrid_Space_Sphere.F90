@@ -65,8 +65,8 @@ Contains
 		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
         
         !delete below when done
-        ind_top = wsp%nf2a ! UBOUND(wsp%s2a(1)%data,4)
-        DO_IDX2
+        !ind_top = wsp%nf2a ! UBOUND(wsp%s2a(1)%data,4)
+        !DO_IDX2
             !Do l = m, l_max
             !SBUFFA(IDX2,vr) = l_l_plus1(m:l_max)* &
             !    & SBUFFA(IDX2,vr)*Over_RhoRSQ(r)
@@ -75,7 +75,7 @@ Contains
             !SBUFFA(l,r,imi,vr) = l_l_plus1(l)* &
             !    & SBUFFA(l,r,imi,vr)/radius(r)
             !Enddo
-        END_DO
+        !END_DO
 
         !/////////// END_DEBUG
 

@@ -924,77 +924,44 @@ Contains
 
 
     Subroutine Transpose_2b1b(self)
-      ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
-      ! Communication is now done entirely within the radial group (processors that 
-      ! share a common set of ell-m values).  
-      Implicit None
+        ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
+        ! Communication is now done entirely within the radial group (processors that 
+        ! share a common set of ell-m values).  
+        Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi, rind
-		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
+        Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi, rind
+        Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
 
-		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: tnr, send_offset
+        Real*8, Allocatable :: send_buff(:),recv_buff(:)
+        Integer :: tnr, send_offset
 
         ! piggyback information
         Integer :: inext, pcurrent
 
-		Class(SphericalBuffer) :: self
+        Class(SphericalBuffer) :: self
 
-		n1 = pfi%n1p
+        n1 = pfi%n1p
         np = pfi%ccomm%np
-      !Allocate(send(my_r%min:my_r%max, 2, n_fields, N_lm_local))
-		nfields = self%nf2b
 
-		!/////
-		! First loading, should be relatively straight forward
-		! We have nfields (nf2b)  and the data is dimensioned x%(l,r,field_num)
+        nfields = self%nf2b
 
-      ! Load the send array in the ordering of the l-m values
+        !/////
+        ! First loading, should be relatively straight forward
+        ! We have nfields (nf2b)  and the data is dimensioned x%(l,r,field_num)
 
-		delta_r = pfi%my_1p%delta
-		!rmin = pfi%my_1p%min
-		!rmax = pfi%my_1p%max
-		!modification for new configuration
-		rmin = 1
-		rmax = 2*delta_r
-		tnr = 2*delta_r
-
-		Allocate(send_buff(1:self%send_size21))
+        ! Load the send array in the ordering of the l-m values
 
 
-    !//  pcurrent = 0
-    !//  inext = num_lm(0)
-	!//	send_offset = 0
-    !//  Do i = 1, lm_count
-    !//     mp = mp_lm_values(i)
-    !//     l = l_lm_values(i)
-	!//		offset = 0 
 
-	!//		Do n = 1, nfields
 
-    !//     	Do r = rmin,rmax
-	!//				send_buff(send_offset+r) = self%s2b(mp)%data(l,offset+r)
-    !//     	End Do
-	!//			send_offset = send_offset+tnr
-	!//			offset = offset+tnr
-	!//		Enddo
-	!//		If (i .eq. inext) Then
-	!//        If (self%do_piggy) Then
-    !//        ! load the piggyback value into the next buffer slot.
-    !//            send_buff(send_offset+1) = self%mrv
-    !//            send_offset = send_offset+1            
-	!//        	Endif
-	!//			pcurrent = pcurrent+1
-    !//        inext = self%istop(pcurrent)
-	!//			if (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
-	!//		Endif
-    !//  Enddo
+        Allocate(send_buff(1:self%send_size21))
 
-    !///////////////////////////////////////
-    ! New way (for new layout)
+
+
+
         r_min = pfi%my_1p%min
         r_max = pfi%my_1p%max
-        Write(6,*)'delta check: ', r_min, r_max, nfields
+
         send_buff = 0.0d0
         pcurrent = 0
         inext = num_lm(0)
@@ -1005,47 +972,45 @@ Contains
             !offset = 0 
 
             Do n = 1, nfields
-              Do imi = 1, 2
+                Do imi = 1, 2
                 Do r = r_min,r_max
-                  !rind = r-r_min
-                  send_buff(send_offset) = self%s2b(mp)%data(l,r,imi,n)
-                  send_offset = send_offset+1
+                send_buff(send_offset) = self%s2b(mp)%data(l,r,imi,n)
+                send_offset = send_offset+1
                 EndDo
-                !send_offset = send_offset+delta_r
-              Enddo
+                Enddo
             Enddo
             If (i .eq. inext) Then
-              If (self%do_piggy) Then
-                ! load the piggyback value into the next buffer slot.
-                send_buff(send_offset) = self%mrv  !<----- I removed send_offset+1
-                send_offset = send_offset+1            
-              Endif
-              pcurrent = pcurrent+1
-              inext = self%istop(pcurrent)
-              If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1 ! <----- I think this is all I need
+                If (self%do_piggy) Then
+                    ! load the piggyback value into the next buffer slot.
+                    send_buff(send_offset) = self%mrv  
+                    send_offset = send_offset+1            
+                Endif
+                pcurrent = pcurrent+1
+                inext = self%istop(pcurrent)
+                If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1 
             Endif
         Enddo
 
-    !///////////////////////////////////////
+        !///////////////////////////////////////
 
 
 		Call self%deconstruct('s2b')
 
 
-		Allocate(recv_buff(1:self%recv_size21))
+        Allocate(recv_buff(1:self%recv_size21))
 
         recv_buff = 0.0d0
-		Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
-			self%rdisp21, pfi%ccomm, self%pad_buffer)
-		DeAllocate(send_buff)
+        Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
+	        self%rdisp21, pfi%ccomm, self%pad_buffer)
+        DeAllocate(send_buff)
 
-		Call self%construct('p1b')
-		! Now, the receive striping needs a little mapping
-		! WPS are coupled, but Z,Btor, and Bpol are not
-		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
-		! We may want to modify this later on to mesh with linear equation structure
+        Call self%construct('p1b')
+        ! Now, the receive striping needs a little mapping
+        ! WPS are coupled, but Z,Btor, and Bpol are not
+        ! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
+        ! We may want to modify this later on to mesh with linear equation structure
       
-		self%p1b = 0.0d0
+        self%p1b = 0.0d0
         Do p = 0, np - 1
             indx = self%rdisp21(p)+1
 
@@ -1058,8 +1023,8 @@ Contains
             cnt = 1
             Do lp = 1, my_num_lm
                 Do n = 1, nfields
-                    self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-                    self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
                 Enddo
                 cnt = cnt+1
             Enddo
@@ -1067,7 +1032,7 @@ Contains
                 self%mrv = max(self%mrv,recv_buff(indx))
                 indx = indx+1
             endif
-        End Do
+        EndDo
 
 		self%config='p1b'
       Deallocate(recv_buff)
@@ -1075,104 +1040,61 @@ Contains
     End Subroutine Transpose_2b1b
 
     Subroutine Transpose_1a2a(self)
-      ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
-      Implicit None
+        ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
+        Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
-		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p,rind
-		Integer :: recv_offset, tnr
+        Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
+        Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p,rind
+        Integer :: recv_offset, tnr
         Integer :: imi
-		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: inext, pcurrent
+        Real*8, Allocatable :: send_buff(:),recv_buff(:)
+        Integer :: inext, pcurrent
 
-		Class(SphericalBuffer) :: self
+        Class(SphericalBuffer) :: self
 
+        nfields = self%nf1a
 
-		! This goes at the beginning
-		
-		nfields = self%nf1a
-
-		Allocate(send_buff(1:self%send_size12))
+        Allocate(send_buff(1:self%send_size12))
 
 
-		! Now, the receive striping needs a little mapping
-		! WPS are coupled, but Z,Btor, and Bpol are not
-		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
-		! We may want to modify this later on to mesh with linear equation structure
+        ! Now, the receive striping needs a little mapping
+        ! WPS are coupled, but Z,Btor, and Bpol are not
+        ! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
+        ! We may want to modify this later on to mesh with linear equation structure
 
-		np = pfi%ccomm%np
-      Do p = 0, np - 1
-			indx = self%sdisp12(p)+1
-			r_min = pfi%all_1p(p)%min
-			r_max = pfi%all_1p(p)%max
-         dr = r_max - r_min
-         ! Each processor in the radial group will have given me the same number of 
-         ! l-m combos in the same (correct) order
-         cnt = 1
-         Do lp = 1, my_num_lm
-				Do n = 1, nfields
-					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,1,cnt,n) ; indx = indx + dr + 1
-					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,2,cnt,n) ; indx = indx + dr + 1
-				Enddo
-				cnt = cnt+1
-			Enddo
-      End Do
-		Call self%deconstruct('p1a')
+        np = pfi%ccomm%np
+        Do p = 0, np - 1
+            indx = self%sdisp12(p)+1
+            r_min = pfi%all_1p(p)%min
+            r_max = pfi%all_1p(p)%max
+            dr = r_max - r_min
+            ! Each processor in the radial group will have given me the same number of 
+            ! l-m combos in the same (correct) order
+            cnt = 1
+            Do lp = 1, my_num_lm
+                Do n = 1, nfields
+                send_buff(indx:indx+dr) = self%p1a(r_min:r_max,1,cnt,n) ; indx = indx + dr + 1
+                send_buff(indx:indx+dr) = self%p1a(r_min:r_max,2,cnt,n) ; indx = indx + dr + 1
+                Enddo
+                cnt = cnt+1
+            Enddo
+        End Do
+        Call self%deconstruct('p1a')
 
+        ! Load the send array in the ordering of the l-m values
+        indx = 1
 
-
-		!////
-
-
-		!/////
-		! First loading, should be relatively straight forward
-		! We have nfields (nf1a)  and the data is dimensioned x%(l,r,field_num)
-
-      ! Load the send array in the ordering of the l-m values
-      indx = 1
-
-		delta_r = pfi%my_1p%delta
-		rmin = pfi%my_1p%min
-		rmax = pfi%my_1p%max
-
-		Allocate(recv_buff(1:self%recv_size12))
+        Allocate(recv_buff(1:self%recv_size12))
 
 
-		Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, &
-			 self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
-		DeAllocate(send_buff)
+        Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, &
+	         self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
+        DeAllocate(send_buff)
 
-		Call self%construct('s2a')
+        Call self%construct('s2a')
 
-		rmin = 1
-		rmax = delta_r*2
-		recv_offset = 0
-		tnr = 2*delta_r
-		pcurrent = 0
-		inext = num_lm(0)
-		recv_offset = 0
-        !Old way
-        !//Do i = 1, lm_count
-            !//mp = mp_lm_values(i)
-            !//l = l_lm_values(i)
-
-            !//offset = 0
-            !//Do n = 1, nfields
-            !//Do r = rmin,rmax 
-
-            !//self%s2a(mp)%data(l,offset+r) = recv_buff(recv_offset+r)
-            !//End Do
-            !//offset = offset+tnr
-            !//recv_offset = recv_offset+tnr
-            !//Enddo
-            !//If (i .eq. inext) Then
-            !//			pcurrent = pcurrent+1
-            !//      inext = self%istop(pcurrent)
-            !//			if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
-            !//		Endif
-        !//Enddo
-        !///////////////////////////////
-      ! New way for new data_layout
+        pcurrent = 0
+        inext = num_lm(0)
         recv_offset = 1
         r_min = pfi%my_1p%min
         r_max = pfi%my_1p%max
@@ -1182,26 +1104,23 @@ Contains
 
 
             Do n = 1, nfields
-              Do imi = 1, 2
+            Do imi = 1, 2
                 Do r = r_min,r_max
-                  rind = r-r_min 
-	              self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset+rind)
+                    self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset) ! +rind)
+                    recv_offset = recv_offset+1
                 EndDo
-                recv_offset = recv_offset+delta_r
-              Enddo
+            Enddo
             Enddo
             If (i .eq. inext) Then
-	            pcurrent = pcurrent+1
+                pcurrent = pcurrent+1
                 inext = self%istop(pcurrent)
-	            if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
+                if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)+1  ! <---- Added +1
             Endif
         Enddo
 
 
-		!////
-		!Write(6,*)'maxval recv : ', maxval(abs(recv_buff))
 		self%config='s2a'
-      Deallocate(recv_buff)
+        Deallocate(recv_buff)
 		
     End Subroutine Transpose_1a2a
 
