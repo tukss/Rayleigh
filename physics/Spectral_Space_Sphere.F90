@@ -280,7 +280,7 @@ Contains
 		Do m = 1, my_num_lm
 			Do i = 1, 2
                 !DEBUGDEBUG
-                wsp%p1a(:,i,m,wvar) = wsp%p1a(:,i,m,tvar)
+                !wsp%p1a(:,i,m,wvar) = wsp%p1a(:,i,m,tvar)
                 !DEBUGDEBUG
 				wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)/radius(:)
 			Enddo

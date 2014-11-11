@@ -97,7 +97,7 @@ Module Parallel_Framework
 
         !For piggyback values on transposes (max timestep)
         Logical :: do_piggy = .false.
-		Real*8 :: mrv	! "max reduce value"
+		Real*8 :: mrv =0.0d0	! "max reduce value"
         Integer, Allocatable :: istop(:)
 
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
@@ -994,32 +994,35 @@ Contains
     ! New way (for new layout)
         r_min = pfi%my_1p%min
         r_max = pfi%my_1p%max
+        Write(6,*)'delta check: ', r_min, r_max, nfields
+        send_buff = 0.0d0
         pcurrent = 0
         inext = num_lm(0)
         send_offset = 1
         Do i = 1, lm_count
             mp = mp_lm_values(i)
             l = l_lm_values(i)
-            offset = 0 
+            !offset = 0 
 
             Do n = 1, nfields
               Do imi = 1, 2
                 Do r = r_min,r_max
-                  rind = r-r_min
-                  send_buff(send_offset+rind) = self%s2b(mp)%data(l,r,imi,n)
-                End Do
-                send_offset = send_offset+delta_r
+                  !rind = r-r_min
+                  send_buff(send_offset) = self%s2b(mp)%data(l,r,imi,n)
+                  send_offset = send_offset+1
+                EndDo
+                !send_offset = send_offset+delta_r
               Enddo
             Enddo
             If (i .eq. inext) Then
               If (self%do_piggy) Then
                 ! load the piggyback value into the next buffer slot.
-                send_buff(send_offset+1) = self%mrv
+                send_buff(send_offset) = self%mrv  !<----- I removed send_offset+1
                 send_offset = send_offset+1            
               Endif
               pcurrent = pcurrent+1
               inext = self%istop(pcurrent)
-              If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
+              If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1 ! <----- I think this is all I need
             Endif
         Enddo
 
@@ -1031,7 +1034,7 @@ Contains
 
 		Allocate(recv_buff(1:self%recv_size21))
 
-
+        recv_buff = 0.0d0
 		Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
 			self%rdisp21, pfi%ccomm, self%pad_buffer)
 		DeAllocate(send_buff)
@@ -1042,7 +1045,7 @@ Contains
 		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
 		! We may want to modify this later on to mesh with linear equation structure
       
-		
+		self%p1b = 0.0d0
         Do p = 0, np - 1
             indx = self%rdisp21(p)+1
 

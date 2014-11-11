@@ -213,6 +213,7 @@ Contains
 		Character*120 :: cfile
         Integer :: fcount(3,2)
         Integer :: lb,ub, f, imi, r, ind
+        Real*8 :: mxvt, mxvp
 		dim2 = tnr*numfields*2
 		checkpoint_iter = iteration
 		Write(iterstring,'(i8.8)') iteration
@@ -442,7 +443,16 @@ Contains
             !Endif
 		Endif
 
+        mxvp = 0.0d0
+        Do mp = my_mp%min, my_mp%max
+            mxvt = maxval(chktmp%s2b(mp)%data(:,:,:,3))
+            mxvp = max(mxvp,mxvt)
+        Enddo
+        Write(6,*)'MAZ PRE: ', mxvp
+
 		Call chktmp%reform()	! move to p1b
+
+        Write(6,*)'MAX POST: ', maxval(chktmp%p1b(:,:,:,3))
 
 		! NOW, if n_r_old and grid_type_old are the same, we can copy chtkmp%p1b into abterms and 
 		! fields.  Otherwise, we need to interpolate onto the current grid
