@@ -2,9 +2,19 @@ F90  = /usr/local/mpich2-1.0.7/bin/mpif90
 F90 = mpif90
 
 #   Flags for the LAPack Libraries
-LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3 -L/usr/lib -lblas -llapack
 
-F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
+ifeq ($(RAYLEIGH_OPT1),openmp)
+	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3_threads -lfftw3 -lm -L/usr/lib -lblas -llapack
+else
+	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3 -L/usr/lib -lblas -llapack
+endif
+
+
+ifeq ($(RAYLEIGH_OPT1),openmp)
+	F90FLAGS = -O1 -fbounds-check -Duseomp=.true. -cpp -fbacktrace -ffixed-line-length-132 -fopenmp -I/usr/include
+else
+	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
+endif
 PROG =	rayleigh
 
 .SUFFIXES: .o .F90 .f .F

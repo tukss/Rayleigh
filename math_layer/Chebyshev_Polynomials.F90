@@ -641,6 +641,7 @@ Contains
 		n2 = dims(2)
 		n3 = dims(3)
 		If (ind .ne. dind) Then
+            !$OMP PARALLEL DO PRIVATE(i,j,k)
 			Do k = 1, n3
 				Do j = 1, n2
 					buffer(n-1,j,k,dind) = 0.0d0
@@ -650,8 +651,10 @@ Contains
 					Enddo
 				Enddo
 			Enddo
+            !$OMP END PARALLEL DO
 			If (dorder .gt. 1) Then 
 				Allocate(dbuffer(0:n-1,1:dorder))
+                !$OMP PARALLEL DO PRIVATE(i,j,k,order,dbuffer)
 				Do k = 1, n3
 					Do j = 1, n2
 						dbuffer(:,1) = buffer(:,j,k,dind)
@@ -665,13 +668,13 @@ Contains
 						buffer(:,j,k,dind) = dbuffer(:,dorder)
 					Enddo
 				Enddo
-
+                !$OMP END PARALLEL DO
 				DeAllocate(dbuffer)
 			Endif
 		Else
 			! In-place
 		Endif
-		buffer(:,:,:,dind) = buffer(:,:,:,dind)
+		!buffer(:,:,:,dind) = buffer(:,:,:,dind)
 	End Subroutine Cheby_Deriv_Buffer_4D	
 
 

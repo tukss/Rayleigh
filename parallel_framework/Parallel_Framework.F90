@@ -22,6 +22,7 @@ Module Parallel_Framework
 		! Allows primarily for dealiasing right now
 		Integer :: n1p, n1s, n2p, n2s, n3p, n3s	
 		Integer :: npe, nprow, npcol, npio,npc
+        Integer :: nthreads = 1
 		Integer, Allocatable :: inds_3s(:)
 		Type(communicator) :: rcomm ! row communicator
 		Type(communicator) :: ccomm ! column communicator
@@ -33,6 +34,7 @@ Module Parallel_Framework
 		Contains
 
 		Procedure :: Init => Initialize_Parallel_Interface
+        Procedure :: openmp_init
 		Procedure :: Exit => Finalize_Framework
 		Procedure ::  Spherical_Init 
 		Procedure ::  Init_Geometry
@@ -1127,8 +1129,10 @@ Contains
 
 
 	Subroutine Initialize_Parallel_Interface(self, pars)
+        Implicit None
 		Integer, Intent(In) :: pars(1:)
 		Integer :: pcheck, error
+        Integer :: ierr
 		Class(Parallel_Interface) :: self	
 		self%geometry = pars(1)
 		self%n1p = pars(2)
@@ -1161,13 +1165,29 @@ Contains
 		Endif
 
 		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,error)
-		Call self%Init_Geometry()
-		!Write(6,*)'Hello ', self%gcomm%rank, self%rcomm%rank, self%ccomm%rank
-		!Write(6,*)'Hello: ', self%ccomm%rank, self%ccomm%rank, self%my_1p%min, self%my_1p%max, self%my_1p%delta
-		!Write(6,*)'Hello: ', self%rcomm%rank,self%ccomm%rank, self%my_2p%min, self%my_2p%max, self%my_2p%delta		
+		Call self%Init_Geometry()	
+
+        Call self%openmp_init()
 
 	End Subroutine Initialize_Parallel_Interface
 
+    
+    Subroutine OpenMp_Init(self)
+#ifdef useomp 
+        Use Omp_lib
+#endif
+		Class(Parallel_Interface) :: self
+        Integer :: my_mpi_rank,my_thread
+        my_mpi_rank = pfi%gcomm%rank
+#ifdef useomp
+        self%nthreads = omp_get_max_threads()
+        !$OMP PARALLEL PRIVATE(my_thread)
+        my_thread = omp_get_thread_num()
+        write(6,*)'rank: ', my_mpi_Rank, 'thread: ', my_thread, 'nthread: ', omp_get_num_threads()
+        !$OMP END PARALLEL
+#endif
+    End Subroutine OpenMp_Init
+    
 	Subroutine Init_Geometry(self)
 		Class(Parallel_Interface) :: self		
 		If (self%geometry == Spherical) Then

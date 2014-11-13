@@ -12,6 +12,7 @@ Program Main
 	Use Linear_Terms_Sphere
 	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Use Timers
+    Use Fourier_Transform, Only : Initialize_FFTs
 	Implicit None
 
 	Call Main_Input()
@@ -33,6 +34,7 @@ Contains
 		Character*120 :: ndrf='reference_nd'
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
+        Call Initialize_FFts()
 		Call Initialize_Reference()
 		
 		Call Initialize_Transport_Coefficients()
