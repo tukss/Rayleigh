@@ -5,7 +5,9 @@ Module Parallel_Framework
 	Use Structures
 	Implicit None
 	Private
-
+#ifdef usemkl
+	include 'mkl_service.fi'
+#endif 
 	!///////////////////////////////////////////////////////////////////////////
 	!  
 	Integer, Parameter, Public :: Cartesian = 1, Cylindrical = 2, Spherical = 3
@@ -1171,11 +1173,12 @@ Contains
 
 	End Subroutine Initialize_Parallel_Interface
 
-    
+			   
     Subroutine OpenMp_Init(self)
 #ifdef useomp 
         Use Omp_lib
 #endif
+
 		Class(Parallel_Interface) :: self
         Integer :: my_mpi_rank,my_thread
         my_mpi_rank = pfi%gcomm%rank
@@ -1185,6 +1188,10 @@ Contains
         my_thread = omp_get_thread_num()
         write(6,*)'rank: ', my_mpi_Rank, 'thread: ', my_thread, 'nthread: ', omp_get_num_threads()
         !$OMP END PARALLEL
+#endif
+#ifdef usemkl
+			my_thread = mkl_get_max_threads()
+			write(6,*)"MKL MAX: ", my_thread
 #endif
     End Subroutine OpenMp_Init
     
