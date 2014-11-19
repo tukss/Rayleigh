@@ -156,7 +156,6 @@ Contains
 
 		old_deltat = deltat
 		If (new_timestep) Then
-			!old_deltat = deltat
 			deltat = new_deltat
 			new_timestep = .false.
 			If (my_rank .eq. 0) Then
@@ -164,9 +163,10 @@ Contains
 				Write(tstring,t_ofmt)deltat
 				Write(6,*)'Timestep has changed from '//Trim(otstring)//' to '//Trim(tstring)//'.'
 			Endif
-
+		
 			Call Reset_Linear_Equations()
 		Endif
+
 		if (iteration .eq. 1) then
 				!Euler Step
 				new_ab_factor = deltat
@@ -180,8 +180,10 @@ Contains
 		
 		!Copy each variable out of the RHS into the top part of the buffer
 		! These variables are in spectral space radially
+		!!!DDDD Write(6,*)'I am getting the new rhs: ', my_rank
 		Call Get_All_RHS(wsp%p1a)
 		wsp%p1a((2*N_r)/3+1:N_r,:,:,:) = 0.0d0	! de-alias
+
 
 		! This is terribly inefficient, but I just want to test the stability of Chebyshev vs. FD for not..
 		! We'll create a new buffer.  ctemp
@@ -196,6 +198,7 @@ Contains
 		! W..
 		Call d_by_dr_cp(wvar,d3wdr3,wsp%p1a,3)
 		ctemp%p1a(:,:,:,1) = wsp%p1a(:,:,:,d3wdr3)
+
 		Call d_by_dr_cp(wvar,dwdr   ,wsp%p1a,1)		
 		Call d_by_dr_cp(wvar,d2wdr2 ,wsp%p1a,2)
 		! P....n
@@ -225,7 +228,9 @@ Contains
 		! transform them now & add them to appropriate equations
 		Call ctemp%construct('p1b')
 		ctemp%p1a((2*N_r)/3+1:N_r,:,:,:) = 0.0d0	! de-alias
+
 		Call Cheby_From_Spectral(ctemp%p1a,ctemp%p1b)
+
 		Call Add_Derivative(peq,wvar,3,wsp%p1b,ctemp%p1b,1)
 		Call Add_Derivative(weq,pvar,1,wsp%p1b,ctemp%p1b,2)
 		Call Add_Derivative(teq,tvar,2,wsp%p1b,ctemp%p1b,3)
@@ -313,6 +318,7 @@ Contains
 
 		!Load the old ab array into the RHS
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
+
 
 		Call wsp%deconstruct('p1b')
 		Call StopWatch(psolve_time)%increment()

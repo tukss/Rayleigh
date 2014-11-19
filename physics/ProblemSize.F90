@@ -152,15 +152,16 @@ Contains
 
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
-		Integer :: r
+		Integer :: r, nthr
 		real*8 :: uniform_dr
 
+		nthr = pfi%nthreads
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))
         Allocate(Radial_Integral_Weights(1:N_R))
 		If (chebyshev) Then
 			grid_type = 2
-			Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights)
+			Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights, nthr)
 			Delta_r(1) = radius(1)-radius(2)
 			Do r = 2, N_R
 				Delta_r(r) = radius(r)-radius(r-1)

@@ -1,7 +1,7 @@
 Module Chebyshev_Polynomials
 	! Module for computing Chebyshev Polynomial Arrays and the associated Derivative Arrays
 	Implicit None
-	Integer, Private :: N_max, N_even, N_odd, n_x
+	Integer, Private :: N_max, N_even, N_odd, n_x, cp_nthreads
 	Real*8, Allocatable, Private :: x(:)  ! The colocation points
 	Real*8, Allocatable :: cheby(:,:)		! cheby(r,k) is chebyshev polynomial of degree k-1 at radius r
 	Real*8, Allocatable :: cheby_even(:,:), cheby_odd(:,:) ! even and odd chebyshev arrays
@@ -27,14 +27,16 @@ Module Chebyshev_Polynomials
 
 Contains
 
-	Subroutine Initialize_Chebyshev(grid, xmin,xmax, integration_weights)
+	Subroutine Initialize_Chebyshev(grid, xmin,xmax, integration_weights,nthread)
 		Implicit None
 		Real*8, Intent(InOut) :: grid(:)
 		Real*8, Intent(In), Optional :: xmin, xmax
 		Real*8 ::delta, gmin, tmp, xx
         Real*8, Intent(InOut) :: integration_weights(1:)
         Integer :: r
+		Integer, Intent(In) :: nthread
 		If (.not. initialized) Then
+			 cp_nthreads = nthread
 		    N_max = size(grid)
 		    Call gen_colocation_points()
 		    grid(:) = x(:)
@@ -631,17 +633,21 @@ Contains
 	End Subroutine From_Spectral_4D
 
 	Subroutine Cheby_Deriv_Buffer_4D(ind,dind,buffer,dorder)
+#ifdef useomp 
+        Use Omp_lib
+#endif
 		Implicit None
 		Real*8,  Intent(InOut) :: buffer(0:,1:,1:,1:)	! Makes it easier to reconcile with my IDL code
 		Integer, Intent(In)    :: ind, dind, dorder
-		Real*8, Allocatable :: dbuffer(:,:)
+		Real*8, Allocatable :: dbuffer(:,:,:)
 		Integer :: dims(4), n,n2,n3, i,j,k, order
+		Integer :: kstart, kend, nthr,trank
 		dims = shape(buffer)
 		n = dims(1)
 		n2 = dims(2)
 		n3 = dims(3)
 		If (ind .ne. dind) Then
-            !$OMP PARALLEL DO PRIVATE(i,j,k)
+         !$OMP PARALLEL DO PRIVATE(i,j,k)
 			Do k = 1, n3
 				Do j = 1, n2
 					buffer(n-1,j,k,dind) = 0.0d0
@@ -651,28 +657,40 @@ Contains
 					Enddo
 				Enddo
 			Enddo
-            !$OMP END PARALLEL DO
+         !$OMP END PARALLEL DO
 			If (dorder .gt. 1) Then 
-				Allocate(dbuffer(0:n-1,1:dorder))
-                !$OMP PARALLEL DO PRIVATE(i,j,k,order,dbuffer)
-				Do k = 1, n3
+				Allocate(dbuffer(0:n-1,1:dorder,0:cp_nthreads-1))
+            !$OMP PARALLEL PRIVATE(i,j,k,trank,order,kstart,kend,nthr)
+#ifdef useomp
+        		trank = omp_get_thread_num()
+		  		nthr  = omp_get_num_threads()
+		  		kstart = (trank*n3)/nthr+1
+		  		kend = ((trank+1)*n3)/nthr
+#else
+				trank = 0
+				kstart = 1
+				kend = n3
+#endif
+				Do k = kstart,kend
+
 					Do j = 1, n2
-						dbuffer(:,1) = buffer(:,j,k,dind)
+						dbuffer(:,1,trank) = buffer(:,j,k,dind)
 						Do order = 2, dorder
-							dbuffer(n-1,order) = 0.0d0
-							dbuffer(n-2,order) = 2.0d0*(n-1)*dbuffer(n-1,order-1)*scaling
+							dbuffer(n-1,order,trank) = 0.0d0
+							dbuffer(n-2,order,trank) = 2.0d0*(n-1)*dbuffer(n-1,order-1,trank)*scaling
 							Do i = n -3, 0, -1
-								dbuffer(i,order) = dbuffer(i+2,order)+2.0d0*(i+1)*dbuffer(i+1,order-1)*scaling						
+								dbuffer(i,order,trank) = dbuffer(i+2,order,trank)+ &
+									& 2.0d0*(i+1)*dbuffer(i+1,order-1,trank)*scaling						
 							Enddo
 						Enddo
-						buffer(:,j,k,dind) = dbuffer(:,dorder)
+						buffer(:,j,k,dind) = dbuffer(:,dorder,trank)
 					Enddo
 				Enddo
-                !$OMP END PARALLEL DO
+            !$OMP END PARALLEL
 				DeAllocate(dbuffer)
 			Endif
 		Else
-			! In-place
+			! In-place -- Needs developing
 		Endif
 		!buffer(:,:,:,dind) = buffer(:,:,:,dind)
 	End Subroutine Cheby_Deriv_Buffer_4D	
