@@ -32,4 +32,8 @@ cp ../physics/*.F90 .
 cp ../Makefiles/Makefile_$MACHINE Makefile
 cp ../Makefiles/object_list .
 make clean
+if ($RAYLEIGH_OPT1 == "mic") then
+make rayleigh.mic
+else
 make rayleigh
+endif
