@@ -111,7 +111,7 @@ Contains
                 Do f = 1, numfields*2
                 Do imi = 1, 2
                 Do r = my_r%min, my_r%max
-				myarr(offset:offset+nl-1,ind) = chktmp%s2a(mp)%data(m:l_max,r,i,f)
+				myarr(offset:offset+nl-1,ind) = chktmp%s2a(mp)%data(m:l_max,r,imi,f)
                 ind = ind+1
                 Enddo
                 Enddo

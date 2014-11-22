@@ -468,6 +468,7 @@ Contains
 		Endif
 		If (new_deltat .lt. min_time_step) Then
 			If (my_rank .eq. 0) Write(6,*)'Time step became too small.'
+			if (my_rank .eq. 0) write(6,*)'ts: ', new_deltat, min_time_step
 			Call pfi%exit()
 			Stop
 		Endif
