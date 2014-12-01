@@ -7,11 +7,12 @@ Module Linear_Terms_Sphere
 	Use BoundaryConditions
 	Use Timers
 	Use ClockInfo
-	Use Legendre_Polynomials, Only : pi
+	!Use Legendre_Polynomials, Only : pi
 	Use ReferenceState
 	Use TransportCoefficients
 	Use NonDimensionalization
     Use Equation_Coefficients
+    !Use Math_Constants, Only : pi
     Implicit None
     Real*8, Allocatable :: Lconservation_weights(:)
 	
