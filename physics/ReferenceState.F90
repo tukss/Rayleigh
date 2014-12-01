@@ -7,7 +7,7 @@
 
 Module ReferenceState
 	Use ProblemSize
-    Use Legendre_Polynomials, Only : pi
+    Use Math_Constants
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
