@@ -15,10 +15,30 @@ Module Equation_Coefficients
 
     Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
     Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
+    Real*8, Allocatable :: dpdr_w_term(:), pressure_dwdr_term(:) ! For nondimensionalizing pressure
 Contains
 
 Subroutine Init_Equation_Coefficients
     Implicit None
+    Integer :: i
+    Real*8 :: amp, grav_r_ref
+    Allocate(dpdr_w_term(1:N_R))
+    !dpdr_w_term = ref%density/Ekman_Number
+    dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark
+    Allocate(pressure_dwdr_term(1:N_R))
+    pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
+    !pressure_dwdr_term(1:N_R) = -1.0d0/Ekman_Number*ref%density
+
+    !The buoyancy term
+    !    ---- Normally set as part of the reference state, but if we're nondimensional,
+    !    we set it to Ra times (r/r_ref)^n
+    If (.not. dimensional) Then
+        amp = Rayleigh_Number/Prandtl_Number
+        grav_r_ref = radius(1)
+        Do i = 1, N_R
+            ref%gravity_term_s(i) = amp*(radius(i)/grav_r_ref)**gravity_power
+        Enddo
+    Endif
 
     !////// Non-Magnetic Terms
     !CORIOLIS FORCE TERM (for Omega x v)
@@ -26,7 +46,7 @@ Subroutine Init_Equation_Coefficients
         If (dimensional) Then
             coriolis_term = 2.0d0*Angular_velocity
         Else
-			coriolis_term = 2.0d0/ek
+			coriolis_term = 2.0d0/Ekman_Number*Prandtl_Number
         Endif
 	Endif
 
@@ -46,7 +66,7 @@ Subroutine Init_Equation_Coefficients
 	If (magnetism) Then
         !Lorentz Force Coefficient (for JXB)
         If (.not. dimensional) Then
-            Lorentz_Coefficient = 1.0d0/(Pm*ek)
+            Lorentz_Coefficient = 1.0d0/(Magnetic_Prandtl_Number*Ekman_Number)
         Else
             Lorentz_Coefficient = 1.0d0
         Endif

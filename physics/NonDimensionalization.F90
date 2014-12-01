@@ -8,14 +8,14 @@ Module NonDimensionalization
 	Integer :: nd_type = 1	! Non-dimensionalization Type
 	Integer :: nd_index = 1	! Radial index of reference state/transport parameters that non-dimensionalization is based off of
 									! Use values at top of simulated domain by default
-	Logical :: Dimensional = .false.	! Code runs non-dimensionally by default
+	!Logical :: Dimensional = .false.	! Code runs non-dimensionally by default
 												! Can run dimensionally for debugging purposes
 
 	Logical :: use_dimensional_inputs = .true.
 
 	!//////////////////////////
 	!Placeholder Variables to make this compile for now...
-	Real*8 :: Angular_Velocity = 1.0d0
+	
 	Logical :: Fix_Entropy_Top = .true., Fix_Entropy_Bottom = .true.
 	Real*8 :: Entropy_Top = 0.0d0, Entropy_Bottom = 1000.0d0
 
@@ -23,19 +23,12 @@ Module NonDimensionalization
     !////////////////////////////
     ! Dimensional-like terms
 
-	!//////////////////////////
-	! Nondimensional Parameters
-	Real*8 :: Ra = 1.0d0
-	Real*8 :: Ek = 1.0d0
-	Real*8 :: Pr = 1.0d0
-	Real*8 :: Pm = 1.0d0
-
 
 	Real*8 :: nd_entropy, nd_gravity
 
 	Real*8 :: nd_length, nd_mass, nd_time, nd_rho, nd_temperature, nd_nu, nd_kappa, nd_eta, nd_pressure
 
-	Namelist /NonDimensionalization_Namelist/ Ra, Ek, Pr, Pm, nd_type, nd_index, dimensional, nd_entropy, angular_velocity, &
+	Namelist /NonDimensionalization_Namelist/ nd_type, nd_index, nd_entropy,  &
 			use_dimensional_inputs, Entropy_Bottom
  
 
@@ -81,7 +74,7 @@ Subroutine Standard_ND
 		nd_pressure = angular_velocity*nd_rho*nd_nu
 	Else
 		nd_pressure = nd_rho*(nd_length/nd_time)**2
-        Ek = 1.0d0  ! Technically Ek is infinity if Omega = 0
+        Ekman_Number = 1.0d0  ! Technically Ek is infinity if Omega = 0
                     ! But the scaling of pressure by Ek in the nondimensionalized momentum eq
                     ! changes to no scaling at all whem Omega = 0, which is the same as Ek = 1
 	Endif
@@ -97,23 +90,25 @@ Subroutine Standard_ND
 	dlnkappa = dlnkappa*nd_length
 	If (magnetism) Then
 		nd_eta = eta(nd_index)
-		Pm = nd_nu/nd_eta
+		Magnetic_Prandtl_Number = nd_nu/nd_eta
 		eta = eta/nd_eta
 		dlneta = dlneta*nd_length
 	Endif
 
-	Ra = Gravitational_Constant*nd_mass*nd_entropy*nd_length/nd_nu/nd_kappa/Pressure_Specific_Heat
-	Pr = nd_nu/nd_kappa
-    kappa = kappa/nd_kappa/Pr
-	Ek = nd_nu/Angular_Velocity/nd_length/nd_length
+	Rayleigh_Number = &
+            & Gravitational_Constant*nd_mass*nd_entropy* &
+            & nd_length/nd_nu/nd_kappa/Pressure_Specific_Heat
+	Prandtl_Number  = nd_nu/nd_kappa
+    kappa = kappa/nd_kappa/Prandtl_Number
+	Ekman_Number = nd_nu/Angular_Velocity/nd_length/nd_length
 
     ref%gravity_term_s = ref%gravity_term_s*(pressure_specific_heat/nd_gravity)
-    ref%gravity_term_s = ref%gravity_term_s*Ra/nd_rho
+    ref%gravity_term_s = ref%gravity_term_s*Rayleigh_Number/nd_rho
 
 	If ((my_rank .eq. 0) .and. (print_reference) ) Then
-		Write(6,*)'Ra:   ', Ra
-		Write(6,*)'Ek:   ', Ek
-		Write(6,*)'Pr:   ', Pr
+		Write(6,*)'Ra:   ', Rayleigh_Number
+		Write(6,*)'Ek:   ', Ekman_Number
+		Write(6,*)'Pr:   ', Prandtl_Number
 		Write(6,*)'el:   ', nd_length
 		Write(6,*)'t :   ', nd_time
 		Write(6,*)'rhoc: ', (ref%density(N_R/2)+ref%density(N_R/2+1))*0.5d0

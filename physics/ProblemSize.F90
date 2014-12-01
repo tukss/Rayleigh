@@ -31,9 +31,10 @@ Module ProblemSize
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
+    Integer :: precise_bounds = -1
 	Type(Load_Config)   :: my_r
 
-	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout
+	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, precise_bounds
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -42,10 +43,10 @@ Contains
 		Integer :: tmp,r, l
 		Integer, Allocatable :: m_vals(:)
 		Real*8 :: ell
-
-		!rmin = (7.0d0)/13.0d0		! benchmark cluge
-		!rmax = (20.0d0)/13.0d0
-
+        if (precise_bounds .eq. 1) Then
+		    rmin = (7.0d0)/13.0d0		! Benchmark bounds have infinite decimal places
+		    rmax = (20.0d0)/13.0d0      ! We override (if desired) the inputs for accuracy
+        Endif
 		n_phi = 2*n_theta
 		If (dealias) Then
 			l_max = (2*n_theta-1)/3
