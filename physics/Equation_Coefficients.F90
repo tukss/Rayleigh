@@ -66,7 +66,7 @@ Subroutine Init_Equation_Coefficients
 	If (magnetism) Then
         !Lorentz Force Coefficient (for JXB)
         If (.not. dimensional) Then
-            Lorentz_Coefficient = 1.0d0/(Magnetic_Prandtl_Number*Ekman_Number)
+            Lorentz_Coefficient = Prandtl_Number/(Magnetic_Prandtl_Number) !*Ekman_Number)
         Else
             Lorentz_Coefficient = 1.0d0
         Endif
