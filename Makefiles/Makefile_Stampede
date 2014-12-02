@@ -6,6 +6,10 @@ else
         F90FLAGS = -FR -fpp -r8 -O3 -xAVX -shared_intel -I$(MKLROOT)/include -I$(MKLROOT)/include/fftw
 endif
 LIBFLAGS = -lstdc++ -lmpi -mkl
+ifeq ($(RAYLEIGH_OPT1),mvapich)
+	LIBFLAGS = -lstdc++ -mkl
+endif
+
 PROG =	rayleigh
 
 ifeq ($(RAYLEIGH_OPT1),mic)
