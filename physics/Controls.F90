@@ -30,7 +30,7 @@ Module Controls
     Logical :: ohmic_heating = .true.
 
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
-                & viscous_heating
+                & viscous_heating, ohmic_heating
 
     !////////////////////////////////////////////////////
     !   Temporal Controls
