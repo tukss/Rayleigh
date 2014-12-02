@@ -2,7 +2,7 @@ Module Diagnostics
 	Use ProblemSize
 	Use Spherical_IO
 	Use Fields
-	Use Legendre_Polynomials, Only : gl_weights, pi
+	Use Legendre_Polynomials, Only : gl_weights
     Use ReferenceState
     Use TransportCoefficients
 	Implicit None

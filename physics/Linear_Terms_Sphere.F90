@@ -7,10 +7,12 @@ Module Linear_Terms_Sphere
 	Use BoundaryConditions
 	Use Timers
 	Use ClockInfo
-	Use Legendre_Polynomials, Only : pi
+	!Use Legendre_Polynomials, Only : pi
 	Use ReferenceState
 	Use TransportCoefficients
 	Use NonDimensionalization
+    Use Equation_Coefficients
+    !Use Math_Constants, Only : pi
     Implicit None
     Real*8, Allocatable :: Lconservation_weights(:)
 	
@@ -219,7 +221,8 @@ Contains
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
 				! Pressure
-				amp = 1.0d0/(Ek*H_Laplacian)*ref%density		! dPdr
+				!amp = 1.0d0/(Ek*H_Laplacian)*ref%density		! dPdr
+                amp = dpdr_W_term/H_Laplacian
 				Call add_implicit_term(weq,pvar, 1, amp,lp)
 
 
@@ -245,7 +248,8 @@ Contains
 				!				Pressure (dWdr) Equation
 				
 				! Pressure
-				amp = -(1.0d0)/Ek*ref%density	
+				!amp = -(1.0d0)/Ek*ref%density	
+                amp = pressure_dwdr_term
 				Call add_implicit_term(peq,pvar, 0, amp,lp)
 
 				! W

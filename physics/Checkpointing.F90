@@ -84,7 +84,7 @@ Contains
 		Real*8, Intent(In) :: abterms(:,:,:,:)
 		Real*8, Intent(In) :: dt, new_dt
 		Integer, Intent(In) :: iteration
-		Integer :: mp, m, offset,nl,p,np
+		Integer :: mp, m, offset,nl,p,np, f, imi, r, ind
 		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
         Real*8 :: elapsed_time
@@ -107,7 +107,16 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 				m = m_values(mp)
 				nl = l_max-m+1
-				myarr(offset:offset+nl-1,:) = chktmp%s2a(mp)%data(m:l_max,:)
+                ind = 1
+                Do f = 1, numfields*2
+                Do imi = 1, 2
+                Do r = my_r%min, my_r%max
+				myarr(offset:offset+nl-1,ind) = chktmp%s2a(mp)%data(m:l_max,r,imi,f)
+                ind = ind+1
+                Enddo
+                Enddo
+                Enddo
+
 				offset = offset+nl
 		Enddo
 		Call chktmp%deconstruct('s2a')
@@ -203,7 +212,8 @@ Contains
 		Character*8 :: iterstring
 		Character*120 :: cfile
         Integer :: fcount(3,2)
-        Integer :: lb,ub
+        Integer :: lb,ub, f, imi, r, ind
+        Real*8 :: mxvt, mxvp
 		dim2 = tnr*numfields*2
 		checkpoint_iter = iteration
 		Write(iterstring,'(i8.8)') iteration
@@ -278,7 +288,7 @@ Contains
 		Call chktmp%construct('s2b')
 		chktmp%config = 's2b'
 	    Do mp = my_mp%min, my_mp%max
-            chktmp%s2b(mp)%data(:,:) = 0.0d0
+            chktmp%s2b(mp)%data(:,:,:,:) = 0.0d0
 	    Enddo
 
         !//////////////////////////////////
@@ -367,11 +377,19 @@ Contains
 			    ! First, each row-head pulls out their own modes			
 			    Do mp = my_mp%min, my_mp%max
 				    m = m_values(mp)
-				    chktmp%s2b(mp)%data(:,:) = 0.0d0
+				    chktmp%s2b(mp)%data(:,:,:,:) = 0.0d0
 				    If (m .le. l_max_old) Then
 					    nl = maxl-m+1
 					    lstart = lmstart_old(m)
-					    chktmp%s2b(mp)%data(m:maxl,:) = rowstrip(lstart:lstart+nl-1,:)
+                        ind = 1
+                        Do f = 1, numfields*2
+                        Do imi = 1, 2
+                        Do r = my_r%min, my_r%max
+					        chktmp%s2b(mp)%data(m:maxl,r,imi,f) = rowstrip(lstart:lstart+nl-1,ind)
+                            ind = ind+1
+                        Enddo
+                        Enddo
+                        Enddo
 				    Endif
 			    Enddo
 
@@ -409,14 +427,26 @@ Contains
 			    Do mp = my_mp%min, my_mp%max
 				    m = m_values(mp)
 				    nl = l_max-m+1
-				    chktmp%s2b(mp)%data(m:l_max,:) = myarr(offset:offset+nl-1,:)
-				    offset = offset+nl
+                        ind = 1
+                    Do f = 1, numfields*2
+                    Do imi = 1, 2
+                    Do r = my_r%min, my_r%max
+				        chktmp%s2b(mp)%data(m:l_max,r,imi,f) = myarr(offset:offset+nl-1,ind)
+				        ind = ind+1
+                    Enddo
+                    Enddo
+                    Enddo
+                    offset = offset+nl
 			    Enddo
 			    DeAllocate(myarr)
             !Endif
 		Endif
 
+
+
 		Call chktmp%reform()	! move to p1b
+
+
 
 		! NOW, if n_r_old and grid_type_old are the same, we can copy chtkmp%p1b into abterms and 
 		! fields.  Otherwise, we need to interpolate onto the current grid
@@ -857,7 +887,7 @@ Contains
 		Real*8, Intent(In) :: dt, new_dt
 		Integer, Intent(In) :: iteration
 		Integer :: mp, m, offset,nl,np
-		Integer :: dim2, i, offset_index
+		Integer :: dim2, i, offset_index, r, imi,f,ind
 		Real*8, Allocatable :: myarr(:,:)
 		Character*8 :: iterstring
 		Character*120 :: cfile
@@ -878,7 +908,15 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 				m = m_values(mp)
 				nl = l_max-m+1
-				myarr(offset:offset+nl-1,:) = chktmp%s2a(mp)%data(m:l_max,:)
+                ind = 1
+                Do f = 1, numfields*2
+                Do imi = 1, 2
+                Do r = my_r%min, my_r%max
+    				myarr(offset:offset+nl-1,ind) = chktmp%s2a(mp)%data(m:l_max,r,imi,f)
+                    ind = ind+1
+                Enddo
+                Enddo
+                Enddo
 				offset = offset+nl
 		Enddo
 		Call chktmp%deconstruct('s2a')
@@ -1099,7 +1137,7 @@ Contains
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
 		Integer :: n_r_old, l_max_old, grid_type_old
-		Integer :: i, ierr,  m, nl
+		Integer :: i, ierr,  m, nl, r, f, imi, ind
 		Integer :: dim2,offset, mp, offset_index
 		Integer :: old_pars(3)
 
@@ -1202,7 +1240,15 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 				m = m_values(mp)
 				nl = l_max-m+1
-				chktmp%s2b(mp)%data(m:l_max,:) = myarr(offset:offset+nl-1,:)
+                ind = 1
+                Do f = 1, numfields*2
+                Do imi = 1, 2
+                Do r = my_r%min, my_r%max
+    				chktmp%s2b(mp)%data(m:l_max,r,imi,f) = myarr(offset:offset+nl-1,ind)
+                    ind = ind+1
+                Enddo
+                Enddo
+                Enddo
 				offset = offset+nl
 		Enddo
 

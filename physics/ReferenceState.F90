@@ -7,7 +7,7 @@
 
 Module ReferenceState
 	Use ProblemSize
-    Use Legendre_Polynomials, Only : pi
+    Use Math_Constants
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
@@ -43,10 +43,22 @@ Module ReferenceState
     Real*8 :: Gravitational_Constant = 6.67d-8
     Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle, length_twiddle ! also in ref structure..
 
+    Real*8 :: Angular_Velocity = 1.0d0
 
 
+    
+	!/////////////////////////////////////////////////////////////////////////////////////
+	! Nondimensional Parameters
+	Real*8 :: Rayleigh_Number         = 0.0d0
+	Real*8 :: Ekman_Number            = 0.0d0
+	Real*8 :: Prandtl_Number          = 1.0d0
+	Real*8 :: Magnetic_Prandtl_Number = 1.0d0
+    Real*8 :: gravity_power           = 0.0d0
+    Logical :: Dimensional = .true.  ! By Default code is dimensional
 	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
-            & pressure_specific_heat, heating_type, luminosity
+            & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
+            & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
+            & gravity_power, dimensional
 Contains
 
 	Subroutine Initialize_Reference()
@@ -265,7 +277,8 @@ Contains
 			ref%dlnT = 0.0d0
 			ref%dsdr = 0.0d0
 			ref%pressure = 1.0d0
-			ref%gravity = 1.0d0 ! Need to revisit this part
+			ref%gravity = 0.0d0 ! Not used with constant reference right now
+            ref%gravity_term_s = 0.0d0 ! Set to Ra later in equation_coefficients
 	End Subroutine Constant_Reference
 
 	

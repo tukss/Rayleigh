@@ -65,6 +65,7 @@ Contains
 		Call Hybrid_Init()
 		Call StopWatch(loop_time)%StartClock()
 		Do iteration = first_iteration, last_iteration
+
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
 			Else
@@ -74,8 +75,11 @@ Contains
 			If (my_rank .eq. 0) Write(6,*)'On iteration : ', iteration, deltat
 
 			Call rlm_spacea()
+
 			Call Physical_Space()
+
 			Call rlm_spaceb()
+
 			Call AdvanceTime()
 
 			If (Mod(iteration,check_frequency) .eq. 0) Then

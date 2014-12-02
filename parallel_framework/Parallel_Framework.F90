@@ -5,7 +5,9 @@ Module Parallel_Framework
 	Use Structures
 	Implicit None
 	Private
-
+#ifdef usemkl
+	include 'mkl_service.fi'
+#endif 
 	!///////////////////////////////////////////////////////////////////////////
 	!  
 	Integer, Parameter, Public :: Cartesian = 1, Cylindrical = 2, Spherical = 3
@@ -22,6 +24,7 @@ Module Parallel_Framework
 		! Allows primarily for dealiasing right now
 		Integer :: n1p, n1s, n2p, n2s, n3p, n3s	
 		Integer :: npe, nprow, npcol, npio,npc
+        Integer :: nthreads = 1
 		Integer, Allocatable :: inds_3s(:)
 		Type(communicator) :: rcomm ! row communicator
 		Type(communicator) :: ccomm ! column communicator
@@ -33,6 +36,7 @@ Module Parallel_Framework
 		Contains
 
 		Procedure :: Init => Initialize_Parallel_Interface
+        Procedure :: openmp_init
 		Procedure :: Exit => Finalize_Framework
 		Procedure ::  Spherical_Init 
 		Procedure ::  Init_Geometry
@@ -52,7 +56,7 @@ Module Parallel_Framework
 		! The buffer object for buffer moving between spaces
 		! The buffer can advance configurations
 
-		Type(rmcontainer), Allocatable :: s2b(:),s2a(:)
+		Type(rmcontainer4D), Allocatable :: s2b(:),s2a(:)
 
 		Real*8, Allocatable :: p2b(:,:,:),p2a(:,:,:)		! for dgemm
 		Real*8, Allocatable :: p3a(:,:,:,:)  ! m/r/delta_theta/field
@@ -97,7 +101,7 @@ Module Parallel_Framework
 
         !For piggyback values on transposes (max timestep)
         Logical :: do_piggy = .false.
-		Real*8 :: mrv	! "max reduce value"
+		Real*8 :: mrv =0.0d0	! "max reduce value"
         Integer, Allocatable :: istop(:)
 
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
@@ -595,16 +599,11 @@ Contains
 					Allocate(self%s2a(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-					!/////////////////////////////////
 
-
-					mx3 = self%nf2a*2*pfi%my_1p%delta
-
-					!////////////////////////////////
 
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
-						Allocate(self%s2a(i)%data(mn2:mx2,1:mx3))
+                        Allocate(self%s2a(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))
 					Enddo
 				Endif
 			Case('s2b')
@@ -622,22 +621,18 @@ Contains
 					Allocate(self%s2b(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
 
-					!/////////////////////////////////
-
-
-					mx3 = self%nf2b*2*pfi%my_1p%delta
-
-					!////////////////////////////////
-
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
-						Allocate(self%s2b(i)%data(mn2:mx2,1:mx3))
+						Allocate(self%s2b(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))
 					Enddo
 
 				Endif
 		End Select
 
 	End Subroutine Allocate_Spherical_Buffer
+
+
+
 
 	Subroutine Advance_Configuration(self)
 		Class(SphericalBuffer) :: self		
@@ -933,231 +928,213 @@ Contains
 
 
     Subroutine Transpose_2b1b(self)
-      ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
-      ! Communication is now done entirely within the radial group (processors that 
-      ! share a common set of ell-m values).  
-      Implicit None
+        ! Go from Explicit_Part(IDX) configuration to the new Implicit%RHS configuration
+        ! Communication is now done entirely within the radial group (processors that 
+        ! share a common set of ell-m values).  
+        Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i
-		Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
+        Integer :: r,l, mp, lp, indx, r_min, r_max, dr,  cnt,i, imi, rind
+        Integer :: n1, n, nfields, offset, delta_r, rmin, rmax, np,p
 
-
-		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: tnr, send_offset
+        Real*8, Allocatable :: send_buff(:),recv_buff(:)
+        Integer :: tnr, send_offset
 
         ! piggyback information
         Integer :: inext, pcurrent
 
-		Class(SphericalBuffer) :: self
+        Class(SphericalBuffer) :: self
 
-		n1 = pfi%n1p
+        n1 = pfi%n1p
         np = pfi%ccomm%np
-      !Allocate(send(my_r%min:my_r%max, 2, n_fields, N_lm_local))
-		nfields = self%nf2b
 
-		!/////
-		! First loading, should be relatively straight forward
-		! We have nfields (nf2b)  and the data is dimensioned x%(l,r,field_num)
+        nfields = self%nf2b
 
-      ! Load the send array in the ordering of the l-m values
+        !/////
+        ! First loading, should be relatively straight forward
+        ! We have nfields (nf2b)  and the data is dimensioned x%(l,r,field_num)
 
-		delta_r = pfi%my_1p%delta
-		!rmin = pfi%my_1p%min
-		!rmax = pfi%my_1p%max
-		!modification for new configuration
-		rmin = 1
-		rmax = 2*delta_r
-		tnr = 2*delta_r
-
-		Allocate(send_buff(1:self%send_size21))
+        ! Load the send array in the ordering of the l-m values
 
 
-      pcurrent = 0
-      inext = num_lm(0)
-		send_offset = 0
-      Do i = 1, lm_count
-         mp = mp_lm_values(i)
-         l = l_lm_values(i)
-			offset = 0 
 
-			Do n = 1, nfields
 
-         	Do r = rmin,rmax
-					send_buff(send_offset+r) = self%s2b(mp)%data(l,offset+r)
-         	End Do
-				send_offset = send_offset+tnr
-				offset = offset+tnr
-			Enddo
-			If (i .eq. inext) Then
-	        If (self%do_piggy) Then
-            ! load the piggyback value into the next buffer slot.
-                send_buff(send_offset+1) = self%mrv
-                send_offset = send_offset+1            
-	        	Endif
-				pcurrent = pcurrent+1
-            inext = self%istop(pcurrent)
-				if (i .lt. lm_count) send_offset = self%sdisp21(pcurrent)
-			Endif
-      Enddo
+        Allocate(send_buff(1:self%send_size21))
 
+
+
+
+        r_min = pfi%my_1p%min
+        r_max = pfi%my_1p%max
+
+        send_buff = 0.0d0
+        pcurrent = 0
+        inext = num_lm(0)
+        send_offset = 1
+        Do i = 1, lm_count
+            mp = mp_lm_values(i)
+            l = l_lm_values(i)
+            !offset = 0 
+
+            Do n = 1, nfields
+                Do imi = 1, 2
+                Do r = r_min,r_max
+                send_buff(send_offset) = self%s2b(mp)%data(l,r,imi,n)
+                send_offset = send_offset+1
+                EndDo
+                Enddo
+            Enddo
+            If (i .eq. inext) Then
+                If (self%do_piggy) Then
+                    ! load the piggyback value into the next buffer slot.
+                    send_buff(send_offset) = self%mrv  
+                    send_offset = send_offset+1            
+                Endif
+                pcurrent = pcurrent+1
+                inext = self%istop(pcurrent)
+                If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1 
+            Endif
+        Enddo
+
+        !///////////////////////////////////////
 
 
 		Call self%deconstruct('s2b')
 
 
-		Allocate(recv_buff(1:self%recv_size21))
+        Allocate(recv_buff(1:self%recv_size21))
 
+        recv_buff = 0.0d0
+        Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
+	        self%rdisp21, pfi%ccomm, self%pad_buffer)
+        DeAllocate(send_buff)
 
-		Call Standard_Transpose(send_buff, recv_buff, self%scount21, self%sdisp21, self%rcount21, &
-			self%rdisp21, pfi%ccomm, self%pad_buffer)
-		DeAllocate(send_buff)
-
-		Call self%construct('p1b')
-		! Now, the receive striping needs a little mapping
-		! WPS are coupled, but Z,Btor, and Bpol are not
-		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
-		! We may want to modify this later on to mesh with linear equation structure
+        Call self%construct('p1b')
+        ! Now, the receive striping needs a little mapping
+        ! WPS are coupled, but Z,Btor, and Bpol are not
+        ! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
+        ! We may want to modify this later on to mesh with linear equation structure
       
-		
-      Do p = 0, np - 1
-			indx = self%rdisp21(p)+1
-         !r_min = 1 + p*n1/np
-			r_min = pfi%all_1p(p)%min
-			r_max = pfi%all_1p(p)%max
-         !r_max = (p+1)*n1/np
-         dr = r_max - r_min
-         ! Each processor in the radial group will have given me the same number of 
-         ! l-m combos in the same (correct) order
-         cnt = 1
-         Do lp = 1, my_num_lm
-				Do n = 1, nfields
-					self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-					self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
-				Enddo
-				cnt = cnt+1
-			Enddo
-        if (self%do_piggy) then
-            self%mrv = max(self%mrv,recv_buff(indx))
-            indx = indx+1
-        endif
-      End Do
+        self%p1b = 0.0d0
+        Do p = 0, np - 1
+            indx = self%rdisp21(p)+1
+
+            r_min = pfi%all_1p(p)%min
+            r_max = pfi%all_1p(p)%max
+
+            dr = r_max - r_min
+            ! Each processor in the radial group will have given me the same number of 
+            ! l-m combos in the same (correct) order
+            cnt = 1
+            Do lp = 1, my_num_lm
+                Do n = 1, nfields
+                self%p1b(r_min:r_max,1,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                self%p1b(r_min:r_max,2,cnt,n) = recv_buff(indx:indx+dr); indx = indx + dr + 1
+                Enddo
+                cnt = cnt+1
+            Enddo
+            if (self%do_piggy) then
+                self%mrv = max(self%mrv,recv_buff(indx))
+                indx = indx+1
+            endif
+        EndDo
 
 		self%config='p1b'
       Deallocate(recv_buff)
 		
     End Subroutine Transpose_2b1b
 
-
-
     Subroutine Transpose_1a2a(self)
-      ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
-      Implicit None
+        ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
+        Implicit None
 
-      Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
-		Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p
-		Integer :: recv_offset, tnr
+        Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
+        Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p,rind
+        Integer :: recv_offset, tnr
+        Integer :: imi
+        Real*8, Allocatable :: send_buff(:),recv_buff(:)
+        Integer :: inext, pcurrent
 
-		Real*8, Allocatable :: send_buff(:),recv_buff(:)
-      Integer :: inext, pcurrent
+        Class(SphericalBuffer) :: self
 
-		Class(SphericalBuffer) :: self
+        nfields = self%nf1a
 
-
-		! This goes at the beginning
-		
-		nfields = self%nf1a
-
-		Allocate(send_buff(1:self%send_size12))
+        Allocate(send_buff(1:self%send_size12))
 
 
-		! Now, the receive striping needs a little mapping
-		! WPS are coupled, but Z,Btor, and Bpol are not
-		! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
-		! We may want to modify this later on to mesh with linear equation structure
+        ! Now, the receive striping needs a little mapping
+        ! WPS are coupled, but Z,Btor, and Bpol are not
+        ! Let's assume that those buffers are dimensioned: (r,real/imag,mode,field)
+        ! We may want to modify this later on to mesh with linear equation structure
 
-		np = pfi%ccomm%np
-      Do p = 0, np - 1
-			indx = self%sdisp12(p)+1
-			r_min = pfi%all_1p(p)%min
-			r_max = pfi%all_1p(p)%max
-         dr = r_max - r_min
-         ! Each processor in the radial group will have given me the same number of 
-         ! l-m combos in the same (correct) order
-         cnt = 1
-         Do lp = 1, my_num_lm
-				Do n = 1, nfields
-					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,1,cnt,n) ; indx = indx + dr + 1
-					send_buff(indx:indx+dr) = self%p1a(r_min:r_max,2,cnt,n) ; indx = indx + dr + 1
-				Enddo
-				cnt = cnt+1
-			Enddo
-      End Do
-		Call self%deconstruct('p1a')
+        np = pfi%ccomm%np
+        Do p = 0, np - 1
+            indx = self%sdisp12(p)+1
+            r_min = pfi%all_1p(p)%min
+            r_max = pfi%all_1p(p)%max
+            dr = r_max - r_min
+            ! Each processor in the radial group will have given me the same number of 
+            ! l-m combos in the same (correct) order
+            cnt = 1
+            Do lp = 1, my_num_lm
+                Do n = 1, nfields
+                send_buff(indx:indx+dr) = self%p1a(r_min:r_max,1,cnt,n) ; indx = indx + dr + 1
+                send_buff(indx:indx+dr) = self%p1a(r_min:r_max,2,cnt,n) ; indx = indx + dr + 1
+                Enddo
+                cnt = cnt+1
+            Enddo
+        End Do
+        Call self%deconstruct('p1a')
 
+        ! Load the send array in the ordering of the l-m values
+        indx = 1
 
-
-		!////
-
-
-		!/////
-		! First loading, should be relatively straight forward
-		! We have nfields (nf1a)  and the data is dimensioned x%(l,r,field_num)
-
-      ! Load the send array in the ordering of the l-m values
-      indx = 1
-
-		delta_r = pfi%my_1p%delta
-		rmin = pfi%my_1p%min
-		rmax = pfi%my_1p%max
-
-		Allocate(recv_buff(1:self%recv_size12))
+        Allocate(recv_buff(1:self%recv_size12))
 
 
-		Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, &
-			 self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
-		DeAllocate(send_buff)
+        Call Standard_Transpose(send_buff, recv_buff, self%scount12, self%sdisp12, &
+	         self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
+        DeAllocate(send_buff)
 
-		Call self%construct('s2a')
+        Call self%construct('s2a')
 
-		rmin = 1
-		rmax = delta_r*2
-		recv_offset = 0
-		tnr = 2*delta_r
-		pcurrent = 0
-		inext = num_lm(0)
-		recv_offset = 0
-      Do i = 1, lm_count
-         mp = mp_lm_values(i)
-         l = l_lm_values(i)
-			
-			offset = 0
-			Do n = 1, nfields
-         Do r = rmin,rmax 
-            !self%s2a(mp)%data(l,r,n) = Cmplx(recv_buff(offset+indx),recv_buff(offset+indx+delta_r)) !  I am keeping this here as a reminder  ,Precision)
-				!indx = indx+1
-				self%s2a(mp)%data(l,offset+r) = recv_buff(recv_offset+r)
-         End Do
-			offset = offset+tnr
-			recv_offset = recv_offset+tnr
-			Enddo
-			If (i .eq. inext) Then
-				pcurrent = pcurrent+1
-            inext = self%istop(pcurrent)
-				if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)
-			Endif
-      Enddo
-		!////
-		!Write(6,*)'maxval recv : ', maxval(abs(recv_buff))
+        pcurrent = 0
+        inext = num_lm(0)
+        recv_offset = 1
+        r_min = pfi%my_1p%min
+        r_max = pfi%my_1p%max
+        Do i = 1, lm_count
+            mp = mp_lm_values(i)
+            l = l_lm_values(i)
+
+
+            Do n = 1, nfields
+            Do imi = 1, 2
+                Do r = r_min,r_max
+                    self%s2a(mp)%data(l,r,imi,n) = recv_buff(recv_offset) ! +rind)
+                    recv_offset = recv_offset+1
+                EndDo
+            Enddo
+            Enddo
+            If (i .eq. inext) Then
+                pcurrent = pcurrent+1
+                inext = self%istop(pcurrent)
+                if (i .lt. lm_count) recv_offset = self%rdisp12(pcurrent)+1  ! <---- Added +1
+            Endif
+        Enddo
+
+
 		self%config='s2a'
-      Deallocate(recv_buff)
+        Deallocate(recv_buff)
 		
     End Subroutine Transpose_1a2a
 
 
 
 	Subroutine Initialize_Parallel_Interface(self, pars)
+        Implicit None
 		Integer, Intent(In) :: pars(1:)
 		Integer :: pcheck, error
+        Integer :: ierr
 		Class(Parallel_Interface) :: self	
 		self%geometry = pars(1)
 		self%n1p = pars(2)
@@ -1190,13 +1167,34 @@ Contains
 		Endif
 
 		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,error)
-		Call self%Init_Geometry()
-		!Write(6,*)'Hello ', self%gcomm%rank, self%rcomm%rank, self%ccomm%rank
-		!Write(6,*)'Hello: ', self%ccomm%rank, self%ccomm%rank, self%my_1p%min, self%my_1p%max, self%my_1p%delta
-		!Write(6,*)'Hello: ', self%rcomm%rank,self%ccomm%rank, self%my_2p%min, self%my_2p%max, self%my_2p%delta		
+		Call self%Init_Geometry()	
+
+        Call self%openmp_init()
 
 	End Subroutine Initialize_Parallel_Interface
 
+			   
+    Subroutine OpenMp_Init(self)
+#ifdef useomp 
+        Use Omp_lib
+#endif
+
+		Class(Parallel_Interface) :: self
+        Integer :: my_mpi_rank,my_thread
+        my_mpi_rank = pfi%gcomm%rank
+#ifdef useomp
+        self%nthreads = omp_get_max_threads()
+        !$OMP PARALLEL PRIVATE(my_thread)
+        my_thread = omp_get_thread_num()
+        write(6,*)'rank: ', my_mpi_Rank, 'thread: ', my_thread, 'nthread: ', omp_get_num_threads()
+        !$OMP END PARALLEL
+#endif
+#ifdef usemkl
+			my_thread = mkl_get_max_threads()
+			write(6,*)"MKL MAX: ", my_thread
+#endif
+    End Subroutine OpenMp_Init
+    
 	Subroutine Init_Geometry(self)
 		Class(Parallel_Interface) :: self		
 		If (self%geometry == Spherical) Then

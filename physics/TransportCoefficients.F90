@@ -74,6 +74,11 @@ Contains
 
 	Subroutine Initialize_Transport_Coefficients()
 		Call Allocate_Transport_Coefficients
+        If (.not. dimensional) Then
+            nu_top = Prandtl_Number
+            kappa_top = 1.0d0
+            eta_top = Prandtl_Number/Magnetic_Prandtl_Number
+        Endif
 		Call Initialize_Nu()							! Viscosity
 		Call Initialize_Kappa()						! Thermal Diffusivity
 		If (magnetism) Call Initialize_Eta()	! Magnetic Diffusivity

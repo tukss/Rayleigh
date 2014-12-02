@@ -9,6 +9,27 @@ Module Fourier_Transform
 		Module Procedure c2r_ip4d_fftw
 	End Interface
 Contains
+    Subroutine Initialize_FFTs()
+        Use Parallel_Framework, Only : pfi
+        Implicit None
+        ! Really just here for openmp init
+        integer :: iret, nthread
+
+        nthread = pfi%nthreads
+#ifdef useomp 
+        if (nthread .gt. 1) Then
+            call dfftw_init_threads(iret)
+				!Note that when using MKL, iret will be 0 always.
+				!iret = 0 means an error when using normal FFTW, but for MKL
+				! This routine is a wrapper that does nothing.
+            !write(6,*)"iret is: ", iret
+        
+            !write(6,*)"FFTW planning with nthreads: ", nthread
+            call dfftw_plan_with_nthreads(nthread)
+        Endif
+#endif
+    End Subroutine Initialize_FFts
+
 	Subroutine r2c_ip4D_fftw(x,plan,rsc)
 		! r2c: Real to Complex (forward transform)
 		! ip4D: In-place transform of 4D array 

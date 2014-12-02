@@ -43,7 +43,7 @@ Contains
 			m = m_values(mp)			
 			Do l = m, l_max
 				nmodes = nmodes+1
-				test%s2a(mp)%data(l,:) = 1.0d0
+				test%s2a(mp)%data(l,:,:,:) = 1.0d0
 			Enddo
 		Enddo
 
@@ -66,7 +66,7 @@ Contains
 		Do mp = my_mp%min, my_mp%max
 			m = m_values(mp)			
 			Do l = m, l_max
-				reldiff(this_mode) = 1.0d0-test%s2a(mp)%data(l,1)
+				reldiff(this_mode) = 1.0d0-test%s2a(mp)%data(l,1,1,1)
 				this_mode = this_mode+1
 				!If (diff .gt. mxdiff) then
 				!	mxdiff = diff
@@ -185,13 +185,13 @@ Contains
 			m = m_values(mp)			
 			Do l = m, l_max
 				nmodes = nmodes+1
-				test%s2a(mp)%data(l,1:nrl) = (l+1)*1.0d0
-				test%s2a(mp)%data(l,nrl+1:2*nrl) = (m+1)*1.0d0
+				test%s2a(mp)%data(l,1:nrl,1,1) = (l+1)*1.0d0
+				test%s2a(mp)%data(l,1:nrl,2,1) = (m+1)*1.0d0
 				if ((m .eq. 0) ) then
 					! Be careful not to give m = 0 any imaginary part
 					! That would be absolutely foolish
-					test%s2a(mp)%data(l,1:nrl) = 14.1d0
-					test%s2a(mp)%data(l,nrl+1:2*nrl) = 0.0d0
+					test%s2a(mp)%data(l,1:nrl,1,1) = 14.1d0
+					test%s2a(mp)%data(l,1:nrl,2,1) = 0.0d0
 				Endif
 			Enddo
 		Enddo
@@ -228,14 +228,14 @@ Contains
 			m = m_values(mp)			
 			Do l = m, l_max
 				if ( (m .eq. 0) ) then
-					reldiff_real(this_mode) = (14.1-test%s2a(mp)%data(l,1))/14.1
-					reldiff_imag(this_mode) = test%s2a(mp)%data(l,nrl+1)
-					write(6,*)test%s2a(mp)%data(l,1)
+					reldiff_real(this_mode) = (14.1-test%s2a(mp)%data(l,1,1,1))/14.1
+					reldiff_imag(this_mode) = test%s2a(mp)%data(l,1,2,1)
+					write(6,*)test%s2a(mp)%data(l,1,1,1)
 				else					
 					ans = (l+1)*1.0d0
-					reldiff_real(this_mode) = (ans-test%s2a(mp)%data(l,1))/ans
+					reldiff_real(this_mode) = (ans-test%s2a(mp)%data(l,1,1,1))/ans
 					ans = (m+1)*1.0d0
-					reldiff_imag(this_mode) = (ans-test%s2a(mp)%data(l,nrl+1))/ans
+					reldiff_imag(this_mode) = (ans-test%s2a(mp)%data(l,1,2,1))/ans
 				endif
 
 			

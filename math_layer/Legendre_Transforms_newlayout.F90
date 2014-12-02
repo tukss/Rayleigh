@@ -16,6 +16,7 @@ Module Legendre_Transforms
 	!End Type rmcontainer
 	Interface Legendre_Transform
 		Module Procedure PtS_2d_dgpv2, StP_2d_dgp
+        Module Procedure PtS_4d_dgpv2 !, StP_4d_dgp
 	End Interface
 Contains
 
@@ -762,7 +763,14 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 	Integer  :: nrhs
 	Real*8 :: alpha, beta
 	Real*8, Allocatable :: temp(:,:),fodd(:,:,:), feven(:,:,:)
-	Integer :: m,nl,nt1,i,j,l, nt2,ddims(3),k 
+	Integer :: m,nl,nt1,i,j,l, nt2,ddims(3),k , oddims(4), nfield
+    Integer :: rmn, rmx, nr
+
+    oddims = shape(data_out(1)%data)
+    nfield = oddims(4)
+    rmn = LBOUND(data_out(1)%data,2)
+    rmx = UBOUND(data_out(1)%data,2)
+    nr = rmx-rmn+1
 
 	ddims = shape(data_in)
 	n_m = ddims(3)
@@ -807,7 +815,7 @@ Subroutine PtS_4d_dgpv2(data_in, data_out)
 				Do im =1, 2
 				Do j = 1, n_l_even(m)
 					l = lvals(m)%even(j)
-					data_out(m)%data(l,1:nr,im,f) = temp(j,istart:iend)
+					data_out(m)%data(l,rmn:rmx,im,f) = temp(j,istart:iend)
 				Enddo
 				istart = istart+nr
 				iend = iend+nr
