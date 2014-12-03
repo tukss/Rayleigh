@@ -23,11 +23,11 @@ Subroutine Init_Equation_Coefficients
     Integer :: i
     Real*8 :: amp, grav_r_ref
     Allocate(dpdr_w_term(1:N_R))
-    dpdr_w_term = ref%density/Ekman_Number
-    !dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark
+    !dpdr_w_term = ref%density/Ekman_Number
+    dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark
     Allocate(pressure_dwdr_term(1:N_R))
-    !pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
-    pressure_dwdr_term(1:N_R) = -1.0d0/Ekman_Number*ref%density
+    pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
+    !pressure_dwdr_term(1:N_R) = -1.0d0/Ekman_Number*ref%density
 
     !The buoyancy term
     !    ---- Normally set as part of the reference state, but if we're nondimensional,
