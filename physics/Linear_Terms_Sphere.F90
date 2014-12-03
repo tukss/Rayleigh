@@ -169,7 +169,7 @@ Contains
 		Allocate(amp(1:N_R))
 		Allocate(H_Laplacian(1:N_R))
 		Do lp = 1, my_nl_lm
-            If (band_solve) Call DeAllocate_LHS(lp)
+            If (bandsolve) Call DeAllocate_LHS(lp)
             Call Allocate_LHS(lp)
 			l = my_lm_lval(lp)		
 

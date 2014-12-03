@@ -6,6 +6,7 @@ Module ProblemSize
 	Use Controls, Only : Chebyshev, use_parity
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
 	Use Timers
+
 	Implicit None
 
 	!//////////////////////////////////////////////////////////////
@@ -34,7 +35,7 @@ Module ProblemSize
     Integer :: precise_bounds = -1
 	Type(Load_Config)   :: my_r
 
-	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, precise_bounds
+	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, precise_bounds,grid_type
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -153,8 +154,9 @@ Contains
 
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
-		Integer :: r, nthr
-		real*8 :: uniform_dr
+		Integer :: r, nthr,i
+		real*8 :: uniform_dr, arg, pi_over_N, rmn, delta, scaling
+        Real*8 ::	Pi  = 3.1415926535897932384626433832795028841972d0
 
 		nthr = pfi%nthreads
 		Allocate(Delta_r(1:N_R))
@@ -178,7 +180,20 @@ Contains
 						Radius(r) = (N_R-r)*uniform_dr + rmin		
 					Enddo
 
- 
+                Case (2)  ! Chebyshev Grid
+
+		            pi_over_N = pi/(N_r*1.0d0)
+		            arg = (0.5d0)*pi_over_N
+		            Do i = 1, N_R
+			            radius(i) = cos(arg)
+			            arg = arg+pi_over_N
+		            Enddo
+                    delta = rmax-rmin
+                    scaling = (radius(1)-radius(n_r) )/ delta
+                    radius = radius/scaling
+                    rmn = minval(radius)
+                    radius(:) = radius(:)-rmn+rmin                    
+
 				Case Default	! Uniform Grid - Same as case 1
 					Radius(N_R) = rmin
 					uniform_dr = 1.0d0/(N_R-1.0d0)*(rmax-rmin)
