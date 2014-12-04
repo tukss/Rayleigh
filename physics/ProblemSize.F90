@@ -29,13 +29,15 @@ Module ProblemSize
 	Integer             :: n_r, tnr
 	Integer             :: grid_type = 1
 	Real*8              :: rmin, rmax, r_inner, r_outer
+    Real*8              :: stretch_factor = 0.0d0
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
     Integer :: precise_bounds = -1
 	Type(Load_Config)   :: my_r
 
-	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, precise_bounds,grid_type
+	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
+            &  precise_bounds,grid_type, stretch_factor
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -155,7 +157,8 @@ Contains
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
 		Integer :: r, nthr,i
-		real*8 :: uniform_dr, arg, pi_over_N, rmn, delta, scaling
+		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
+        real*8 :: delr0
         Real*8 ::	Pi  = 3.1415926535897932384626433832795028841972d0
 
 		nthr = pfi%nthreads
@@ -193,6 +196,41 @@ Contains
                     radius = radius/scaling
                     rmn = minval(radius)
                     radius(:) = radius(:)-rmn+rmin                    
+
+                Case (3) ! Stretched Grid -  high res near boundaries
+                         ! Each cell is (1+stretch_factor) bigger than the one before it
+                         ! n_r is assumed to be even for this to work
+                    delta = rmax-rmin
+                    arg = 0.0d0
+                    radius(1) = 0.0d0
+                    r = (n_r/2)+1
+
+                    Do i = 0, r-2
+                        arg = arg + (1.0d0+stretch_factor)**i
+                    Enddo
+                    delr0 = delta/arg  ! This is the grid spacing at the outer boundary
+
+                    ! Set up the top half of the grid (1 through nr/2+1)                    
+                    Do i = 1, r-1
+                        arg = delr0*( (1.0+stretch_factor)**i )
+                        radius(i+1) = radius(i)+arg
+                    Enddo
+
+                    ! Reflect to get the other half.
+                    Do i = 1, (n_r/2)-1
+                        arg = radius(r)-radius(r-i )
+                        radius(r+i )=radius(r)+arg
+                    Enddo
+
+                    !Finally, rescale the grid
+                    rmx = maxval(radius)
+                    radius(:) = radius(:)*delta/rmx
+                    radius(:) = delta-radius(:)+rmin
+                    !If (my_rank .eq. 0) Then
+                    !    Do i = 1, n_r
+                    !       Write(6,*)'Radius : ', radius(i)
+                    !    Enddo
+                    !Endif
 
 				Case Default	! Uniform Grid - Same as case 1
 					Radius(N_R) = rmin
