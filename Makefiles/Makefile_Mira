@@ -12,8 +12,9 @@ BLLIB = /soft/libraries/alcf/current/xl/BLAS/lib
 LESSL = /soft/libraries/essl/current/lib64
 ILESSL = /soft/libraries/essl/current/include
 
-# These are some debugging flags
-F90FLAGS =  -qfree=f90 -O2 -I/projects/cig_dynamo/rayleigh_dev/build -I$(FFTWINC) 
+# The first set of flags has the build path hard-coded.  This is error prone!
+##F90FLAGS =  -qfree=f90 -O2 -I/projects/cig_dynamo/rayleigh_dev/build -I$(FFTWINC) 
+F90FLAGS =  -qfree=f90 -O2 -I .  -I$(FFTWINC)
 
 LIBFLAGS = -L$(FFTWLIB) -lfftw3 -L$(LALIB) -llapack -L$(BLLIB) -lblas
 
