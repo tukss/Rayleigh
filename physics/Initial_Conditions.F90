@@ -122,10 +122,14 @@ Contains
 		tempfield%p1a(:,:,:,:) = 0.0d0
 
 		Call StopWatch(cread_time)%StartClock()
-		!Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
+        If (chk_type .eq. 2) Then
+		    Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
+        Else
+    		Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+        Endif
 		Call StopWatch(cread_time)%Increment()
 
-		Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+
 
 		Call Set_All_RHS(tempfield%p1a)
 		Call tempfield%deconstruct('p1a')

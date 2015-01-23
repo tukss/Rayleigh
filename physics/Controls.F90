@@ -40,9 +40,10 @@ Module Controls
     Integer :: check_frequency = 20000          ! Number of iterations between checkpoint dumps
     Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
 	Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
+    Integer :: chk_type = 1                     ! Set to 2 for memory friendly IO.  In development
 
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
-                & cflmax, cflmin, max_time_step
+                & cflmax, cflmin, max_time_step,chk_type
 
 
 End Module Controls
