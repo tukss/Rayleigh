@@ -541,17 +541,24 @@ Contains
 		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
-		Integer :: i, j, k,qq
+		Integer :: i, j, k,qq, p, sizecheck
 		Integer :: n, nn, this_nshell, nq_shell, shell_slice_tag
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
 		Integer :: nelem, buffsize
         Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
         Real*8, Allocatable :: out_radii(:)
-
-        integer :: ierr, hdisp
-		integer(kind=MPI_OFFSET_KIND) :: disp
+        
+        integer :: ierr, rcount
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
 		Integer :: mstatus(MPI_STATUS_SIZE)
-
+        sizecheck = sizeof(disp)
+        if (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
+            Endif
+        endif 
         nq_shell = Shell_Slices%nq
         shell_slice_tag = Shell_Slices%mpi_tag
         funit = Shell_Slices%file_unit
@@ -590,16 +597,17 @@ Contains
 			 	If (your_id .ne. io_node) then
 					! Receive and copy
 
-         		    !Call receive(buff, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm)
+         		    Call receive(buff, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm)
 
-					!all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:this_nshell,1:nq_shell) = &
-					!	& buff(1:nphi , 1:your_ntheta, 1:this_nshell, 1:nq_shell)
+					all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:this_nshell,1:nq_shell) = &
+						& buff(1:nphi , 1:your_ntheta, 1:this_nshell, 1:nq_shell)
 				Else
 					If (Shell_Slices%my_nlevels .gt. 0) Then
 						! Copy my shells into the main output array
 
-					!	all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:s_end,1:nq_shell) &
-					!		& = shell_slice_outputs(:,:,:,:)
+						all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:this_nshell,1:nq_shell) &
+							& = shell_slice_outputs(:,:,:,:)
+                                !shell_slice_outputs(1:nphi,my_theta_min:my_theta_max,1:this_nshell,1:nq_shell)
 					Endif			
 				Endif
 				DeAllocate(buff)
@@ -607,7 +615,7 @@ Contains
 		Else
 			!  Non responsible nodes send their info
 			If (Shell_Slices%my_nlevels .gt. 0) Then
-				!Call send(shell_slice_outputs, dest = 0,tag=shell_slice_tag, grp = pfi%rcomm)
+				Call send(shell_slice_outputs, dest = 0,tag=shell_slice_tag, grp = pfi%rcomm)
 			Endif
 		Endif
 
@@ -615,13 +623,14 @@ Contains
         ! Communication is complete.  Now we open the file using MPI-IO
         
 
+        ! For the moment, every process in column 0 participates in the mpi operation
+        ! The plan is to tune this later so that 
+        if (my_row_rank .eq. 0) Call Shell_Slices%OpenFile_Par(this_iter, error)
 
-        If (responsible .eq. 1) Then
-
-        Call Shell_Slices%OpenFile_Par(this_iter, error)     
-        Write(6,*)"Open Error: ", error   
+        If (responsible .eq. 1) Then   
+           funit = shell_slices%file_unit
         If (Shell_Slices%current_rec .eq. 1) Then                
-            funit = shell_slices%file_unit
+            
             If (shell_slices%master) Then            
                 ! The master rank (whoever owns the first output shell level) writes the header
                 dims(1) = ntheta
@@ -653,56 +662,54 @@ Contains
 
             Endif
         Endif
+
+            ! I might really (really) want to look into file views later.
+            ! Depending on the offset size mpi type, disp will crap out past 2GB
             hdisp = 24 ! dimensions+endian+version+record count
             hdisp = hdisp+shell_slices%nq*4 ! nq
             hdisp = hdisp+Shell_Slices%nlevels*12  ! level indices and level values
             hdisp = hdisp+ ntheta*8  ! costheta
 
-            disp = hdisp
-
+            qdisp = ntheta*Shell_Slices%nlevels*nphi*8
+            full_disp = qdisp*Shell_Slices%nq+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(Shell_Slices%current_rec-1)
             
-            Call shell_slices%closefile_par()
-            !disp = 8
-
-            !Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
-            !Write(6,*)'ierr is: ', ierr, shell_slices%current_rec
-            !If (my_column_rank .eq. first_shell_rank) Then  
-                ! Update the record count in the header
-            !    buffsize = 1
-            !    call MPI_FILE_WRITE(funit,shell_slices%current_rec , buffsize, MPI_INTEGER, & 
-            !        mstatus, ierr) 
-            !    if (ierr .ne. 0) Then
-            !        Write(6,*)'Error in writin shell slices.  MPI Error Code: ', ierr
-            !    Endif
-            !Endif
-            !Call MPI_FILE_CLOSE(funit, ierr)
-            !Shell_Slices%current_rec = Shell_Slices%current_rec+1
+            buffsize = Shell_Slices%my_nlevels*ntheta*nphi
+            ! The file is striped with time step slowest, followed by q
 
 
-            !call MPI_FILE_OPEN(pfi%ccomm%comm, "ShellTEST", & 
-            !    MPI_MODE_WRONLY +MPI_MODE_APPEND, & 
-            !    MPI_INFO_NULL, funit, ierr) 
+            rcount = 0
+            Do p = 1, Shell_Slices%nshell_r_ids
+                if (Shell_Slices%shell_r_ids(p) .lt. my_column_rank) Then
+                    rcount = rcount+ Shell_Slices%nshells_at_rid(p)
+                Endif
+            Enddo
+            my_rdisp = rcount*ntheta*nphi*8
+            Do i = 1, Shell_Slices%nq
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, all_shell_slices(1,1,1,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+            disp = hdisp+full_disp*Shell_Slices%current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
 
-            !Call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 	! Imaginary part
-            !    MPI_DOUBLE_PRECISION, 'native', & 
-            !    MPI_INFO_NULL, ierr) 
 
-            !    file_pos = Shell_Slices%file_position
-            !    Write(funit)((((all_shell_slices(k,j,i,qq),k=1,nphi), &
-            !        & j=1,ntheta),i=1,Shell_Slices%nlevels),qq=1,Shell_Slices%nq)
+            If (myid .eq. 0) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
 
-            !    If (myid .eq. 0) Then
-            !        Write(funit)simtime
-            !        Write(funit)this_iter
-            !    Endif
-
-                ! Close with MPI Ccomm
-            !    Call Shell_Slices%CloseFile()
-            
 
 			DeAllocate(all_shell_slices)
         Endif  ! Responsible
 
+        If (my_row_rank .eq. 0) Call shell_slices%closefile_par()
 		If (Shell_Slices%my_nlevels .gt. 0) Then
 			DeAllocate(shell_slice_outputs)
 		Endif
@@ -1336,7 +1343,7 @@ Contains
 					ptemp3(pcount) = ptemp(i+1)	! ptemp3 is the number of shells this radial id has
 				endif
 			enddo
-            Write(6,*)"pcount is: ", pcount, my_column_rank
+            
 			!   Resize the temporary arrays
 			Allocate(self%shell_r_ids(1:pcount))
 			Allocate(self%nshells_at_rid(1:pcount))
@@ -1512,24 +1519,27 @@ Contains
     Subroutine CloseFile_Par(self)
         USE MPI_BASE
         Implicit None
-        integer :: ierr, disp,buffsize
+        integer :: ierr, buffsize
         Integer :: mstatus(MPI_STATUS_SIZE)
+        integer(kind=MPI_OFFSET_KIND) :: disp
         !Parallel File Close
         !Peforms the same task as closefile, but using MPI-IO
         Class(DiagnosticInfo) :: self
         disp = 8
-        !Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
+        Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
+            If (ierr .ne. 0) Then
+                Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid
+            Endif
         If (self%master) Then  
-            Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
-            Write(6,*)'ierr2 is: ', ierr, self%current_rec
-            ! Update the record count in the header
+
             buffsize = 1
+
             call MPI_FILE_WRITE(self%file_unit,self%current_rec , buffsize, MPI_INTEGER, & 
                 mstatus, ierr) 
-            Write(6,*)'ierr3 is: ', ierr, self%current_rec
+            If (ierr .ne. 0) Write(6,*)'Error writing to header.  Error code: ', ierr
         Endif
         Call MPI_FILE_CLOSE(self%file_unit, ierr)
-        Write(6,*)'Closing file error: ',ierr
+        If (ierr .ne. 0) Write(6,*)'Error closing file.  Error code: ',ierr
     End Subroutine CloseFile_Par
 
 
