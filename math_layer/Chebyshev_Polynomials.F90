@@ -21,8 +21,20 @@ Module Chebyshev_Polynomials
 		Module Procedure From_Spectral_1D, From_Spectral_2D, From_Spectral_3D, From_Spectral_4D
 	End Interface
 
+	Interface Cheby_From_SpectralFE
+		Module Procedure From_SpectralFE_4D
+	End Interface
+
+	Interface Cheby_To_SpectralFE
+		Module Procedure To_SpectralFE_4D
+	End Interface
+
 	Interface d_by_dr_cp
 		Module Procedure Cheby_Deriv_Buffer_4D
+	End Interface
+
+	Interface d_by_dr_cpFE
+		Module Procedure FECheby_Deriv_Buffer_4D
 	End Interface
 
 Contains
@@ -756,5 +768,319 @@ Contains
 		Enddo
 
 	End Subroutine Load_Single_Row_Cheby
+
+
+    !///////////////////////////////////////////
+    ! Finite Element versions of load row routines
+	Subroutine Load_Interior_Rows_FECheby(nglobal,row,col,amp,dorder,mpointer)
+		Integer, Intent(In) :: row, col, dorder, nglobal
+		Integer :: r, n, off1,rmod
+		real*8, Intent(In) :: amp(:)
+		real*8, Pointer, Dimension(:,:), Intent(In) :: mpointer
+		Do r = 1, Nglobal       ! Nglobal is like n_r
+            off1 = N_max*((r-1)/N_max)
+            rmod = MOD(r-1,N_max)+1
+			Do n = 1, N_max
+				mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1)+amp(r)*dcheby(rmod,n,dorder)
+			Enddo
+		Enddo
+	End Subroutine Load_Interior_Rows_FECheby
+
+	Subroutine Load_Single_Row_FECheby(r,row,col,amp,dorder,mpointer, clear_row, boundary)
+		Integer, Intent(In) :: r,row, col, dorder
+		Integer :: n, off1, rmod
+		real*8, Intent(In) :: amp
+		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
+		Logical, Intent(In), Optional :: clear_row, boundary
+		Logical :: bjunk
+		If (present(clear_row)) Then
+			! clear everything in this row
+			mpointer(r+row,:) = 0.0d0
+		Endif
+		If (present(boundary)) Then
+			! Do nothing at the moment
+			bjunk = boundary	! This is in development, but placeholder to avoid Intel compiler warnings (unused vars)
+		Endif
+        off1 = N_max*((r-1)/N_max)
+        rmod = MOD(r-1,N_max)+1
+		Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
+			mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1)+amp*dcheby(rmod,n,dorder)
+		Enddo
+
+	End Subroutine Load_Single_Row_FECheby
+
+	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
+		Integer, Intent(In) :: rind,row, col, dorder, nglobal
+		Integer :: n, off1, off2, r, rstart,rmod, extra
+		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
+
+
+
+        ! We'll either be doing index 1 (within a subdomain) or index N_max
+        if (rind .eq. 1) Then
+            rstart = N_max+1
+            extra = -N_max      ! We link current domain and previous domain (domain to the left)
+        else
+            rstart = N_max
+            extra = 0   ! Link current domain and next domain (to the right)
+        endif
+        Do r = rstart, nglobal-1, N_max  ! explicitly leave out the boundaries
+            
+    		! clear everything in this row
+    		mpointer(r+row,:) = 0.0d0
+            rmod = MOD(r-1,N_max)+1
+            off1 = N_max*((r-1)/N_max)+extra
+            off2 = off1+N_max
+            !Write(6,*)"r: ", r, rmod, off1, off2, rind, rstart
+		    Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
+			    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) + dcheby(rmod,n,dorder)
+                mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) - dcheby(rmod,n,dorder)
+		    Enddo
+        Enddo
+	End Subroutine Cheby_Continuity
+
+
+	Subroutine From_SpectralFE_4D(c_in,f_out)
+		Implicit None
+        ! Parity is assumed to be true for NOW
+        ! This may be inefficient, but I just want it to work first.  Will optimize later
+		Real*8, Intent(In) :: c_in(:,:,:,:)
+		Real*8, Intent(InOut) :: f_out(:,:,:,:)
+		Real*8, Allocatable :: c_temp(:,:,:,:), f_temp(:,:,:,:)
+		Real*8 :: alpha, beta
+		Integer :: i, j, k, kk, n2, n3, n4, dims(4),nsub,nglobal, hoff, hh
+        Integer :: istart, iend
+		alpha = 1.0d0
+		beta = 0.0d0
+
+		dims = shape(c_in)
+        nglobal = dims(1)
+		n2 = dims(2)
+		n3 = dims(3)
+		n4 = dims(4)
+        nsub = nglobal/n_max
+		If (parity) Then
+            DO hh = 1, nsub
+            hoff = n_max*(hh-1)
+
+			Allocate(c_temp(1:n_even,1:n2, 1:n3, 1:n4))
+			Allocate(f_temp(1:n_x   ,1:n2, 1:n3, 1:n4))
+			Do kk = 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, n_even
+				c_temp(i,j,k,kk) = c_in(hoff+2*i-1,j,k,kk) 
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+
+			CALL DGEMM('N','N',N_x,n2*n3*n4,N_even, alpha, cheby_even, N_x,c_temp , N_even, beta,f_temp,N_x)
+
+			Do kk = 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, n_even
+				f_out(i+hoff,j,k,kk) = f_temp(i,j,k,kk)
+				f_out(hoff+N_max-i+1,j,k,kk) = f_temp(i,j,k,kk)
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+
+			If (n_even .ne. n_odd) Then
+				Do kk = 1, n4
+				Do k = 1, n3
+				Do j = 1, n2
+					f_out(hoff+n_x,j,k,kk) = f_out(hoff+n_x,j,k,kk)*2.0d0
+				Enddo
+				Enddo
+				Enddo
+				DeAllocate(c_temp)
+				Allocate(c_temp(1:n_odd,1:n2,1:n3,1:n4))
+			Endif
+			Do kk = 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, n_odd
+				c_temp(i,j,k,kk) = c_in(hoff+2*i,j,k,kk) 
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+			CALL DGEMM('N','N',N_x,n2*n3*n4,N_odd, alpha, cheby_odd, N_x,c_temp , N_odd, beta,f_temp,N_x)
+
+			Do kk = 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, n_odd
+				f_out(hoff+i,j,k,kk) = f_out(i,j,k,kk) + f_temp(i,j,k,kk)
+				f_out(hoff+N_max-i+1,j,k,kk) = f_out(N_max-i+1,j,k,kk)-f_temp(i,j,k,kk)
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+			If (n_even .ne. n_odd) Then
+				f_out(n_x,:,:,:) = f_out(n_x,:,:,:) + f_temp(n_x,:,:,:)*2.0d0
+			Endif
+			DeAllocate(c_temp, f_temp)
+
+            ENDDO ! HH
+		Else
+			CALL DGEMM('N','N',N_max,n2*n3*n4,N_Max, alpha, cheby, N_max,c_in , N_Max, beta,f_out,N_max)
+
+		Endif
+
+        Do hh = 1, nsub
+        hoff = (hh-1)*n_max
+        istart = 1+hoff
+        iend = istart+n_max-1
+		Do kk = 1, n4
+		Do k = 1, n3
+		Do j = 1, n2
+			f_out(istart:iend,j,k,kk) = f_out(istart:iend,j,k,kk) -c_in(hoff+1,j,k,kk)/2.0d0
+		Enddo
+		Enddo
+		Enddo
+        Enddo
+	End Subroutine From_SpectralFE_4D
+
+	Subroutine To_SpectralFE_4D(f_in,c_out)
+		Implicit None
+
+		Real*8, Intent(In) :: f_in(:,:,:,:)
+		Real*8, Intent(InOut) :: c_out(:,:,:,:)
+		Real*8 :: alpha, beta
+		Real*8, Allocatable :: f_even(:,:,:,:), f_odd(:,:,:,:), c_temp(:,:,:,:)
+		Integer :: i, j, k, kk, n2, n3, n4, dims(4),nsub,nglobal, hoff, hh
+        Integer :: istart, iend
+
+		alpha = 2.0d0/n_max
+		beta = 0.0d0
+		dims = shape(f_in)
+        nglobal = dims(1)
+		n2 = dims(2)
+		n3 = dims(3)
+		n4 = dims(4)
+        nsub = nglobal/n_max
+		If (parity) Then
+            DO hh = 1, nsub
+            hoff = n_max*(hh-1)
+			Allocate(c_temp(1:n_even, 1:n2, 1:n3, 1:n4 ))
+			Allocate(f_even(1:n_x   , 1:n2, 1:n3, 1:n4 ))
+			Allocate( f_odd(1:n_x   , 1:n2, 1:n3, 1:n4 ))
+			Do kk= 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, N_x
+				f_even(i,j,k, kk) = f_in(hoff+i,j,k,kk)+f_in(hoff+N_max-i+1,j,k,kk)
+				f_odd(i,j,k, kk)  = f_in(hoff+i,j,k,kk)-f_in(hoff+N_max-i+1,j,k,kk)
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+			CALL DGEMM('T','N',N_even,n2*n3*n4,N_x, alpha, cheby_even, N_x,f_even , N_x, beta,c_temp,N_even)
+			Do kk = 1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, n_even
+				c_out(hoff+2*i-1,j,k,kk) = c_temp(i,j,k,kk)
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+			If (n_even .ne. n_odd) Then
+				DeAllocate(c_temp)
+				Allocate(c_temp(1:n_odd,1:n2,1:n3,1:n4))
+			Endif
+			Call DGEMM('T','N',N_odd,n2*n3*n4,N_x, alpha, cheby_odd, N_x,f_odd , N_x, beta,c_temp,N_odd)
+			Do kk =1, n4
+			Do k = 1, n3
+			Do j = 1, n2
+			Do i = 1, N_odd
+				c_out(hoff+2*i,j,k,kk) = c_temp(i,j,k,kk)
+			Enddo
+			Enddo
+			Enddo
+			Enddo
+			DeAllocate(f_even,f_odd,c_temp)
+			ENDDO ! HH
+		Else
+			CALL DGEMM('T','N',N_max,n2*n3*n4,N_Max, alpha, cheby, N_max,f_in , N_Max, beta,c_out,N_max)
+		Endif
+	End Subroutine To_SpectralFE_4D
+
+	Subroutine FECheby_Deriv_Buffer_4D(ind,dind,buffer,dorder)
+#ifdef useomp 
+        Use Omp_lib
+#endif
+		Implicit None
+		Real*8,  Intent(InOut) :: buffer(0:,1:,1:,1:)	! Makes it easier to reconcile with my IDL code
+		Integer, Intent(In)    :: ind, dind, dorder
+		Real*8, Allocatable :: dbuffer(:,:,:)
+		Integer :: dims(4), n,n2,n3, i,j,k, order
+		Integer :: kstart, kend, nthr,trank
+        Integer :: nglobal, nsub, hoff, hh
+		dims = shape(buffer)
+		nglobal = dims(1)
+        nsub = nglobal/n_max
+        n = n_max
+		n2 = dims(2)
+		n3 = dims(3)
+		If (ind .ne. dind) Then
+         !$OMP PARALLEL DO PRIVATE(i,j,k,hh,hoff)
+			Do k = 1, n3
+				Do j = 1, n2
+                DO hh = 1, nsub
+                    hoff = (hh-1)*n_max
+					buffer(hoff+n-1,j,k,dind) = 0.0d0
+					buffer(hoff+n-2,j,k,dind) = 2.0d0*(n-1)*buffer(hoff+n-1,j,k,ind)*scaling
+					Do i = n-3,0, -1
+						buffer(hoff+i,j,k,dind) = buffer(hoff+i+2,j,k,dind)+2.0d0*(i+1)*buffer(hoff+i+1,j,k,ind)*scaling
+					Enddo
+                ENDDO !hh
+				Enddo
+			Enddo
+         !$OMP END PARALLEL DO
+			If (dorder .gt. 1) Then 
+				Allocate(dbuffer(0:nglobal-1,1:dorder,0:cp_nthreads-1))
+            !$OMP PARALLEL PRIVATE(i,j,k,trank,order,kstart,kend,nthr)
+#ifdef useomp
+        		trank = omp_get_thread_num()
+		  		nthr  = omp_get_num_threads()
+		  		kstart = (trank*n3)/nthr+1
+		  		kend = ((trank+1)*n3)/nthr
+#else
+				trank = 0
+				kstart = 1
+				kend = n3
+#endif
+				Do k = kstart,kend
+
+					Do j = 1, n2
+						dbuffer(:,1,trank) = buffer(:,j,k,dind)
+						Do order = 2, dorder
+                            DO hh = 1, nsub
+                            hoff = (hh-1)*n_max
+							dbuffer(hoff+n-1,order,trank) = 0.0d0
+							dbuffer(hoff+n-2,order,trank) = 2.0d0*(n-1)*dbuffer(hoff+n-1,order-1,trank)*scaling
+							Do i = n -3, 0, -1
+								dbuffer(hoff+i,order,trank) = dbuffer(hoff+i+2,order,trank)+ &
+									& 2.0d0*(i+1)*dbuffer(hoff+i+1,order-1,trank)*scaling						
+							Enddo
+                            ENDDO !hh
+						Enddo
+						buffer(:,j,k,dind) = dbuffer(:,dorder,trank)
+					Enddo
+				Enddo
+            !$OMP END PARALLEL
+				DeAllocate(dbuffer)
+			Endif
+		Else
+			! In-place -- Needs developing
+		Endif
+		!buffer(:,:,:,dind) = buffer(:,:,:,dind)
+	End Subroutine FECheby_Deriv_Buffer_4D	
+
 
 End Module Chebyshev_Polynomials

@@ -34,10 +34,16 @@ Module ProblemSize
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
     Integer :: precise_bounds = -1
-	Type(Load_Config)   :: my_r
+    Type(Load_Config)   :: my_r
+
+    !///////////////////////////////////////////////////////////////
+    ! Radial Grid Variables Related to the Finite-Element Approach
+    Integer :: fensub = -1   !  Number of subdomains to divide N_R into
+    Integer :: fencheby = -1 ! Number of chebyshev modes per subdomain
+	Logical :: finite_element = .false.
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
-            &  precise_bounds,grid_type, stretch_factor
+            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -50,6 +56,12 @@ Contains
 		    rmin = (7.0d0)/13.0d0		! Benchmark bounds have infinite decimal places
 		    rmax = (20.0d0)/13.0d0      ! We override (if desired) the inputs for accuracy
         Endif
+        if ( (fensub .gt. 0) .and. (fencheby .gt. 0) ) Then
+            !Overwrite n_r
+            n_r =fensub*fencheby 
+            finite_element = .true.
+        Endif
+
 		n_phi = 2*n_theta
 		If (dealias) Then
 			l_max = (2*n_theta-1)/3
@@ -95,6 +107,12 @@ Contains
 		my_rank = pfi%gcomm%rank
 		my_row_rank = pfi%rcomm%rank
 		my_column_rank = pfi%ccomm%rank
+        !//////////////////////////////////////////////////
+        !Provide quick notification that n_r may have changed
+        if ( finite_element) Then
+            if (my_rank .eq. 0) Write(6,*)"Finite Elements.  N_R is: ", n_r
+        Endif
+
 		!//////////////////////////////////////////////////
 		! Intialize Legendre Transforms & Horizontal Grid
 		tmp = my_mp%delta
@@ -156,10 +174,17 @@ Contains
 
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
-		Integer :: r, nthr,i
+		Integer :: r, nthr,i,j 
 		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
         real*8 :: delr0
         Real*8 ::	Pi  = 3.1415926535897932384626433832795028841972d0
+
+        !////////////////////////////////////////
+        ! Variables for FE approach
+        Real*8, Allocatable :: xtemp(:)
+        Real*8 :: dsub, offset, xmax, xmin
+        Integer :: istart, iend
+
 
 		nthr = pfi%nthreads
 		Allocate(Delta_r(1:N_R))
@@ -172,6 +197,37 @@ Contains
 			Do r = 2, N_R
 				Delta_r(r) = radius(r)-radius(r-1)
 			Enddo
+
+        Else If (finite_element) Then
+            Write(6,*)"Initializing grid..."
+            Allocate(xtemp(1:fencheby))
+            dsub = (rmax-rmin)/DBLE(fensub)
+            xmin = 0.0d0
+            xmax = dsub
+            
+            Call Initialize_Chebyshev(xtemp,xmin,xmax,radial_integral_weights, nthr)
+            offset = rmax-xtemp(1)
+            istart = 1
+            iend = istart+fencheby-1
+            Do j = 1, fensub
+                radius(istart:iend) = xtemp(1:fencheby)+offset
+                offset = radius(iend)-xtemp(1)
+                istart = istart+fencheby
+                iend = iend+fencheby
+            Enddo 
+            Do j = 1, n_r
+                if (MOD(j,fencheby) .eq. 0) Then
+                    delta_r(j) = radius(j-1)-radius(j)
+                Else
+                    delta_r(j) = radius(j)-radius(j+1)
+                Endif
+            Enddo
+            If (my_rank .eq. 0) Then
+                Do j = 1, n_r
+                    write(6,*)j," : ", radius(j), " , ", delta_r(j)
+                    if (MOD(j,fencheby) .eq. 0) Write(6,*)"---------------------"
+                Enddo
+            Endif
 		Else
 
 			Select Case (grid_type)

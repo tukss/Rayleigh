@@ -5,7 +5,7 @@ Module Initial_Conditions
 	Use Fourier_Transform
 	Use Legendre_Transforms, Only : Legendre_Transform 
 	Use SendReceive
-	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral
+	Use Chebyshev_Polynomials, Only : Cheby_To_Spectral, Cheby_To_SpectralFE
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Use Timers
@@ -299,7 +299,11 @@ Contains
 		If (chebyshev) Then
 			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
 			Call tempfield%construct('p1a')
-			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            If (finite_element) Then
+                Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            Else
+    			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            Endif
 			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
 			Call tempfield%deconstruct('p1a')
 		Endif
@@ -560,7 +564,11 @@ Contains
 		If (chebyshev) Then
 			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
 			Call tempfield%construct('p1a')
-			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            If (finite_element) Then
+    			Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            Else
+    			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            Endif
 			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
 			Call tempfield%deconstruct('p1a')
 		Endif
@@ -1054,7 +1062,11 @@ Contains
 		If (chebyshev) Then
 			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
 			Call tempfield%construct('p1a')
-			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            If (finite_element) Then
+    			Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            Else
+    			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            Endif
 			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
 			Call tempfield%deconstruct('p1a')
 		Endif

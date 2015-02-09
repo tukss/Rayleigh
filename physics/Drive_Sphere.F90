@@ -2,7 +2,7 @@ Module Drive_Sphere
 	Use ClockInfo
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
-	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp
+	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
 	Use Checkpointing
 	Use Controls
 	Use Timers
@@ -59,7 +59,10 @@ Contains
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
-
+		If (finite_element) Then
+			! work structure for post_solveFE (same as above)
+			Call ctemp%init(field_count = wsfcount, config = 'p1b')
+		Endif
 
 
 		Call Hybrid_Init()
@@ -68,6 +71,8 @@ Contains
 
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
+            Else If (finite_element) Then
+                Call Post_Solve_FE
 			Else
 				Call Post_Solve()	! Linear Solve configuration
 			Endif

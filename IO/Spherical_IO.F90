@@ -697,7 +697,7 @@ Contains
             Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
 
 
-            If (myid .eq. 0) Then
+            If (shell_slices%master) Then
                 buffsize = 1
                 Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
                        MPI_DOUBLE_PRECISION, mstatus, ierr)

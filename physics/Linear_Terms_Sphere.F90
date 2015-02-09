@@ -69,6 +69,7 @@ Contains
 			nvar = 4
 		Endif
 		If (chebyshev) Call Use_Chebyshev()	! Turns chebyshev mode to "on" for the linear solve
+        If (finite_element) Call Use_Finite_Elements()
 		Call Initialize_Equation_Set(neq,nvar,N_R,my_nl_lm, my_nm_lm,2)
 
 		Do lp = 1, my_nl_lm
@@ -371,7 +372,14 @@ Contains
 				Call Clear_Row(peq,lp,1)			! Pressure only has one boundary condition
 				Call Clear_Row(teq,lp,1)
 				Call Clear_Row(teq,lp,N_R)
+                If (finite_element) Then
+                    Call FEContinuity(peq,lp,pvar,fencheby,0) ! Pressure is continuous
+                    Call FEContinuity(peq,lp,pvar,1,1)   ! dPdr is continuous (for ell = 0)
 
+                    Call FEContinuity(teq,lp,tvar,fencheby,0) ! T/S is continuous
+                    Call FEContinuity(teq,lp,tvar,1,1)   ! T' / S' is continuous (for ell = 0)
+
+                Endif
 
 				!*******************************************************
 				! Entropy Boundary Conditions
@@ -413,7 +421,20 @@ Contains
 				Call Clear_Row(teq,lp,N_R)
 				Call Clear_Row(zeq,lp,1)
 				Call Clear_Row(zeq,lp,N_R)
+                If (finite_element) Then
+                    Call FEContinuity(peq,lp,pvar,fencheby,0)   ! Pressure is continuous
+                    Call FEContinuity(peq,lp,wvar,1,2)          ! W'' is continuous 
 
+                    Call FEContinuity(weq,lp,wvar,fencheby,0)   ! W is continuous
+                    Call FEContinuity(weq,lp,wvar,1,1)          ! W' is continuous 
+
+                    Call FEContinuity(teq,lp,tvar,fencheby,0)   ! T/S is continuous
+                    Call FEContinuity(teq,lp,tvar,1,1)          ! T' / S' is continuous (for ell = 0)
+
+
+                    Call FEContinuity(zeq,lp,zvar,fencheby,0)   ! Z is continuous
+                    Call FEContinuity(zeq,lp,zvar,1,1)          ! Z' is continuous 
+                Endif
 
 				!*******************************************************
 				! Entropy Boundary Conditions
@@ -544,6 +565,14 @@ Contains
 					Call Clear_Row(aeq,lp,1)
 					Call Clear_Row(aeq,lp,N_R)
 
+                    If (finite_element) Then
+                        Call FEContinuity(aeq,lp,avar,fencheby,0)   ! A is continuous
+                        Call FEContinuity(aeq,lp,avar,1,1)          ! A' is continuous
+
+                        Call FEContinuity(ceq,lp,cvar,fencheby,0)   ! C is continuous
+                        Call FEContinuity(ceq,lp,cvar,1,1)          ! C' is continuous
+ 
+                    Endif
 
 					! Match to a potential field at top and bottom
 					! Btor = 0 at top and bottom
@@ -577,7 +606,7 @@ Contains
 
 	Subroutine Fix_Boundary_Conditions()
 		Implicit None
-		Integer :: l, indx, ii,lp
+		Integer :: l, indx, ii,lp, j
       ! start applying the boundary and continuity conditions by setting 
       ! the appropriate right hand sides.
 
@@ -655,7 +684,41 @@ Contains
 
          Endif
 
+         If (finite_element) Then
+            ! Apply continuity conditions across the subdomains
+            
+            Do j = fencheby, N_R-1, fencheby
+                equation_set(1,weq)%RHS(      j, : , indx:indx+n_m) = 0.0d0
+                equation_set(1,weq)%RHS(N_R  +j, : , indx:indx+n_m) = 0.0d0
+                equation_set(1,weq)%RHS(2*N_R+j, : , indx:indx+n_m) = 0.0d0
+                if (l .ne. 0) equation_set(1,zeq)%RHS(      j, : , indx:indx+n_m) = 0.0d0
+            Enddo
+            If (Magnetism) Then
+                if (l .ne. 0) then
+                Do j = fencheby, N_R-1, fencheby
+                    equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                    equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                Enddo
+                endif
+            Endif
 
+            Do j = fencheby+1, N_R-1, fencheby
+                equation_set(1,weq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                equation_set(1,weq)%RHS(N_R+j  ,: , indx:indx+n_m) = 0.0d0
+                equation_set(1,weq)%RHS(2*N_R+j,: , indx:indx+n_m) = 0.0d0
+                if (l .ne. 0) equation_set(1,zeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+            Enddo
+            If (Magnetism) Then
+                if (l .ne. 0) then
+                Do j = fencheby+1, N_R-1, fencheby
+                    equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                    equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                Enddo
+                endif
+            Endif
+
+
+         Endif
 
          indx = indx + n_m + 1
       Enddo

@@ -1,6 +1,7 @@
 Module Linear_Solve
 	Use Finite_Difference
-	Use Chebyshev_Polynomials, Only : Load_Single_Row_Cheby, Load_Interior_Rows_Cheby
+	Use Chebyshev_Polynomials, Only : Load_Single_Row_Cheby, Load_Interior_Rows_Cheby, Load_Single_Row_FECheby, &
+        &  Load_Interior_Rows_FECheby, Cheby_Continuity
 	!==========================================================================
 	! Generalized Implicit Time-stepping
 	! Currently assumes that implicit time stepping can be done with 1 dimension (only)
@@ -17,6 +18,7 @@ Module Linear_Solve
 	real*8, Allocatable :: dfield(:,:,:,:)
 	Logical :: band_solve = .false.
 	Logical, Private :: chebyshev = .false.
+    Logical, Private :: finite_element = .false.
 	Real*8, Allocatable, Private :: temp_rhs(:,:,:)
 	Type Data_arrays		! support structure for the equation structure
 		real*8, Allocatable :: data(:,:,:)	! dimensioned (r, mode, derivative_order)
@@ -89,7 +91,9 @@ Module Linear_Solve
 	Subroutine Use_BandSolve()
 		band_solve = .true.
 	End Subroutine Use_BandSolve
-
+	Subroutine Use_Finite_Elements()
+		finite_element = .true.
+	End Subroutine Use_Finite_Elements
 	Subroutine DeAllocate_Derivatives()
 		Implicit None
 		Integer :: i, j, dmax, dtype
@@ -465,6 +469,8 @@ Module Linear_Solve
 		If (present(static)) Then
 			If (chebyshev) Then
 				Call Load_Interior_Rows_Cheby(rowblock, colblock,amp,dorder,mpointer)
+            Else If (finite_element) Then
+                Call Load_Interior_Rows_FECheby(ndim1,rowblock, colblock,amp,dorder,mpointer)
 			Else
 				Call Load_Interior_Rows(rowblock, colblock,amp,dorder,mpointer) ! Uses existing version of load rows
 			Endif
@@ -475,6 +481,8 @@ Module Linear_Solve
 			amp = amp*time_amp
 			If (chebyshev) Then
 				Call Load_Interior_Rows_Cheby(rowblock, colblock,amp,dorder,mpointer)
+            Else If (finite_element) Then
+                Call Load_Interior_Rows_FECheby(ndim1,rowblock, colblock,amp,dorder,mpointer)
 			Else
 				Call Load_Interior_Rows(rowblock, colblock,amp,dorder,mpointer) ! Uses existing version of load rows
 			Endif
@@ -738,6 +746,8 @@ Module Linear_Solve
         Else
     		If (chebyshev) Then
 	    		Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
+            Else If (finite_element) Then
+	    Call Load_Single_Row_FECheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
 		    Else
 			    Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
 		    Endif
@@ -745,9 +755,18 @@ Module Linear_Solve
 	End Subroutine Load_BC
 
 
+    Subroutine FEContinuity(eqind, mode, varind,row,dorder)
+        Implicit None
+        Integer, Intent(In) :: eqind, varind, mode, row, dorder
+		Integer :: colblock, rowblock
+		real*8, Pointer, Dimension(:,:) :: mpointer
+		mpointer => equation_set(mode,eqind)%mpointer
+		colblock = equation_set(mode,eqind)%colblock(varind)
+		rowblock = equation_set(mode,eqind)%rowblock
 
+        Call Cheby_Continuity(ndim1,row,rowblock,colblock,dorder,mpointer)
 
-
+    End Subroutine FEContinuity
 	Subroutine Clear_Row(eqind, mode,row)
 		Implicit None
 		Integer, Intent(In) :: eqind, mode, row
