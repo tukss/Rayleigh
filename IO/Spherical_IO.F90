@@ -289,10 +289,10 @@ Contains
 		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
         If (Shell_Slices%nlevels .gt. 0) Then
             shell_ind = Shell_Slices%ind
-            If (myid .eq. 0) THen
-
+            !If (myid .eq. 0) THen
+                !NOTE:  Same as other remark when allocating.  Really should use master node here
                 Shell_Slices%oqvals(shell_ind) = current_qval
-            Endif
+            !Endif
         
 
 		    If (Shell_Slices%my_nlevels .gt. 0) Then
@@ -547,6 +547,7 @@ Contains
 		Integer :: nelem, buffsize
         Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
         Real*8, Allocatable :: out_radii(:)
+        Integer, Allocatable :: level_inds(:)
         
         integer :: ierr, rcount
 		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
@@ -652,10 +653,16 @@ Contains
 	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
                     mstatus, ierr) 
                 DeAllocate(out_radii)
+                
 
+                allocate(level_inds(1:Shell_Slices%nlevels))
+                Do i = 1, Shell_Slices%nlevels
+                    level_inds(i) = Shell_Slices%levels(i)
+                Enddo
+                Write(6,*)'buffsize check: ', buffsize, level_inds
 	            call MPI_FILE_WRITE(funit, Shell_Slices%levels, buffsize, MPI_INTEGER, & 
                     mstatus, ierr) 
-
+                DeAllocate(level_inds)
                 buffsize = ntheta
 	            call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
                     mstatus, ierr) 
@@ -1277,9 +1284,10 @@ Contains
             Enddo
         Endif
 
-        if (pid .eq. 0) Then
+        !if (pid .eq. 0) Then
+            !NOTE:  Later, we may want to do this only on the master node later, but this isn't a huge memory issue
             Allocate(self%oqvals(1:self%nq))
-        Endif
+        !Endif
     End Subroutine Initialize_Diagnostic_Info
     Subroutine AdvanceInd(self)
         Implicit None
