@@ -8,6 +8,7 @@
 Module ReferenceState
 	Use ProblemSize
     Use Math_Constants
+    Use Math_Utility
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
@@ -33,6 +34,7 @@ Module ReferenceState
     Integer :: reference_type
     Integer :: heating_type = 0 ! 0 means no reference heating.  > 0 selects optional reference heating
     Real*8  :: Luminosity
+    Real*8  :: heating_factor, heating_r0
     Type(ReferenceInfo) :: ref
 
     Real*8 :: pressure_specific_heat  ! CP (not CV)
@@ -58,7 +60,7 @@ Module ReferenceState
 	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
-            & gravity_power, dimensional
+            & gravity_power, dimensional,heating_factor, heating_r0
 Contains
 
 	Subroutine Initialize_Reference()
@@ -197,6 +199,11 @@ Contains
         If (heating_type .eq. 1) Then
             Call Constant_Reference_Heating()
         Endif
+
+        If (heating_type .eq. 2) Then
+            Call Tanh_Reference_Heating()
+        Endif
+
     End Subroutine Initialize_Reference_Heating
 
     Subroutine Constant_Reference_Heating()
@@ -216,6 +223,33 @@ Contains
         ref%heating(:) = alpha
         DeAllocate(temp)
     End Subroutine Constant_Reference_Heating
+
+    Subroutine Tanh_Reference_Heating()
+        Implicit None
+        Real*8 :: integral, alpha
+        Real*8, Allocatable :: temp(:), x(:)
+
+        ! Luminosity is specified as an input
+        ! Heating is set so that temp * 4 pi r^2 integrates to one Lsun 
+        ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity
+        Allocate(temp(1:N_R))
+        Allocate(x(1:N_R))
+        x = heating_factor*(radius-heating_r0)/ (max(radius)-min(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
+        Call tanh_profile(x,temp,flip)
+        Call Integrate_in_radius(temp,integral)
+        integral = integral*4.0d0*pi
+        alpha = Luminosity/integral
+        ref%heating(:) = alpha*temp/(ref%density*ref%temperature)
+        ref%heating = ref%heating/(radius**2)
+        if (my_rank .eq. 0) Then
+            Open(unit=15,file='reference_heating',form='unformatted', status='replace',access='stream')
+			Write(15)n_r
+			Write(15)(radius(i),i=1,n_r)
+    
+        Endif
+        DeAllocate(x,temp)
+    End Subroutine Tanh_Reference_Heating
+
 
     Subroutine Integrate_in_radius(func,int_func)
         Implicit None
