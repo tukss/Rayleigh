@@ -15,7 +15,7 @@ Contains
         endif
 
         Do i = 1, nx
-            y(i) = 0.5d0*(1.0d0+flip_factor*tanh(x))
+            y(i) = 0.5d0*(1.0d0+flip_factor*tanh(x(i)))
         Enddo
 
     End Subroutine tanh_profile

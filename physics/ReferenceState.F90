@@ -227,27 +227,40 @@ Contains
     Subroutine Tanh_Reference_Heating()
         Implicit None
         Real*8 :: integral, alpha
-        Real*8, Allocatable :: temp(:), x(:)
+        Real*8, Allocatable :: temp(:), x(:), temp2(:)
+		  Integer :: i
 
         ! Luminosity is specified as an input
         ! Heating is set so that temp * 4 pi r^2 integrates to one Lsun 
         ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity
         Allocate(temp(1:N_R))
+		  Allocate(temp2(1:N_R))
         Allocate(x(1:N_R))
-        x = heating_factor*(radius-heating_r0)/ (max(radius)-min(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
-        Call tanh_profile(x,temp,flip)
-        Call Integrate_in_radius(temp,integral)
+        x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
+        Call tanh_profile(x,temp)
+
+		  temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
+
+		  temp2 = -temp2/(4*pi*radius*radius)
+
+        Call Integrate_in_radius(temp2,integral)
+
         integral = integral*4.0d0*pi
         alpha = Luminosity/integral
-        ref%heating(:) = alpha*temp/(ref%density*ref%temperature)
-        ref%heating = ref%heating/(radius**2)
+        
+		  ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
         if (my_rank .eq. 0) Then
             Open(unit=15,file='reference_heating',form='unformatted', status='replace',access='stream')
 			Write(15)n_r
 			Write(15)(radius(i),i=1,n_r)
-    
+			Write(15)(ref%heating(i), i = 1, n_r)
+    		Write(15)(temp(i), i = 1, n_r)
+			Write(15)(temp2(i), i = 1, n_r)
+			Write(15)(ref%density(i), i = 1, n_r)
+			Write(15)(ref%temperature(i), i = 1, n_r)
         Endif
-        DeAllocate(x,temp)
+		  
+        DeAllocate(x,temp, temp2)
     End Subroutine Tanh_Reference_Heating
 
 
