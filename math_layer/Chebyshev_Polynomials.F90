@@ -914,14 +914,14 @@ Contains
 			Do k = 1, n3
 			Do j = 1, n2
 			Do i = 1, n_odd
-				f_out(hoff+i,j,k,kk) = f_out(i,j,k,kk) + f_temp(i,j,k,kk)
-				f_out(hoff+N_max-i+1,j,k,kk) = f_out(N_max-i+1,j,k,kk)-f_temp(i,j,k,kk)
+				f_out(hoff+i,j,k,kk) = f_out(hoff+i,j,k,kk) + f_temp(i,j,k,kk)
+				f_out(hoff+N_max-i+1,j,k,kk) = f_out(hoff+N_max-i+1,j,k,kk)-f_temp(i,j,k,kk)
 			Enddo
 			Enddo
 			Enddo
 			Enddo
 			If (n_even .ne. n_odd) Then
-				f_out(n_x,:,:,:) = f_out(n_x,:,:,:) + f_temp(n_x,:,:,:)*2.0d0
+				f_out(hoff+n_x,:,:,:) = f_out(hoff+n_x,:,:,:) + f_temp(hoff+n_x,:,:,:)*2.0d0
 			Endif
 			DeAllocate(c_temp, f_temp)
 

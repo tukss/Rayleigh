@@ -858,8 +858,9 @@ End Subroutine LU_Solve_Band
 		Call dgetrs('N', ma, mb, mat, Size(mat,1), pvt, rhs, Size(rhs,1), info)
 
 
-		If(Present(nb)) Then
-			Write(6,*)'info is ', info
+		!If(Present(nb)) Then
+        If (info .ne. 0) Then
+			Write(6,*)'Problem is solve!  info is ', info
 		Endif
 
 End Subroutine LU_Solve_full

@@ -133,6 +133,7 @@ Contains
 		Endif
 
 		!Load the old ab array into the RHS
+
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
 
 		Call wsp%deconstruct('p1b')
@@ -524,6 +525,8 @@ Contains
 
 
 		!Load the old ab array into the RHS
+        !wsp%p1a = 0.0d0
+        !wsp%p1b = 0.0d0
 		Call Set_All_RHS(wsp%p1b)	! RHS now holds old_AB+CN factors
 
 

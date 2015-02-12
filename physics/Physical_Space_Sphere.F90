@@ -527,7 +527,7 @@ Contains
 		Integer :: r,t,k
 		
 		DO_IDX
-			FIELDSP(IDX,pvar) = FIELDSP(IDX,tvar)! cluge to keep t
+			FIELDSP(IDX,tout) = FIELDSP(IDX,tvar)*radius(r)  ! hang on to t
 		END_DO
 
 

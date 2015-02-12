@@ -18,7 +18,7 @@ Module Diagnostics
 
 	Integer, Parameter, Private :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
     Integer, Parameter, Private :: thermalE_flux_radial = 16, radial_ke = 17
-    Integer, Parameter, Private :: ke_flux_radial = 18
+    Integer, Parameter, Private :: ke_flux_radial = 18, enth_flux_radial = 19
 	! We have some "known" outputs as well that allow us to verify that
 	! the spherical_io interface is functional
 	Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -68,7 +68,7 @@ Contains
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
 		Real*8, Intent(In) :: current_time
-		Real*8 :: mypi, over_n_phi, tmp, tmp2
+		Real*8 :: mypi, over_n_phi, tmp, tmp2, dtdp, dtds, tpert
 		Integer :: p,t,r
 		
 		If (time_to_output(iteration)) Then
@@ -132,7 +132,7 @@ Contains
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
 						Do p = 1, n_phi
-						qty(p,r,t) = buffer(p,r,t,pvar)*radius(r)
+						qty(p,r,t) = buffer(p,r,t,tout)
 						Enddo
 					Enddo
 				Enddo
@@ -249,18 +249,35 @@ Contains
 			Endif	
 
 
-			If (compute_quantity(thermalE_flux_radial)) Then
+			If (compute_quantity(Enth_flux_radial)) Then
                 
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)*buffer(1:n_phi,:,:,pvar)   !pvar is temperature/r
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
+                        dtdp = (ref%gamma-1.0d0)/ref%gamma*(ref%temperature(r)/ref%pressure(r))
+                        dtds = ref%temperature(r)/pressure_specific_heat 
 						Do p = 1, n_phi
-						    qty(p,r,t) = qty(p,r,t)*ref%density(r)*ref%temperature(r)*radius(r)
+                            tpert = dtds*buffer(p,r,t,tout)+dtdp*buffer(p,r,t,pvar)
+						    qty(p,r,t) = tpert*buffer(p,r,t,vr)*pressure_specific_heat
 						Enddo
 					Enddo
 				Enddo                
 				Call Add_Quantity(qty)
 			Endif	
+
+			If (compute_quantity(thermalE_flux_radial)) Then
+                
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)*buffer(1:n_phi,:,:,tout)   !pvar is temperature/r
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						    qty(p,r,t) = qty(p,r,t)*ref%density(r)*ref%temperature(r)
+						Enddo
+					Enddo
+				Enddo                
+				Call Add_Quantity(qty)
+			Endif	
+
+
 
 			If (compute_quantity(vol_heating)) Then
                 If (allocated(ref%heating)) Then

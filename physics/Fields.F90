@@ -36,7 +36,7 @@ Module Fields
 	Integer :: dpdr
 	Integer :: dwdr,  d3wdr3, dtdr, dzdr, d2zdr2, d2tdr2, d2wdr2
 	Integer :: vr, vtheta, vphi,dtdt,dvrdt,dvtdr,dvpdr,dvrdr
-	Integer :: dvrdp, dvtdp, dvpdp, dtdp
+	Integer :: dvrdp, dvtdp, dvpdp, dtdp, tout !tout hold temperature/entropy for output
 
 	Integer :: dvtdt, dvpdt
 
@@ -215,6 +215,7 @@ Contains
 		! in physical space configuration using continuity and Z stream function
 		Call Add_Field(dvtdt,arr)
 		Call Add_field(dvpdt,arr)		
+        Call Add_field(tout,arr)
 
 		wsfcount(1,1) = c1a_counter
 		wsfcount(2,1) = c2a_counter
