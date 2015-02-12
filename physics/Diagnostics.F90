@@ -68,7 +68,7 @@ Contains
 		Integer, Intent(In) :: iteration
 		Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
 		Real*8, Intent(In) :: current_time
-		Real*8 :: mypi, over_n_phi, tmp, tmp2, dtdp, dtds, tpert
+		Real*8 :: mypi, over_n_phi, tmp, tmp2, dt_by_dp, dt_by_ds, tpert
 		Integer :: p,t,r
 		
 		If (time_to_output(iteration)) Then
@@ -253,10 +253,10 @@ Contains
                 
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
-                        dtdp = (ref%gamma-1.0d0)/ref%gamma*(ref%temperature(r)/ref%pressure(r))
-                        dtds = ref%temperature(r)/pressure_specific_heat 
+                        dt_by_dp = (ref%gamma-1.0d0)*ref%temperature(r)/(ref%gamma*ref%pressure(r))
+                        dt_by_ds = ref%temperature(r)/pressure_specific_heat 
 						Do p = 1, n_phi
-                            tpert = dtds*buffer(p,r,t,tout)+dtdp*buffer(p,r,t,pvar)
+                            tpert = dt_by_ds*buffer(p,r,t,tout)+dt_by_dp*buffer(p,r,t,pvar)
 						    qty(p,r,t) = tpert*buffer(p,r,t,vr)*pressure_specific_heat
 						Enddo
 					Enddo
