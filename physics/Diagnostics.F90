@@ -254,6 +254,7 @@ Contains
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
                         dt_by_dp = (ref%gamma-1.0d0)*ref%temperature(r)/(ref%gamma*ref%pressure(r))
+                        dt_by_dp = dt_by_dp*ref%density(r)  ! Really solved for P/rho_bar - lbr approximation
                         dt_by_ds = ref%temperature(r)/pressure_specific_heat 
 						Do p = 1, n_phi
                             tpert = dt_by_ds*buffer(p,r,t,tout)+dt_by_dp*buffer(p,r,t,pvar)
