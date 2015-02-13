@@ -249,21 +249,24 @@ Contains
 			Endif	
 
 
-			If (compute_quantity(Enth_flux_radial)) Then
-                
-				Do t = my_theta%min, my_theta%max
-					Do r = my_r%min, my_r%max
-                        dt_by_dp = (ref%gamma-1.0d0)*ref%temperature(r)/(ref%gamma*ref%pressure(r))
-                        dt_by_dp = dt_by_dp*ref%density(r)  ! Really solved for P/rho_bar - lbr approximation
-                        dt_by_ds = ref%temperature(r)/pressure_specific_heat 
-						Do p = 1, n_phi
-                            tpert = dt_by_ds*buffer(p,r,t,tout)+dt_by_dp*buffer(p,r,t,pvar)
-						    qty(p,r,t) = tpert*buffer(p,r,t,vr)*pressure_specific_heat
-						Enddo
-					Enddo
-				Enddo                
-				Call Add_Quantity(qty)
-			Endif	
+
+
+            If (compute_quantity(Enth_flux_radial)) Then
+
+                    Do t = my_theta%min, my_theta%max
+                            Do r = my_r%min, my_r%max
+            dt_by_ds = ref%temperature(r)/pressure_specific_heat
+            dt_by_dp = 1.0d0/pressure_specific_heat
+                                    Do p = 1, n_phi
+                tpert = dt_by_ds*buffer(p,r,t,tout)+dt_by_dp*buffer(p,r,t,pvar)
+                                        tpert = tpert*ref%density(r) ! This is now T'*rho_bar
+                                        qty(p,r,t) = tpert*buffer(p,r,t,vr)*pressure_specific_heat
+                                    Enddo
+                            Enddo
+                    Enddo
+                    Call Add_Quantity(qty)
+            Endif
+
 
 			If (compute_quantity(thermalE_flux_radial)) Then
                 

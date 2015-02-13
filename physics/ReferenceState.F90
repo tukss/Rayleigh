@@ -237,9 +237,12 @@ Contains
 		  Allocate(temp2(1:N_R))
         Allocate(x(1:N_R))
         x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
-        Call tanh_profile(x,temp)
+        !Call tanh_profile(x,temp)
+        Do i = 1, n_r
+            temp2(i) = 0.5d0*(1.0d0-tanh(x(i))*tanh(x(i)))*heating_factor/(maxval(radius)-minval(radius))
+        Enddo
 
-		  temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
+		  !temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
 
 		  temp2 = -temp2/(4*pi*radius*radius)
 
