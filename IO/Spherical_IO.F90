@@ -323,7 +323,7 @@ Contains
 		Implicit None
 		Integer :: j, ilocal, shell_ind, field_ind, rind, counter
         Integer :: k, jj
-		Real*8, Intent(In) :: qty(:,1:,my_theta_min:)
+		Real*8, Intent(In) :: qty(1:,1:,my_theta_min:)
 
         If (Shell_Spectra%nlevels .gt. 0) Then
             shell_ind = Shell_Spectra%ind
@@ -413,7 +413,7 @@ Contains
             
 
             Allocate(sendbuffer(0:lmax,my_mp_min:my_mp_max,shell_spectra%my_nlevels,shell_spectra%nq,2))
-            sendbuffer = -1.0d0 !Comment this out later
+            sendbuffer = 0.0d0 !Comment this out later
 
             ! Do one pass of s2b to get the real parts
             ncount = Shell_Spectra%my_nlevels*Shell_Spectra%nq
@@ -425,7 +425,7 @@ Contains
                     counter = 0
                     Do f = 1, Shell_Spectra%nq
 
-                        field_ind = counter/my_nr
+                        field_ind = counter/my_nr+1
                         Do r = 1, shell_spectra%my_nlevels   
                                 
                             rind = MOD(counter,my_nr)+my_rmin
