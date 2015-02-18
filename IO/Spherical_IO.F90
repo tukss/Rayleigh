@@ -323,7 +323,7 @@ Contains
 		Implicit None
 		Integer :: j, ilocal, shell_ind, field_ind, rind, counter
         Integer :: k, jj
-		Real*8, Intent(In) :: qty(:,:,my_theta_min:)
+		Real*8, Intent(In) :: qty(:,1:,my_theta_min:)
 
         If (Shell_Spectra%nlevels .gt. 0) Then
             shell_ind = Shell_Spectra%ind
@@ -347,10 +347,11 @@ Contains
 
 		            ilocal = Shell_Spectra%my_shell_levs(j)-my_rmin+1
 
-                    counter = (shell_ind-1)*Shell_Spectra%my_nlevels+ j 
+                    counter = (shell_ind-1)*Shell_Spectra%my_nlevels+ j-1 
 
-                    field_ind = (counter-1)/my_nr+1
-                    rind = counter-(field_ind-1)*my_nr +my_rmin-1
+                    field_ind = counter/my_nr+1
+                    rind = MOD(counter,my_nr)+my_rmin
+
                     Do k = 1, nphi
                     Do jj = my_theta_min, my_theta_max
 				        spectra_buffer%p3b(k,rind,jj,field_ind) = &
@@ -419,23 +420,18 @@ Contains
             
             nf = spectra_buffer%nf2b
             Do p = 1, 2
-            !counter = 1
             Do mp = my_mp_min,my_mp_max
                 m = pfi%inds_3s(mp)
-                !Do p = 1, 2
-                    counter = 1
-                    Do f = 1, nf
-                        !rone = (f-1)*2*my_nr+1+(p-1)*my_nr
-                        Do r = my_rmin, my_rmax !rone,rone+my_nr-1
-                            If (counter .le. ncount) Then
-                                field_ind = (counter-1)/shell_spectra%my_nlevels+1
-                                rind = counter-(field_ind-1)*shell_spectra%my_nlevels
+                    counter = 0
+                    Do f = 1, Shell_Spectra%nq
 
-                                sendbuffer(m:lmax,mp,rind,field_ind,p) = &
-                                    & spectra_buffer%s2b(mp)%data(m:lmax,r,p,f)
-
-                                counter = counter+1
-                            Endif
+                        field_ind = counter/my_nr
+                        Do r = 1, shell_spectra%my_nlevels   
+                                
+                            rind = MOD(counter,my_nr)+my_rmin
+                            sendbuffer(m:lmax,mp,r,f,p) = &
+                                & spectra_buffer%s2b(mp)%data(m:lmax,rind,p,field_ind)
+                            counter = counter+1
                         Enddo
                     Enddo
                 Enddo
