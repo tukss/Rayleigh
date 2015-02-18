@@ -1313,7 +1313,8 @@ Contains
 		self%my_nlevels = 0
 		Allocate(self%my_shell_levs(1:self%nlevels))
 		Allocate(self%have_shell(1:self%nlevels))
-		Allocate(self%my_shell_ind(1:self%nlevels))		
+		Allocate(self%my_shell_ind(1:self%nlevels))
+		self%have_shell(:) = 0		
 		Do j = 1, self%nlevels
 			ilocal = self%levels(j)
 			If ((ilocal .ge. my_rmin) .and. (ilocal .le. my_rmax)) Then ! my processor has this radius
