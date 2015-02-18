@@ -425,8 +425,8 @@ Contains
                 !Do p = 1, 2
                     counter = 1
                     Do f = 1, nf
-                        rone = (f-1)*2*my_nr+1+(p-1)*my_nr
-                        Do r = rone,rone+my_nr-1
+                        !rone = (f-1)*2*my_nr+1+(p-1)*my_nr
+                        Do r = my_rmin, my_rmax !rone,rone+my_nr-1
                             If (counter .le. ncount) Then
                                 field_ind = (counter-1)/shell_spectra%my_nlevels+1
                                 rind = counter-(field_ind-1)*shell_spectra%my_nlevels
