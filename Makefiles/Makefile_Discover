@@ -7,7 +7,7 @@ else
 endif
 
 
-LIBFLAGS = -lstdc++ -lmpi -mkl
+LIBFLAGS = -lstdc++ -mkl
 
 PROG =	rayleigh
 
