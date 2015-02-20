@@ -204,6 +204,10 @@ Contains
             Call Tanh_Reference_Heating()
         Endif
 
+	If (heating_type .eq. 3) Then
+	    Call Bouss_Reference_Heating()
+	Endif
+
     End Subroutine Initialize_Reference_Heating
 
     Subroutine Constant_Reference_Heating()
@@ -223,6 +227,11 @@ Contains
         ref%heating(:) = alpha
         DeAllocate(temp)
     End Subroutine Constant_Reference_Heating
+
+    Subroutine Bouss_Reference_Heating()
+	Implicit None
+	ref%heating(:) = 1.0d0
+    End Subroutine Bouss_Reference_Heating
 
     Subroutine Tanh_Reference_Heating()
         Implicit None
@@ -329,6 +338,8 @@ Contains
 			ref%pressure = 1.0d0
 			ref%gravity = 0.0d0 ! Not used with constant reference right now
             ref%gravity_term_s = 0.0d0 ! Set to Ra later in equation_coefficients
+			pressure_specific_heat = 1.0d0
+			Call initialize_reference_heating()
 	End Subroutine Constant_Reference
 
 	
