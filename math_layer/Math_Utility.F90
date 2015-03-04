@@ -7,7 +7,7 @@ Contains
         Real*8, Intent(InOut) :: y(1:)
         Logical, Intent(In), Optional :: flip
         Real*8 :: flip_factor = 1.0d0
-        Integer :: xsize(1), nx
+        Integer :: xsize(1), nx, i
         xsize = size(x)
         nx = xsize(1)
         if (present(flip)) Then
