@@ -1276,7 +1276,9 @@ Contains
         If (present(levels)) Then
             self%levels(:) = levels(:)
             Do i = 1, nshellmax
-                if(self%levels(i) .gt. 0) self%nlevels = self%nlevels+1
+                if( (self%levels(i) .gt. 0) .and. (self%levels(i) .le. nr) ) Then
+                    self%nlevels = self%nlevels+1
+                Endif
             Enddo
         Endif
 
