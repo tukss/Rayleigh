@@ -543,22 +543,39 @@ Contains
 				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
                        MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
                        MPI_INFO_NULL, funit, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Opening File: ', pfi%ccomm%rank
+                Endif
+
 				disp1 = my_check_disp*8
 				disp2 = (my_check_disp+full_disp)*8
 
 				call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 	! Real part
                            MPI_DOUBLE_PRECISION, 'native', & 
                            MPI_INFO_NULL, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Setting View 1: ', pfi%ccomm%rank
+                Endif
 				call MPI_FILE_WRITE(funit, arr(1,v_offset1), buffsize, MPI_DOUBLE_PRECISION, & 
                         mstatus, ierr) 
-
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Writing 1: ', pfi%ccomm%rank
+                Endif
 				call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 	! Imaginary part
                            MPI_DOUBLE_PRECISION, 'native', & 
                            MPI_INFO_NULL, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Setting View 2: ', pfi%ccomm%rank
+                Endif
 				call MPI_FILE_WRITE(funit, arr(1,v_offset2), buffsize, MPI_DOUBLE_PRECISION, & 
                         mstatus, ierr) 
-
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Writing 2: ', pfi%ccomm%rank
+                Endif
 				call MPI_FILE_CLOSE(funit, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Closing File: ', pfi%ccomm%rank
+                Endif
      			
 
                                       
