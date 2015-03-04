@@ -605,7 +605,9 @@ Contains
         call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
         MPI_MODE_RDONLY, & 
         MPI_INFO_NULL, funit, ierr) 
-
+            if (ierr .ne. 0) Then
+                Write(6,*)'Error opening: ', pfi%ccomm%rank
+            Endif
         bsize_in = nread*nlm
         If (ierr .eq. 0) Then
        ! If (nread .gt. 0) Then     !!! SET_VIEW OR _READ ARE BLOCKING APPRENTLY?...
@@ -614,16 +616,28 @@ Contains
             call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 
                 MPI_DOUBLE_PRECISION, 'native', & 
                 MPI_INFO_NULL, ierr) 
+            if (ierr .ne. 0) Then
+                Write(6,*)'Error setting view1: ', pfi%ccomm%rank
+            Endif
             If (nread .gt. 0) Then
             call MPI_FILE_READ(funit, arr(1,v_offset1), bsize_in, MPI_DOUBLE_PRECISION, & 
             mstatus, ierr) 
+            if (ierr .ne. 0) Then
+                Write(6,*)'Error reading1: ', pfi%ccomm%rank
+            Endif
             Endif
             call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 
                 MPI_DOUBLE_PRECISION, 'native', & 
                 MPI_INFO_NULL, ierr) 
+            if (ierr .ne. 0) Then
+                Write(6,*)'Error setting view2: ', pfi%ccomm%rank
+            Endif
             If (nread .gt. 0) Then
             call MPI_FILE_READ(funit, arr(1,v_offset2), bsize_in, MPI_DOUBLE_PRECISION, & 
             mstatus, ierr) 
+            if (ierr .ne. 0) Then
+                Write(6,*)'Error reading2: ', pfi%ccomm%rank
+            Endif
             Endif
        ! Endif
         Else
@@ -632,7 +646,9 @@ Contains
             Endif
         Endif                     
         call MPI_FILE_CLOSE(funit, ierr)    
-                           
+        if (ierr .ne. 0) Then
+                Write(6,*)'Error closing file: ', pfi%ccomm%rank
+        Endif
 	End Subroutine Read_Field
 
 
