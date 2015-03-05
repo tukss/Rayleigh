@@ -550,6 +550,68 @@ Contains
 				disp1 = my_check_disp*8
 				disp2 = (my_check_disp+full_disp)*8
 
+
+                Call MPI_File_Seek(funit,disp1,MPI_SEEK_SET,ierr)
+                If (ierr .ne. 0) Write(6,*)'Error Seeking 1: ', pfi%ccomm%rank
+
+
+				Call MPI_FILE_WRITE(funit, arr(1,v_offset1), buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                If (ierr .ne. 0) Write(6,*)'Error Writing 1: ', pfi%ccomm%rank
+
+
+                Call MPI_File_Seek(funit,disp2,MPI_SEEK_SET,ierr)
+                If (ierr .ne. 0) Write(6,*)'Error Seeking 2: ', pfi%ccomm%rank
+
+
+				Call MPI_FILE_WRITE(funit, arr(1,v_offset2), buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                If (ierr .ne. 0) Write(6,*)'Error Writing 2: ', pfi%ccomm%rank
+
+
+				Call MPI_FILE_CLOSE(funit, ierr) 
+                if (ierr .ne. 0) Write(6,*)'Error Closing File: ', pfi%ccomm%rank
+
+     			
+
+                                      
+                                          
+	End Subroutine Write_Field
+
+
+	Subroutine Write_Field_Orig(arr,ind,tag,iter)
+				Implicit None
+				Integer, Intent(In) :: ind, iter
+				Real*8, Intent(In) :: arr(1:,1:)
+				Character*8 :: iterstring
+				Character*3, Intent(In) :: tag
+				Character*120 :: cfile
+
+				integer ierr, funit , v_offset1, v_offset2
+				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
+				Integer :: mstatus(MPI_STATUS_SIZE)
+	         write(iterstring,'(i8.8)') iter
+            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+
+
+ 				! We have to be careful here.  Each processor does TWO writes. 
+				! The first write places the real part of the field into the file.
+				! The view then changes and advances to the appropriate location of the
+				! imaginary part.  This step is crucial for checkpoints to work with
+				! Different processor configurations.
+ 				v_offset1 = (ind-1)*tnr+1
+				v_offset2 = v_offset1+my_r%delta
+
+				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
+                       MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                       MPI_INFO_NULL, funit, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Opening File: ', pfi%ccomm%rank
+                Endif
+
+				disp1 = my_check_disp*8
+				disp2 = (my_check_disp+full_disp)*8
+
 				call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 	! Real part
                            MPI_DOUBLE_PRECISION, 'native', & 
                            MPI_INFO_NULL, ierr) 
@@ -580,7 +642,7 @@ Contains
 
                                       
                                           
-	End Subroutine Write_Field
+	End Subroutine Write_Field_Orig
 
 
     Subroutine Read_Field(arr,ind,tag,iter,nread,nlm)
