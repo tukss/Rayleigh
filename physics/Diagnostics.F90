@@ -140,6 +140,17 @@ Contains
 				Call Add_Quantity(qty)
 			Endif		
 
+			If (compute_quantity(pressure)) Then
+				Do t = my_theta%min, my_theta%max
+					Do r = my_r%min, my_r%max
+						Do p = 1, n_phi
+						qty(p,r,t) = buffer(p,r,t,pvar)
+						Enddo
+					Enddo
+				Enddo
+				Call Add_Quantity(qty)
+			Endif		
+
 			If (compute_quantity(gradt_r)) Then
 				Do t = my_theta%min, my_theta%max
 					Do r = my_r%min, my_r%max
