@@ -12,7 +12,7 @@ Module Parallel_Framework
 	!  
 	Integer, Parameter, Public :: Cartesian = 1, Cylindrical = 2, Spherical = 3
 	Integer, Parameter, Public :: p1 =1 ,s1 = 2, p2 = 3,s2a =4, p3a=5,p3b=6
-	Public :: Load_Config, Full_Barrier
+	Public :: Load_Config, Full_Barrier, Main_MPI_Init
 	Character*6 :: ifmt = '(i4.4)' ! Integer format for indicating processor tag numbers in output
 	Type, Public :: Parallel_Interface
 		Type(Load_Config) :: my_1p, my_2p, my_3p	!  like my_r, my_theta in ASH 
@@ -28,18 +28,20 @@ Module Parallel_Framework
 		Integer, Allocatable :: inds_3s(:)
 		Type(communicator) :: rcomm ! row communicator
 		Type(communicator) :: ccomm ! column communicator
-		Type(communicator) :: gcomm ! global communicator
+		Type(communicator) :: gcomm ! global communicator for individual run.  Mirrors mpi_comm_world in standard mode
+        Type(communicator) :: wcomm ! Mirror of MPI_COMM_WORLD
 		!##################################################
 		Type(Load_Config), Allocatable, Public :: lb_1p(:), lb_1s(:)
 
 
 		Contains
-
+        Procedure :: Init_World_Comm
 		Procedure :: Init => Initialize_Parallel_Interface
         Procedure :: openmp_init
 		Procedure :: Exit => Finalize_Framework
 		Procedure ::  Spherical_Init 
 		Procedure ::  Init_Geometry
+        Procedure :: Broadcast_Intarr
 	End Type Parallel_Interface
 
 	Type, Public :: mcontainer
@@ -107,6 +109,7 @@ Module Parallel_Framework
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
 		Contains
+
 		Procedure :: Init  => Initialize_Spherical_Buffer
 		Procedure :: construct => Allocate_Spherical_Buffer
 		Procedure :: deconstruct => DeAllocate_Spherical_Buffer
@@ -1128,11 +1131,26 @@ Contains
 		
     End Subroutine Transpose_1a2a
 
-
-
-	Subroutine Initialize_Parallel_Interface(self, pars)
+    Subroutine Main_MPI_Init(ret_rank)
         Implicit None
-		Integer, Intent(In) :: pars(1:)
+        Integer, Intent(out) :: ret_rank
+        Call pfi%init_world_comm()
+        ret_rank = pfi%wcomm%rank
+    End Subroutine Main_MPI_Init
+
+    Subroutine Init_World_Comm(self)
+        !This handles initialization of MPI_COMM_WORLD
+        Implicit None
+        Integer :: error
+        Class(Parallel_Interface) :: self
+        self%wcomm = init_main_group(error)
+    End Subroutine Init_World_Comm
+
+
+	Subroutine Initialize_Parallel_Interface(self, pars,ncpus)
+        Implicit None
+		Integer, Intent(In) ::  pars(1:)
+        Integer, Intent(In) :: ncpus(1:)
 		Integer :: pcheck, error
         Integer :: ierr
 		Class(Parallel_Interface) :: self	
@@ -1153,7 +1171,16 @@ Contains
 		Else
 			! get the process grid info from the environment
 		Endif
-		self%gcomm = init_main_group(error)
+        If (size(ncpus) .gt. 1) Then
+            !Multiple run Mode
+            self%gcomm = Init_SubGroup(self%wcomm,ncpus,error)
+        Else
+            !Normal Mode -- gcomm is mirror of wcomm/MPI_COMM_WORLD
+            self%gcomm%rank = self%wcomm%rank
+            self%gcomm%np = self%wcomm%np
+            self%gcomm%comm = self%wcomm%comm
+
+        Endif
 		if (self%gcomm%np .ne. self%npe) Then
 			If (self%gcomm%rank .eq. 0) Then
 				Write(6,*)'Error np does not agree with number of processes.'
@@ -1172,7 +1199,33 @@ Contains
         Call self%openmp_init()
 
 	End Subroutine Initialize_Parallel_Interface
-
+    Subroutine Broadcast_Intarr(self,intarr,src,comm_option)
+        Implicit None
+		Class(Parallel_Interface) :: self
+        Integer, Intent(In) :: intarr(:)
+        Integer, Intent(In), Optional :: src, comm_option
+        Integer :: arr_size, comm_handle, src_rank, ierr
+        arr_size = size(intarr)
+        If (present(src)) Then
+            src_rank = src
+        Else
+            src_rank = 0
+        Endif
+        comm_handle = self%wcomm%comm
+        If (present(comm_option)) Then
+            Select Case(comm_option)
+                Case(1)
+                    comm_handle = self%gcomm%comm
+                Case(2)
+                    comm_handle = self%rcomm%comm
+                Case(3)
+                    comm_handle = self%ccomm%comm
+                Case Default
+                    comm_handle = self%wcomm%comm
+            End Select
+        Endif
+		Call MPI_Bcast(intarr,arr_size, MPI_INTEGER, src_rank, comm_handle, ierr)
+    End Subroutine Broadcast_Intarr
 			   
     Subroutine OpenMp_Init(self)
 #ifdef useomp 

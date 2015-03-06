@@ -3,7 +3,7 @@ Module ProblemSize
 	Use Finite_Difference, Only  : Initialize_Derivatives, Rescale_Grid_FD
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
-	Use Controls, Only : Chebyshev, use_parity
+	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
 	Use Timers
 
@@ -12,7 +12,11 @@ Module ProblemSize
 	!//////////////////////////////////////////////////////////////
 	! Processor Configuration
 	Integer :: ncpu = 1, nprow = 1, npcol =1 , npout = 1
-	Integer :: my_rank, my_row_rank, my_column_rank ! rank *within* row and rank *within* column
+	Integer :: my_rank      ! This is the rank within a run communicator
+    Integer :: global_rank  ! This differs from my_rank only when multi-run mode is active
+    Integer :: ncpu_global  ! Same as ncpu unless multi-run mode is active
+    Integer :: my_row_rank, my_column_rank ! rank *within* row and rank *within* column
+
 	!//////////////////////////////////////////////////////////////
 	! Horizontal Grid Variables
 	Integer              :: n_theta, n_phi
@@ -52,6 +56,8 @@ Contains
 		Integer :: tmp,r, l
 		Integer, Allocatable :: m_vals(:)
 		Real*8 :: ell
+        Character*120 :: grid_file
+        Integer :: cpu_tmp(1)
         if (precise_bounds .eq. 1) Then
 		    rmin = (7.0d0)/13.0d0		! Benchmark bounds have infinite decimal places
 		    rmax = (20.0d0)/13.0d0      ! We override (if desired) the inputs for accuracy
@@ -100,7 +106,13 @@ Contains
 		ppars(8) = ncpu
 		ppars(9) = nprow
 		ppars(10) = npcol
-		Call pfi%init(ppars)
+        If (multi_run_mode) Then
+    		Call pfi%init(ppars,run_cpus)
+        Else
+            cpu_tmp(1) = ncpu
+    		Call pfi%init(ppars,cpu_tmp)
+        Endif
+
 		Call Initialize_Timers()
 		Call StopWatch(init_time)%startclock()
 		Call Map_Indices()
@@ -139,7 +151,8 @@ Contains
 		r_inner = rmin
 		r_outer = rmax
 		if (pfi%gcomm%rank .eq. 0) then
-			Open(101, file = 'grid', status='replace', form = 'unformatted')
+            grid_file = Trim(my_path)//'grid'
+			Open(101, file = grid_file, status='replace', form = 'unformatted')
 			Write(101) n_r
 			Write(101) (radius(r),r=1,n_r)
 			Write(101) n_theta

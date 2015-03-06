@@ -3,6 +3,14 @@ Module Controls
 	Implicit None
 
     !////////////////////////////////////////////////////////////////////////////////
+    ! Multiple run controls,  These are not set in a namelist, but are used through command line options.
+    Character*120, Allocatable :: rundirs(:)
+    Logical :: multi_run_mode = .false.
+    Integer :: nruns = 0 ! only set to non-zero value if multi_run_mode is True
+    Integer, Allocatable :: run_cpus(:)
+    Character*120 :: my_path = ''
+
+    !////////////////////////////////////////////////////////////////////////////////
     ! Numerical Controls
     ! Flats that control details of the parallelization/data layout and 
     ! how the equations are solved (not what equations are solved).

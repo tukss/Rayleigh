@@ -1,5 +1,6 @@
 Module Diagnostics
 	Use ProblemSize
+    Use Controls
 	Use Spherical_IO
 	Use Fields
 	Use Legendre_Polynomials, Only : gl_weights
@@ -57,7 +58,7 @@ Contains
         rweights(n_r) = delr*radius(n_r)**2
 
         rweights = rweights/sum(rweights)
-		  Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta)	
+		  Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
 
         DeAllocate(tweights)

@@ -180,6 +180,7 @@ Contains
 					! This file should contain everything that needs to be known
 	         	write(iterstring,'(i8.8)') iteration
             	cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+                cfile = Trim(my_path)//cfile
 	            open(unit=15,file=cfile,form='unformatted', status='replace')
 	            Write(15)n_r
 					Write(15)grid_type
@@ -219,7 +220,7 @@ Contains
 		Write(iterstring,'(i8.8)') iteration
         If (my_rank .eq. 0) Then
             !process zero reads all the old info and broadcasts to all other ranks
-            cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
             open(unit=15,file=cfile,form='unformatted', status='old')
             Read(15)n_r_old
             Read(15)grid_type_old
@@ -529,7 +530,7 @@ Contains
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
-            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
  				! We have to be careful here.  Each processor does TWO writes. 
@@ -591,7 +592,7 @@ Contains
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
-            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
  				! We have to be careful here.  Each processor does TWO writes. 
@@ -658,7 +659,7 @@ Contains
         integer(kind=MPI_OFFSET_KIND) disp1,disp2 
         Integer :: mstatus(MPI_STATUS_SIZE)
         write(iterstring,'(i8.8)') iter
-        cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+        cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
   
         v_offset1 = (ind-1)*tnr+1
@@ -827,7 +828,7 @@ Contains
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
 	         write(iterstring,'(i8.8)') iter
-            cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
 		var_offset = (ind-1)*tnr
@@ -1043,7 +1044,7 @@ Contains
 			! row/column 0 writes out a file with the grid, etc.
 			! This file should contain everything that needs to be known
         	write(iterstring,'(i8.8)') iteration
-        	cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+        	cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
          open(unit=15,file=cfile,form='unformatted', status='replace')
          Write(15)n_r
 		   Write(15)grid_type
@@ -1090,7 +1091,7 @@ Contains
 		integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 		Integer :: mstatus(MPI_STATUS_SIZE)
 	   write(iterstring,'(i8.8)') iter
-      cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+      cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
 		var_offset = (ind-1)*tnr
@@ -1246,7 +1247,7 @@ Contains
 		Write(iterstring,'(i8.8)') iteration
 		If (my_rank .eq. 0) Then
 			!process zero reads all the old info and broadcasts to all other ranks
-          cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+          cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
 	       open(unit=15,file=cfile,form='unformatted', status='old')
 	       Read(15)n_r_old
 			 Read(15)grid_type_old

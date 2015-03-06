@@ -7,6 +7,7 @@
 
 Module ReferenceState
 	Use ProblemSize
+    Use Controls
     Use Math_Constants
     Use Math_Utility
 	Implicit None
@@ -238,6 +239,7 @@ Contains
         Real*8 :: integral, alpha
         Real*8, Allocatable :: temp(:), x(:), temp2(:)
 		  Integer :: i
+        Character*120 :: heating_file
 
         ! Luminosity is specified as an input
         ! Heating is set so that temp * 4 pi r^2 integrates to one Lsun 
@@ -262,7 +264,8 @@ Contains
         
 		  ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
         if (my_rank .eq. 0) Then
-            Open(unit=15,file='reference_heating',form='unformatted', status='replace',access='stream')
+            heating_file = Trim(my_path)//'reference_heating'
+            Open(unit=15,file=heating_file,form='unformatted', status='replace',access='stream')
 			Write(15)n_r
 			Write(15)(radius(i),i=1,n_r)
 			Write(15)(ref%heating(i), i = 1, n_r)
@@ -304,9 +307,9 @@ Contains
 		Character*120 :: ref_file
 		Integer :: i,sig = 314
 		if (present(filename)) then
-			ref_file = filename
+			ref_file = Trim(my_path)//filename
 		else
-			ref_file = 'reference'
+			ref_file = Trim(my_path)//'reference'
 		endif
 
 		If (my_rank .eq. 0) Then

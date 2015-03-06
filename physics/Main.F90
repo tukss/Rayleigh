@@ -4,7 +4,6 @@ Program Main
 	Use Parallel_Framework
 	Use ProblemSize
 	Use Input
-	!Use Physics
 	Use Diagnostics
 	Use TestSuite
 	Use Checkpointing
@@ -14,6 +13,11 @@ Program Main
 	Use Timers
     Use Fourier_Transform, Only : Initialize_FFTs
 	Implicit None
+
+    Call Main_MPI_Init(global_rank)    !Initialize MPI
+
+    Call Check_Run_Mode()   !This needs to be done before ever reading main input
+
 
 	Call Main_Input()
 	

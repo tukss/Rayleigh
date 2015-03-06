@@ -112,7 +112,7 @@ Module Spherical_IO
     Integer :: shellspectra_frequency=1000000
 
     Integer :: full3d_frequency= 100000
-
+    Character*120 :: local_file_path=''
 
     Namelist /output_namelist/shellavg_values, globalavg_values, &
         & shellslice_values, shellslice_levels, azavg_values, &
@@ -166,12 +166,15 @@ Contains
         Allocate(f_of_r(my_rmin:my_rmax))
     End Subroutine Begin_Outputting
 
-	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in)
+
+
+	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in,file_path)
 		Implicit None
 		Integer :: k, fcount(3,2), ntot, fcnt, master_rank
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
-
+        Character*120, Intent(In) :: file_path
+        local_file_path = file_path
 		! Handles output bookkeeping
 
 		my_theta_min = pfi%my_2p%min
@@ -655,7 +658,7 @@ Contains
                 Do i = 1, Shell_Slices%nlevels
                     level_inds(i) = Shell_Slices%levels(i)
                 Enddo
-                Write(6,*)'buffsize check: ', buffsize, level_inds
+
 	            call MPI_FILE_WRITE(funit, Shell_Slices%levels, buffsize, MPI_INTEGER, & 
                     mstatus, ierr) 
                 DeAllocate(level_inds)
@@ -1193,7 +1196,7 @@ Contains
 
 			write(iterstring,i_ofmt) current_iteration
 			write(qstring,'(i2.2)') current_qval
-         cfile = 'Spherical_3D/'//trim(iterstring)//'_'//qstring
+         cfile = trim(local_file_path)//'Spherical_3D/'//trim(iterstring)//'_'//qstring
 			!Write(6,*)cfile
 			call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
                    MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
@@ -1210,7 +1213,7 @@ Contains
 				! row/column 0 writes out a file with the grid, etc.
 				! This file should contain everything that needs to be known for processing later
 	         write(iterstring,'(i8.8)') current_iteration
-            cfile = 'Spherical_3D/'//trim(iterstring)//'_'//'grid'
+            cfile = trim(local_file_path)//'Spherical_3D/'//trim(iterstring)//'_'//'grid'
 	         open(unit=15,file=cfile,form='unformatted', status='replace')
 	         Write(15)nr
 				Write(15)ntheta
@@ -1411,7 +1414,7 @@ Contains
             ibelong = iter-imod+modcheck    ! This iteration belongs in a file with number= ibelong
         endif
         write(iterstring,i_ofmt) ibelong
-        filename = trim(self%file_prefix)//trim(iterstring)
+        filename = trim(local_file_path)//trim(self%file_prefix)//trim(iterstring)
 
         If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
@@ -1465,7 +1468,7 @@ Contains
         endif
 
         write(iterstring,i_ofmt) ibelong
-        filename = trim(self%file_prefix)//trim(iterstring)
+        filename = trim(local_file_path)//trim(self%file_prefix)//trim(iterstring)
 
         If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
