@@ -35,6 +35,9 @@ Module Diagnostics
 	Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: rweights(:)
     Real*8 :: over_eight_pi
+    !//////////////////////////////////
+    Integer, private :: reboot_count = 0  ! Number of times diagnostics has been rebooted during this run
+    Integer, private :: rbtunit = 154
 Contains
 
 	Subroutine Initialize_Diagnostics()
@@ -62,8 +65,68 @@ Contains
 
 
         DeAllocate(tweights)
+        DeAllocate(rweights)
 		!Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
 	End Subroutine Initialize_Diagnostics
+
+    Subroutine Reboot_Diagnostics(iteration,force_reboot)
+        Implicit None
+        ! Checks to see if a reboot file is found.  If so, reboot the diagnostics
+        Character*120 :: reboot_file
+        Character*1 :: ndigstr
+        Character*6 :: digfmt
+        Logical, Intent(In), Optional :: force_reboot
+        Logical :: reboot_now = .false.
+        Integer :: ndigits, tmp
+        Integer, Intent(In) :: iteration
+        If (present(force_reboot)) Then
+            If (force_reboot) Then
+                !This functionality is used in conjunction with a full reboot.
+                reboot_count = 0
+                reboot_now = .true.
+            Endif
+        Else
+            If (MOD(iteration,diagnostic_reboot_interval) .eq. 0) Then
+                ! We check for the reboot file
+                ndigits = 1
+                tmp = reboot_count/10
+                Do While( tmp .gt. 0)
+                    ndigits = ndigits+1
+                    tmp = tmp/10
+                Enddo
+                Write(ndigstr,'(i1.1)') ndigits
+                digfmt = '(i'//ndigstr//'.'//ndigstr//')'
+                reboot_file = 'reboot_diagnostics_'//digfmt
+                Open(unit = rbtunit,file = reboot_file, err = 341)
+                reboot_now = .true.
+                GOTO 342
+341             reboot_now = .false.         
+342             reboot_count = reboot_count+1
+            Endif
+        Endif
+
+
+        If (reboot_now) Then        
+            Call   CleanUP_Spherical_IO()
+            !Call   Read_Output_Namelist()
+            Call Initialize_Diagnostics()
+        Endif
+    End Subroutine Reboot_Diagnostics
+
+	Subroutine Read_Output_Namelist()
+		Implicit None
+        Character*120 :: input_file
+        input_file = Trim(my_path)//'main_input'
+
+		! First read the main input file
+		Open(unit=20, file=input_file, status="old", position="rewind")
+		Read(unit=20, nml=output_namelist)
+		Close(20)
+
+
+
+
+	End Subroutine Read_Output_Namelist
 
 	Subroutine PS_Output(buffer,iteration, current_time)
 		Implicit None

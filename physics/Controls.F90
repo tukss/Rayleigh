@@ -49,9 +49,17 @@ Module Controls
     Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
 	Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
     Integer :: chk_type = 1                     ! Set to 2 for memory friendly IO.  In development
-
+    Integer :: diagnostic_reboot_interval = -1
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
-                & cflmax, cflmin, max_time_step,chk_type
+                & cflmax, cflmin, max_time_step,chk_type, diagnostic_reboot_interval
 
+Contains
+    Subroutine Initialize_Controls()
+        Implicit None
+        !Set default for diagnostic_reboot_interval (if necessary)
+        If (diagnostic_reboot_interval .le. 0) Then
+            diagnostic_reboot_interval = check_frequency
+        Endif
+    End Subroutine Initialize_Controls
 
 End Module Controls

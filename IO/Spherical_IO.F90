@@ -88,6 +88,7 @@ Module Spherical_IO
         Procedure :: update_position
         Procedure :: getq_now
         Procedure :: init_ocomm
+        Procedure :: CleanUp
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! 
 
@@ -123,7 +124,7 @@ Module Spherical_IO
 
 
 
-    Integer, Private :: nq_max
+
     Integer :: integer_zero = 0
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
@@ -1574,4 +1575,114 @@ Contains
             Endif
         Endif
     End Subroutine getq_now
+
+    !/////////////////////////////////////////
+    ! Cleanup Routines
+    Subroutine CleanUp(self)
+        Implicit None
+        Class(DiagnosticInfo) :: self
+        ! DeAllocates all allocated components of the info structure.
+        ! Reinitializes all static components to their initial values (if they had one).
+        self%values(1:nqmax) = -1 
+        self%levels(1:nshellmax) = -1 
+        self%compute(1:nqmax)= -1
+        self%nq = 0
+        self%nlevels = 0
+        self%my_nlevels = 0
+        self%file_unit = 15
+        self%file_prefix = 'None'
+        If (Allocated(self%oqvals))  DeAllocate(self%oqvals)
+
+        self%frequency = 10000000 
+        self%rec_per_file =1     
+        self%current_rec = 1       
+        self%file_header_size =0 
+        self%file_record_size = 0 
+        self%file_position = 1   
+        self%avg_level = 0       
+
+        self%ind = 1              
+        self%begin_output = .false.
+        self%mpi_tag = 1          
+
+        self%output_version = -1 
+        self%grab_this_q = .false.       
+
+        If (Allocated(self%my_shell_levs)) DeAllocate(self%my_shell_levs)
+        If (Allocated(self%have_shell)) DeAllocate(self%have_shell)
+        If (Allocated(self%my_shell_ind)) DeAllocate(self%my_shell_ind)
+        If (Allocated(self%shell_r_ids)) DeAllocate(self%shell_r_ids)
+        If (Allocated(self%nshells_at_rid)) DeAllocate(self%nshells_at_rid)
+        self%master = .false.
+    End Subroutine CleanUP
+
+    Subroutine CleanUP_Spherical_IO
+        Implicit None
+        !DeAllocates all allocated module arrays
+        !Re-initializes module variables to their default values (if any)
+        current_averaging_level = 0
+        current_qval = 0
+
+        averaging_level(1:nqmax) = 0
+        compute_q(1:nqmax) = 0
+        shellavg_values(1:nqmax)=-1 
+        globalavg_values(1:nqmax)=-1
+        shellslice_values(1:nqmax) =-1
+        shellslice_levels(1:nshellmax)=-1
+        azavg_values(1:nqmax)=-1
+        full3d_values(1:nqmax) = -1 
+        shellspectra_values(1:nqmax)=-1
+        shellspectra_levels(1:nshellmax)=-1
+        histo_values(1:nqmax) = -1
+        histo_levels(1:nshellmax)=-1
+
+        globalavg_nrec = 1
+        shellavg_nrec = 1
+        azavg_nrec = 1
+        shellslice_nrec =1
+        shellspectra_nrec =1
+
+        globalavg_frequency = 1000000
+        shellavg_frequency = 1000000
+        azavg_frequency = 1000000
+        shellslice_frequency = 1000000
+        shellspectra_frequency=1000000
+
+        full3d_frequency= 100000
+        local_file_path=''
+
+        integer_zero = 0
+        If (Allocated(circumference)) DeAllocate(circumference)
+        If (Allocated(qty)) DeAllocate(qty)
+        If (Allocated(f_of_r_theta)) DeAllocate(f_of_r_theta)
+        If (Allocated(azav_outputs)) DeAllocate(azav_outputs)
+        If (Allocated(f_of_r)) DeAllocate(f_of_r)
+        If (Allocated(rdtheta_total)) DeAllocate(rdtheta_total)
+        If (Allocated(shellav_outputs)) DeAllocate(shellav_outputs)
+        If (Allocated(globav_outputs)) DeAllocate(globav_outputs)
+        If (Allocated(shell_slice_outputs)) DeAllocate(shell_slice_outputs)
+    
+        
+        If (Allocated(sintheta_dtheta)) DeAllocate(sintheta_dtheta)
+        If (Allocated(rsquared_dr)) DeAllocate(rsquared_dr)
+        i_ofmt = '(i8.8)'  ! These should never change during a run, but just in case...
+        i_pfmt = '(i5.5)'
+        io_node = 0
+        If (Allocated(theta_integration_weights)) DeAllocate(theta_integration_weights)
+        If (Allocated(r_integration_weights))   DeAllocate(r_integration_weights)
+        If (Allocated(radius)) DeAllocate(radius)
+        If (Allocated(sintheta)) DeAllocate(sintheta)
+        If (Allocated(costheta)) DeAllocate(costheta)
+
+
+        Call Full_3D%cleanup
+        Call Global_Averages%cleanup
+        Call AZ_Averages%cleanup
+        Call Shell_Averages%cleanup
+        Call Shell_Slices%cleanup
+        Call Shell_Spectra%cleanup
+        !Call spectra_buffer%cleanup
+
+    End Subroutine CleanUP_Spherical_IO
+
 End Module Spherical_IO

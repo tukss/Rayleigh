@@ -36,6 +36,7 @@ Contains
 	Subroutine Main_Initialization()
 		Implicit None
 		Character*120 :: ndrf='reference_nd'
+        Call Initialize_Controls()
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
         Call Initialize_FFts()
