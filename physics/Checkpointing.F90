@@ -1090,8 +1090,8 @@ Contains
 		integer ierr, funit 
 		integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 		Integer :: mstatus(MPI_STATUS_SIZE)
-	   write(iterstring,'(i8.8)') iter
-      cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+        write(iterstring,'(i8.8)') iter
+        cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
 		var_offset = (ind-1)*tnr

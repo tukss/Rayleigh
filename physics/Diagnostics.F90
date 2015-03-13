@@ -36,8 +36,9 @@ Module Diagnostics
     Real*8, Allocatable :: rweights(:)
     Real*8 :: over_eight_pi
     !//////////////////////////////////
+
     Integer, private :: reboot_count = 0  ! Number of times diagnostics has been rebooted during this run
-    Integer, private :: rbtunit = 154
+    
 Contains
 
 	Subroutine Initialize_Diagnostics()
@@ -69,16 +70,33 @@ Contains
 		!Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
 	End Subroutine Initialize_Diagnostics
 
+    Function count_digits(n) result(ndigits)
+        !Counts the number of digits in the integer n
+        Implicit None
+        Integer, Intent(in) :: n
+        Integer :: ndigits, tmp
+        ndigits = 1
+        tmp = abs(n)/10
+        Do While( tmp .gt. 0)
+            ndigits = ndigits+1
+            tmp = tmp/10
+        Enddo
+    End Function count_digits
+
     Subroutine Reboot_Diagnostics(iteration,force_reboot)
         Implicit None
         ! Checks to see if a reboot file is found.  If so, reboot the diagnostics
+        Integer, Intent(In) :: iteration
+        Logical, Intent(In), Optional :: force_reboot
+
         Character*120 :: reboot_file
         Character*1 :: ndigstr
         Character*6 :: digfmt
-        Logical, Intent(In), Optional :: force_reboot
+        Character*4 :: suffix
         Logical :: reboot_now = .false.
-        Integer :: ndigits, tmp
-        Integer, Intent(In) :: iteration
+
+        Integer :: ndigits
+
         If (present(force_reboot)) Then
             If (force_reboot) Then
                 !This functionality is used in conjunction with a full reboot.
@@ -87,29 +105,27 @@ Contains
             Endif
         Else
             If (MOD(iteration,diagnostic_reboot_interval) .eq. 0) Then
-                ! We check for the reboot file
-                ndigits = 1
-                tmp = reboot_count/10
-                Do While( tmp .gt. 0)
-                    ndigits = ndigits+1
-                    tmp = tmp/10
-                Enddo
+
+                ! Find the name of the current reboot file.
+                ndigits = count_digits(reboot_count)
                 Write(ndigstr,'(i1.1)') ndigits
                 digfmt = '(i'//ndigstr//'.'//ndigstr//')'
-                reboot_file = 'reboot_diagnostics_'//digfmt
-                Open(unit = rbtunit,file = reboot_file, err = 341)
-                reboot_now = .true.
-                GOTO 342
-341             reboot_now = .false.         
-342             reboot_count = reboot_count+1
+                If (my_rank .eq. 0) Write(suffix,digfmt)reboot_count
+                reboot_file = 'reboot_diagnostics_'//Trim(suffix)
+                
+                If (my_rank .eq. 0) Write(6,*)'CHECKING FOR FILE', reboot_file
+                INQUIRE(file = reboot_file, exist = reboot_now)
+                If (reboot_now) reboot_count = reboot_count+1
             Endif
         Endif
 
 
-        If (reboot_now) Then        
+        If (reboot_now) Then     
+            If (my_rank .eq. 0) Write(6,*)'Reboot file found.  Rebooting diagnostics.'   
             Call   CleanUP_Spherical_IO()
-            !Call   Read_Output_Namelist()
+            Call   Read_Output_Namelist()
             Call Initialize_Diagnostics()
+            reboot_now = .false.
         Endif
     End Subroutine Reboot_Diagnostics
 

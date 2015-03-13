@@ -3,6 +3,7 @@ Module Drive_Sphere
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
+    Use Diagnostics, Only : Reboot_Diagnostics
 	Use Checkpointing
 	Use Controls
 	Use Timers
@@ -98,6 +99,10 @@ Contains
                 Endif
 				Call StopWatch(cwrite_time)%Increment()
             Endif
+            Call Reboot_Diagnostics(iteration)
+            !Note:  The above only reboots the diagnostics if: 
+            !       1.) It's time to check for the reboot file (based on diagnostic_reboot_interval)
+            !       2.) The appropriately named reboot file exists (reboot_diagnostics0, reboot_diagnostics1, etc.)
 		Enddo
 		Call StopWatch(loop_time)%Increment()
 		if (my_rank .eq. 0) Then

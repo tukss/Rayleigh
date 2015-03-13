@@ -331,6 +331,9 @@ Contains
 	End Subroutine Write_Reference
 
 	Subroutine Constant_Reference()
+            Implicit None
+            Integer :: i
+            Real*8 :: r_outer, r_inner, prefactor
 			ref%density = 1.0d0
 			ref%dlnrho = 0.0d0
 			ref%d2lnrho = 0.0d0
@@ -343,8 +346,14 @@ Contains
             ref%gravity_term_s = 0.0d0 ! Set to Ra later in equation_coefficients
 			pressure_specific_heat = 1.0d0
 			Call initialize_reference_heating()
+            Allocate(s_conductive(1:N_R))
+            r_outer = radius(1)
+            r_inner = radius(N_R)
+            prefactor = r_outer*r_inner/(r_inner-r_outer)
+            Do i = 1, N_R
+                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
+            Enddo
 	End Subroutine Constant_Reference
 
-	
 
 End Module ReferenceState
