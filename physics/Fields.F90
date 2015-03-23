@@ -3,6 +3,7 @@ Module Fields
 	Use Parallel_Framework
 	Use ProblemSize
 	Use Controls
+    Use Spherical_Buffer
 	!///////////////////////////////////////////////////////////
 	! The scalable framework of this program is centered around
 	! a large buffer that holds multiple fields.

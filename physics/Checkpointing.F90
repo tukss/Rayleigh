@@ -1,6 +1,7 @@
 Module Checkpointing
 	Use ProblemSize
 	Use Parallel_Framework
+    Use Spherical_Buffer
 	Use Linear_Solve, Only : get_all_rhs
 	Use SendReceive
 	Use ISendReceive
