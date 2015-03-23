@@ -1,7 +1,8 @@
 Module Controls
 	! Things that control how the simulation runs
+    Use BufferedOutput
 	Implicit None
-
+    
     !////////////////////////////////////////////////////////////////////////////////
     ! Multiple run controls,  These are not set in a namelist, but are used through command line options.
     Character*120, Allocatable :: rundirs(:)
@@ -40,7 +41,7 @@ Module Controls
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
                 & viscous_heating, ohmic_heating
 
-    !////////////////////////////////////////////////////
+    !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls
     !   Flags that control details of the time-stepping (some relate to the numerics, but we keep the time-related things together).
 	Real*8  :: alpha_implicit = 0.51d0            ! Crank Nicolson Implict/Explicit weighting factor (1.0 is fully implicit)
@@ -53,6 +54,17 @@ Module Controls
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
                 & cflmax, cflmin, max_time_step,chk_type, diagnostic_reboot_interval
 
+
+
+    !///////////////////////////////////////////////////////////////////////////
+    ! I/O Controls
+    ! What is normally sent to standard out can, if desired, be sent to a file instead
+    Integer :: stdout_flush_interval = 50  ! Lines stored before stdout buffer is flushed to stdout_unit
+    Character*120 :: stdout_file = 'nofile'
+    Type(OutputBuffer) :: stdout
+    Namelist /IO_Controls_Namelist/ stdout_flush_interval,stdout_file
+
+
 Contains
     Subroutine Initialize_Controls()
         Implicit None
@@ -60,6 +72,21 @@ Contains
         If (diagnostic_reboot_interval .le. 0) Then
             diagnostic_reboot_interval = check_frequency
         Endif
+
+        !Initialize the stdout buffer -- by default, write to unit 6 with frequency of 1
+
+		Select Case(stdout_file)
+			Case('stdout')	! Standard out, but flush with user-defined frequency
+                Call stdout%init(6,line_count = stdout_flush_interval)
+			Case('nofile')
+                Call stdout%init(6) ! Standard out, with effectively no buffering (line_count = 1)
+		    Case Default
+			    ! All stdout written to file, flushed at user-defined flush interval
+                Call stdout%init(116,line_count = stdout_flush_interval,filename=stdout_file)
+		End Select
+
     End Subroutine Initialize_Controls
+
+  
 
 End Module Controls

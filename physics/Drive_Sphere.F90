@@ -44,7 +44,10 @@ Contains
 	Subroutine Main_Loop_Sphere()
 		Implicit None
 		Integer ::  last_iteration, first_iteration,i
-		Real*8  :: captured_time			
+		Real*8  :: captured_time		
+        Character*14 :: tmstr
+        Character*8 :: istr, dtfmt ='(ES10.4)'
+        Character*7 :: fmtstr = '(F14.4)', ifmtstr = '(i8.8)' 
 		! We enter the main loop assuming that the solve has just been performed
 		! and that the equation set structure's RHS contains our primary fields with 
 		! radial dimension in-processor.
@@ -78,8 +81,11 @@ Contains
 				Call Post_Solve()	! Linear Solve configuration
 			Endif
 
-			If (my_rank .eq. 0) Write(6,*)'On iteration : ', iteration, deltat
-
+			If (my_rank .eq. 0) Then
+                Write(istr,ifmtstr)iteration
+                Write(tmstr,dtfmt)deltat
+                Call stdout%print(' On iteration : '//istr//'    DeltaT :   '//tmstr)
+            Endif
 			Call rlm_spacea()
 
 			Call Physical_Space()
@@ -106,30 +112,53 @@ Contains
 		Enddo
 		Call StopWatch(loop_time)%Increment()
 		if (my_rank .eq. 0) Then
-			Write(6,*)'//////////////////////////////////////////////'
-			Write(6,*)' Elapsed time: ', StopWatch(loop_time)%elapsed
-			Write(6,*)'  Column time: ', StopWatch(ctranspose_time)%elapsed
-			Write(6,*)'     Row time: ', StopWatch(rtranspose_time)%elapsed
-			Write(6,*)'Legendre time: ', StopWatch(legendre_time)%elapsed
-			Write(6,*)'     FFT time: ', StopWatch(fft_time)%elapsed
-			Write(6,*)'   Solve time: ', StopWatch(solve_time)%elapsed
-			Write(6,*)'    rlma time: ', StopWatch(rlma_time)%elapsed
-			Write(6,*)'    rlmb time: ', StopWatch(rlmb_time)%elapsed
-			Write(6,*)'  pspace time: ', StopWatch(pspace_time)%elapsed
-			Write(6,*)'  psolve time: ', StopWatch(psolve_time)%elapsed
-			Write(6,*)'    dphi time: ', StopWatch(dphi_time)%elapsed
+            Call stdout%print('  ')
+            Call stdout%print('  ')
+			Call stdout%print('//////////////////////////////////////////////')
+			Call stdout%print('   Measured Timings for Process 0  (seconds)  ')
+            Call stdout%print('  ')
+            Write(tmstr,fmtstr)StopWatch(loop_time)%elapsed
+            Call stdout%print(' Elapsed time: '//tmstr )
+
+
+            Write(tmstr,fmtstr)StopWatch(ctranspose_time)%elapsed
+            Call stdout%print('  Column time: '//tmstr)
+
+
+
+            Write(tmstr,fmtstr)StopWatch(rtranspose_time)%elapsed
+            Call stdout%print('     Row time: '//tmstr)
+
+            Write(tmstr,fmtstr)StopWatch(legendre_time)%elapsed
+            Call stdout%print('Legendre time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(fft_time)%elapsed
+            Call stdout%print('     FFT time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(solve_time)%elapsed
+            Call stdout%print('   Solve time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(rlma_time)%elapsed
+            Call stdout%print('    rlma time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(rlmb_time)%elapsed
+            Call stdout%print('    rlmb time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(pspace_time)%elapsed
+            Call stdout%print('  pspace time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(psolve_time)%elapsed
+            Call stdout%print('  psolve time: '//tmstr)
+            Write(tmstr,fmtstr)StopWatch(dphi_time)%elapsed
+            Call stdout%print('    dphi time: '//tmstr)
+
 			captured_time = 0.0d0
 			Do i = 2, 11
 				captured_time = captured_time + StopWatch(i)%elapsed
 			Enddo
-			Write(6,*)'captured time: ', captured_time
-			Write(6,*)'iter/sec     : ', max_iterations/StopWatch(loop_time)%elapsed
-			Write(6,*)'//////////////////////////////////////////////'
-			Write(6,*)'         sub times        '
-			Write(6,*)'      nl time: ', StopWatch(nl_time)%elapsed
-			Write(6,*)'    sdiv time: ', StopWatch(sdiv_time)%elapsed
-			Write(6,*)'      ts time: ', StopWatch(ts_time)%elapsed
-			Write(6,*)'      ar time: ', StopWatch(ar_time)%elapsed
+            Write(tmstr,fmtstr)captured_time
+            Call stdout%print('captured time: '//tmstr)
+
+            Write(tmstr,fmtstr)max_iterations/StopWatch(loop_time)%elapsed
+            Call stdout%print('   ')
+            Call stdout%print('     iter/sec: '//tmstr)
+
+			Call stdout%print('//////////////////////////////////////////////')
+
 		Endif
 		Call Finalize_Timing(n_r,l_max,max_iterations)
 	End Subroutine Main_Loop_Sphere

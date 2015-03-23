@@ -32,7 +32,9 @@ Contains
 			If (my_rank .eq. 0) Then
 				Write(otstring,t_ofmt)old_deltat
 				Write(tstring,t_ofmt)deltat
-				Write(6,*)'Timestep has changed from '//Trim(otstring)//' to '//Trim(tstring)//'.'
+				Call stdout%print('Timestep has changed from '//Trim(otstring)//' to '//Trim(tstring)//'.')
+                Call stdout%partial_flush()  ! Make SURE that a changing timestep is recorded ...
+                                             ! ... even at the expense of additional file I/O for redirected stdout
 			Endif
 			Call StopWatch(seteq_time)%startclock()
 			Call Reset_Linear_Equations()

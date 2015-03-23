@@ -100,7 +100,7 @@ Contains
         Real*8 :: One, ee
         Real*8 :: InnerRadius, OuterRadius
         Integer :: r
-        If (my_rank .eq. 0) write(6,*)'Initializing polytropic reference state.'
+        If (my_rank .eq. 0) Call stdout%print('Initializing polytropic reference state.')
         ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
         ! The following parameters are read from the input file.
         ! poly_n

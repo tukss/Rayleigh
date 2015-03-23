@@ -3,7 +3,8 @@ Module Input
                              & ncpu_global
 	Use Controls,     Only : temporal_controls_namelist, numerical_controls_namelist, &
                             & physical_controls_namelist, max_iterations, pad_alltoall, &
-                            & multi_run_mode, nruns, rundirs, my_path, run_cpus
+                            & multi_run_mode, nruns, rundirs, my_path, run_cpus, &
+                            & io_controls_namelist
 	Use Spherical_IO, Only : output_namelist
 	Use BoundaryConditions, Only : boundary_conditions_namelist
 	Use Initial_Conditions, Only : initial_conditions_namelist, alt_check
@@ -27,6 +28,7 @@ Contains
 		Read(unit=20, nml=numerical_controls_namelist)
 		Read(unit=20, nml=physical_controls_namelist)
 		Read(unit=20, nml=temporal_controls_namelist)
+		Read(unit=20, nml=io_controls_namelist)
 		Read(unit=20, nml=output_namelist)
 		Read(unit=20, nml=boundary_conditions_namelist)
 		Read(unit=20, nml=initial_conditions_namelist)

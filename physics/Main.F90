@@ -1,4 +1,5 @@
 Program Main
+    Use Controls
 	Use Fields
 	Use Initial_Conditions
 	Use Parallel_Framework
@@ -28,7 +29,7 @@ Program Main
 	Else
 		Call Main_Initialization()
 
-	  	!Call Main_Loop()
+
 		Call Main_Loop_Sphere()
 	Endif
 	Call Finalization()
@@ -62,6 +63,7 @@ Contains
 
 
 	Subroutine Finalization()
+        If (my_rank .eq. 0) Call stdout%finalize()
 		Call pfi%exit()
 	End Subroutine Finalization
 End Program Main

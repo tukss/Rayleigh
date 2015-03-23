@@ -113,7 +113,7 @@ Contains
                 If (my_rank .eq. 0) Write(suffix,digfmt)reboot_count
                 reboot_file = 'reboot_diagnostics_'//Trim(suffix)
                 
-                If (my_rank .eq. 0) Write(6,*)'CHECKING FOR FILE', reboot_file
+                
                 INQUIRE(file = reboot_file, exist = reboot_now)
                 If (reboot_now) reboot_count = reboot_count+1
             Endif
@@ -121,7 +121,7 @@ Contains
 
 
         If (reboot_now) Then     
-            If (my_rank .eq. 0) Write(6,*)'Reboot file found.  Rebooting diagnostics.'   
+            If (my_rank .eq. 0) Call stdout%print('Reboot file found.  Rebooting diagnostics.')   
             Call   CleanUP_Spherical_IO()
             Call   Read_Output_Namelist()
             Call Initialize_Diagnostics()
@@ -159,7 +159,7 @@ Contains
 			If (compute_quantity(v_r)) Then
 				
 				qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
-				!write(6,*)'Computing vr ', maxval(qty)
+
 				Call Add_Quantity(qty)
 			Endif		
 
