@@ -68,6 +68,7 @@ Module Controls
 Contains
     Subroutine Initialize_Controls()
         Implicit None
+        character*120 :: ofilename
         !Set default for diagnostic_reboot_interval (if necessary)
         If (diagnostic_reboot_interval .le. 0) Then
             diagnostic_reboot_interval = check_frequency
@@ -82,7 +83,8 @@ Contains
                 Call stdout%init(6) ! Standard out, with effectively no buffering (line_count = 1)
 		    Case Default
 			    ! All stdout written to file, flushed at user-defined flush interval
-                Call stdout%init(116,line_count = stdout_flush_interval,filename=stdout_file)
+                ofilename = Trim(my_path)//Trim(stdout_file)
+                Call stdout%init(116,line_count = stdout_flush_interval,filename=ofilename)
 		End Select
 
     End Subroutine Initialize_Controls
