@@ -443,8 +443,8 @@ Contains
 	Subroutine Adjust_TimeStep()
 		Implicit None
 		Real*8 :: maxt2, maxt
-		
-
+		Character*8 :: dtfmt ='(ES10.4)'
+        Character*14 :: tmstr, tmstr2
 		Call wsp%get_mrv(maxt2)
 		if (maxt2 .gt. 0.0d0) Then
 			maxt = 1.0d0/sqrt(maxt2)
@@ -467,8 +467,13 @@ Contains
 			new_timestep = .true.
 		Endif
 		If (new_deltat .lt. min_time_step) Then
-			If (my_rank .eq. 0) Write(6,*)'Time step became too small.'
-			if (my_rank .eq. 0) write(6,*)'ts: ', new_deltat, min_time_step
+			If (my_rank .eq. 0) Then
+                Call stdout%print('Time step became too small.')
+                Write(tmstr,dtfmt)new_deltat
+                Write(tmstr2,dtfmt)min_time_step
+                Call stdout%print(' DeltaT became : '//tmstr//'  Min DeltaT Allowed:   '//tmstr2)
+                Call stdout%partial_flush()
+            Endif
 			Call pfi%exit()
 			Stop
 		Endif

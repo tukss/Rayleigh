@@ -913,7 +913,7 @@ Contains
 			!  MPI Write
 
 	      write(iterstring,'(i8.8)') iter
-         cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+         cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
  			! We have to be careful here.  Each processor does TWO writes. 
