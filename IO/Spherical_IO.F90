@@ -2,6 +2,7 @@ Module Spherical_IO
     Use Spherical_Buffer
 	Use Parallel_Framework
 	Use SendReceive
+    Use General_MPI
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform
 	Implicit None
@@ -1027,26 +1028,24 @@ Contains
         global_avg_tag = Global_Averages%mpi_tag
         funit = Global_Averages%file_unit
 
-        responsible = 0
-        If (myid .eq. io_node) responsible = 1
 
-        If (responsible .eq. 1) Then
-        !Responsible node receives  all the pieces of the az_averages from the other nodes
-        !Eventually I am going to replace this with a customized allreduce that uses a row/column cascade
+        !///////////////////////////////
+        ! Sum across rows, and then across the first column
 
-            Allocate(full_avg(nq_globav))
-            full_avg(:) = 0.0d0
-            Allocate(buff(nq_globav))
-            Do n = 0, nproc-1
-                If (n .ne. io_node) then		
-                    Call receive(buff, source= n,tag=global_avg_tag,grp = pfi%gcomm)
-                Else
-                    buff(:) = globav_outputs(:)
-                DeAllocate(globav_outputs)
-                Endif
-                full_avg(:) = full_avg(:)+buff(:)
-            Enddo			
-            DeAllocate(buff)
+        Allocate(full_avg(nq_globav))
+        Allocate(buff(nq_globav))
+
+        full_avg(:) = 0.0d0
+        buff(:) = 0.0d0
+        Call dsum1d(globav_outputs,buff,pfi%rcomm)
+        If (my_row_rank .eq. 0) Then
+            Call dsum1d(buff,full_avg,pfi%ccomm)
+        Endif
+
+        !//////////////////////////////
+       
+
+        If (myid .eq. io_node) Then
 
             Call Global_Averages%OpenFile(this_iter, error)
             If (error .eq. 0) Then
@@ -1062,11 +1061,13 @@ Contains
                 Write(funit)this_iter
                 Call Global_Averages%CloseFile 
             Endif
-            DeAllocate(full_avg)
-        Else
-            Call send(globav_outputs, dest = 0,tag=global_avg_tag, grp=pfi%gcomm)
-            DeAllocate(globav_outputs)
+
         Endif
+
+        DeAllocate(globav_outputs)
+        DeAllocate(buff)
+        DeAllocate(full_avg)
+
     End Subroutine Write_Global_Average
 
 
