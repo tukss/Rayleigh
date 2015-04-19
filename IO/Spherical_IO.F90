@@ -1522,7 +1522,7 @@ Contains
             Endif
         Else
     		call MPI_FILE_OPEN(self%ocomm, filename, & 
-                 MPI_MODE_WRONLY, & 
+                 MPI_MODE_RDWR, & 
                  MPI_INFO_NULL, funit, ierr) 
             self%file_unit = funit
 
