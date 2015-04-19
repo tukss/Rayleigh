@@ -1449,6 +1449,9 @@ Contains
         Else
             Open(unit=self%file_unit,file=filename,form='unformatted', status='old',access='stream', &
                 & iostat = errcheck, POSITION = 'APPEND')    
+
+            ! This looks redundant, but it allows partial files to be continued following restart
+            Read(self%file_unit,POS = 9)self%current_rec  
             self%current_rec = self%current_rec+1
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
