@@ -2,6 +2,7 @@ Module Spherical_IO
     Use Spherical_Buffer
 	Use Parallel_Framework
 	Use SendReceive
+    Use ISendReceive
     Use General_MPI
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform
@@ -1075,49 +1076,62 @@ Contains
 		Implicit None
         Integer, Intent(In) :: this_iter
 		Real*8, Intent(In) :: simtime
-		Integer :: responsible
-		Integer :: i, k, n, nn, nq_shellav, shell_avg_tag
-        Real*8, Allocatable :: full_shellavg(:,:), buff(:,:)		
+		Integer :: i,j, k, n, nn, nq_shellav, shell_avg_tag
+        Real*8, Allocatable :: full_shellavg(:,:), buff(:,:), buff2(:,:)		
         Integer :: your_r_min, your_r_max, your_nr, your_id
-        Integer :: funit, error
+        Integer :: funit, error, inds(2), ncount, sirq,nirq
+        Integer, Allocatable :: rirqs(:)
 
         shell_avg_tag = Shell_Averages%mpi_tag
         nq_shellav = Shell_Averages%nq
         funit = Shell_Averages%file_unit
-		responsible = 0
-		If (myid .eq. io_node) responsible = 1
 
-		If (responsible .eq. 1) Then
-			! Responsible node receives  all the pieces of the shell_averages from the other nodes
+        !Sum across the row to complete integration in theta
+        Allocate(buff(my_rmin:my_rmax,nq_shellav))
+        buff(:,:) = 0.0d0
+        Call dsum2d(shellav_outputs,buff,pfi%rcomm)
 
-			Allocate(full_shellavg(1:nr,nq_shellav))
-			full_shellavg(:,:) = 0.0D0
-
-			Do n = 0, nproc1-1  
-
-                your_r_min = pfi%all_1p(n)%min
-                your_r_max = pfi%all_1p(n)%max
-                your_nr = pfi%all_1p(n)%delta                
-
-                Do nn = 0, nproc2-1
-                    your_id = nn+n*nproc2
-
-	     		 
-                    Allocate(buff(your_r_min:your_r_max,nq_shellav))
-                    If (your_id .ne. io_node) then
-                        Call receive(buff, source= your_id,tag=shell_avg_tag,grp=pfi%gcomm)
-                    Else
-                        buff = shellav_outputs
-                        DeAllocate(shellav_outputs)
-                    Endif
-                    full_shellavg(your_r_min:your_r_max,:) = &
-                        & full_shellavg(your_r_min:your_r_max,:) + &
-                        & buff(your_r_min:your_r_max,:)
-                    DeAllocate(buff)
+        If (my_row_rank .eq. 0) Then
+            !now set up a series of isends/ireceives along the column
+            If (my_column_rank .eq. 0) Then
+                !Post ireceives before anything else is done
+                nirq = nproc1-1
+                Allocate(rirqs(1:nirq))
+                Do n = 1, nproc1-1
+                    your_r_min = pfi%all_1p(n)%min
+                    your_nr = pfi%all_1p(n)%delta
+                    ncount = your_nr*nq_shellav
+                    inds(1) = 1
+                    inds(2) = your_r_min
+                    Call IReceive(full_shellavg, rirqs(n),n_elements = ncount, &
+                            &  source= n,tag = shell_avg_tag, grp = pfi%ccomm,indstart = inds)
                 Enddo
-			Enddo
+                ! Load my buff into the full_shellavg array
+                Do j = my_rmin,my_rmax
+                    Do i = 1, nq_shellav
+                        full_shellavg(i,j) = buff(j,i)
+                    Enddo
+                Enddo
+                DeAllocate(buff)
+                Call IWaitAll(nirq, rirqs)
+                DeAllocate(rirqs)
+            Else
+                Allocate(buff2(nq_shellav, my_rmin:my_rmax)) ! Transpose for easier send logic
+                Do j = my_rmin,my_rmax
+                    Do i = 1, nq_shellav
+                        buff2(i,j) = buff(j,i)
+                    Enddo
+                Enddo
+                ncount = my_nr*nq_shellav
+                Call ISend(buff2, sirq,ncount, dest = 0, tag = shell_avg_tag, grp = pfi%ccomm)
 
+                Call IWait(sirq)
+                DeAllocate(buff2)
+                DeAllocate(buff)
+            Endif
+        Endif
 
+        If (myid .eq. io_node) Then ! Rank Zero writes the file
             Call Shell_Averages%OpenFile(this_iter, error)
             If (error .eq. 0) Then
                 If (Shell_Averages%current_rec .eq. 1) Then
@@ -1126,19 +1140,19 @@ Contains
                     Write(funit)(radius(i),i=1,nr)
                     Call Shell_Averages%update_position()
                 Endif
-                    Write(funit)((full_shellavg(i,k),i=1,nr),k=1,nq_shellav)
+                    Write(funit)((full_shellavg(k,i),i=1,nr),k=1,nq_shellav)
                 Write(funit) simtime
 
                 Write(funit)this_iter
 
 
                 Call Shell_Averages%CloseFile
+                DeAllocate(full_shellavg)
             Endif
-		Else
-            !  Non responsible nodes send their info				 
-            Call send(shellav_outputs, dest = 0,tag=shell_avg_tag, grp = pfi%gcomm)
-            DeAllocate(shellav_outputs)
 		Endif
+
+        DeAllocate(shellav_outputs)
+
 	End Subroutine Write_Shell_Average
 
 	Subroutine Write_Full_3D(qty)
