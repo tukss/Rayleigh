@@ -1531,7 +1531,7 @@ Contains
             !Read the current record
 
             !call MPI_FILE_READ(self%file_unit, self%current_rec, 1, MPI_INTEGER, & 
-            mstatus, ierr)
+            !mstatus, ierr)
 
             self%current_rec = self%current_rec+1
             If (ierr .ne. 0) Then
