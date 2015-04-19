@@ -1097,6 +1097,7 @@ Contains
                 !Post ireceives before anything else is done
                 nirq = nproc1-1
                 Allocate(rirqs(1:nirq))
+                Allocate(full_shellavg(1:nq_shellav,1:nr))
                 Do n = 1, nproc1-1
                     your_r_min = pfi%all_1p(n)%min
                     your_nr = pfi%all_1p(n)%delta
