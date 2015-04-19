@@ -1477,6 +1477,7 @@ Contains
         Integer :: modcheck, imod, file_iter, next_iter, ibelong
         Integer :: buffsize, funit
         Integer :: mstatus(MPI_STATUS_SIZE)
+        integer(kind=MPI_OFFSET_KIND) :: disp
 
 
         modcheck = self%frequency*self%rec_per_file
@@ -1524,6 +1525,13 @@ Contains
                  MPI_MODE_WRONLY, & 
                  MPI_INFO_NULL, funit, ierr) 
             self%file_unit = funit
+
+            disp = 8
+            Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
+            !Read the current record
+
+            call MPI_FILE_READ(self%file_unit, self%current_rec, 1, MPI_INTEGER, & 
+            mstatus, ierr)
 
             self%current_rec = self%current_rec+1
             If (ierr .ne. 0) Then
