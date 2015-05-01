@@ -463,6 +463,9 @@ Contains
 				endif
 			endif
 		Endif
+        if (new_deltat .gt. (max_time_step*1.000001d0)) Then
+            new_deltat = max_time_step
+        Endif
 		If (new_deltat .ne. deltat) Then
 			new_timestep = .true.
 		Endif

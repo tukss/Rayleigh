@@ -1,5 +1,38 @@
 import numpy as np
 import os
+class RayleighProfile:
+    """Rayleigh Reference State Structure
+    ----------------------------------
+    self.nr         : number of radial points
+    self.nq         : number of quantities in the 2-D structure file
+    self.radius      : radial coordinates
+    self.vals        : vals[0:nr-1,0:nq-1]
+
+    """
+
+    def __init__(self,filename):
+        """filename  : The reference state file to read.
+           path      : The directory where the file is located (if full path not in filename
+        """
+
+        fd = open(filename,'rb')
+        # We read an integer to assess which endian the file was written in...
+        bs = check_endian(fd,314,'int32')
+        
+        nr = swapread(fd,dtype='int32',count=1,swap=bs)
+        n2 = swapread(fd,dtype='int32',count=1,swap=bs)
+        nq = n2-1
+        tmp = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr,1), order = 'F')
+        self.radius      = tmp[:,0]
+        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
+        self.nr = nr
+        self.nq = nq
+        self.vals = tmp2[:,:]
+
+        fd.close()
+
+
+
 class ReferenceState:
     """Rayleigh Reference State Structure
     ----------------------------------
@@ -186,16 +219,18 @@ class AzAverage:
         self.nq = nq
         self.nr = nr
         self.ntheta = ntheta
+        print version, nrec, nq, nr
+
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
         self.costheta = np.reshape(swapread(fd,dtype='float64',count=ntheta,swap=bs),(ntheta), order = 'F')
         self.sintheta = (1.0-self.costheta**2)**0.5
-        self.vals  = np.zeros((nr,ntheta,nq,nrec),dtype='float64')
+        self.vals  = np.zeros((ntheta,nr,nq,nrec),dtype='float64')
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
 
         for i in range(nrec):
-            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta,swap=bs),(nr,ntheta,nq), order = 'F')
+            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta,swap=bs),(ntheta,nr,nq), order = 'F')
             self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)

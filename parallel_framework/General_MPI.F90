@@ -91,4 +91,30 @@ Subroutine DSUM2D(sendbuf, recvbuf, grp, dest)
   
 End Subroutine DSUM2D
 
+Subroutine BCAST2D(buff, grp, dest)
+  Real*8 :: buff(:,:)
+  Type(communicator), Optional :: grp
+  Integer, Intent(In), Optional :: dest
+  Integer :: icount,  comm
+  Integer :: MPI_err, root
+  If (present(dest)) then
+    root = dest
+  Else
+    root = 0
+  Endif
+
+  icount = size(buff)
+  
+  If (Present(grp)) Then
+     comm = grp%comm
+  Else
+     comm = MPI_COMM_WORLD
+  End If
+
+
+  Call MPI_BCAST(buff, icount, MPI_DOUBLE_PRECISION,  root, comm, MPI_err)
+  
+End Subroutine BCAST2D
+
+
 End Module General_MPI

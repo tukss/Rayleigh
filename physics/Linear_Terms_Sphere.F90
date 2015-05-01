@@ -593,6 +593,22 @@ Contains
 					samp = - (l+1)*One_Over_R(r)
 					Call Load_BC(lp,r,ceq,cvar,samp,0)	
 
+
+                    If (fix_poloidalfield_top) Then
+					    Call Clear_Row(ceq,lp,1)
+					    Call Clear_Row(aeq,lp,1)
+                        r = 1
+					    Call Load_BC(lp,r,ceq,cvar,one,0)
+                        Call Load_BC(lp,r,aeq,avar,one,0)
+                    Endif
+                    If (fix_poloidalfield_bottom) Then
+					    Call Clear_Row(aeq,lp,N_R)
+					    Call Clear_Row(ceq,lp,N_R)
+                        r = N_R
+					    Call Load_BC(lp,r,ceq,cvar,one,0)
+					    Call Load_BC(lp,r,aeq,avar,one,0)
+                    Endif
+
 				Endif	! Magnetism
 
 
@@ -606,7 +622,7 @@ Contains
 
 	Subroutine Fix_Boundary_Conditions()
 		Implicit None
-		Integer :: l, indx, ii,lp, j
+		Integer :: l, indx, ii,lp, j, k
       ! start applying the boundary and continuity conditions by setting 
       ! the appropriate right hand sides.
 
@@ -645,6 +661,36 @@ Contains
  
 					equation_set(1,aeq)%RHS(1,:,indx:indx+n_m) = Zero
 					equation_set(1,aeq)%RHS(N_R,:,indx:indx+n_m) = Zero
+
+                    If (fix_poloidalfield_top) Then
+                        If (l .eq. 1) Then
+                        Do k = indx, indx+n_m
+                            If (m_lm_values(k) .eq. 0) Then
+                                equation_set(1,ceq)%RHS(1,1,k) = C10_top
+                                equation_set(1,ceq)%RHS(1,2,k) = 0.0d0
+                            Endif
+                            If (m_lm_values(k) .eq. 1) Then
+                                equation_set(1,ceq)%RHS(1,1,k) = C11_top
+                                equation_set(1,ceq)%RHS(1,2,k) = C1m1_top
+                            Endif
+                        Enddo
+                        Endif
+                    Endif
+
+                    If (fix_poloidalfield_bottom) Then
+                        If (l .eq. 1 ) Then
+                        Do k = indx, indx+n_m
+                            If (m_lm_values(k) .eq. 0) Then
+                                equation_set(1,ceq)%RHS(N_R,1,k) = C10_bottom
+                                equation_set(1,ceq)%RHS(N_R,2,k) = 0.0d0
+                            Endif
+                            If (m_lm_values(k) .eq. 1) Then
+                                equation_set(1,ceq)%RHS(N_R,1,k) = C11_bottom
+                                equation_set(1,ceq)%RHS(N_R,2,k) = C1m1_bottom
+                            Endif
+                        Enddo
+                        Endif
+                    Endif
 
           
 				Endif

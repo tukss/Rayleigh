@@ -10,6 +10,7 @@ Module ReferenceState
     Use Controls
     Use Math_Constants
     Use Math_Utility
+    Use General_MPI, Only : BCAST2D
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
@@ -58,10 +59,11 @@ Module ReferenceState
 	Real*8 :: Magnetic_Prandtl_Number = 1.0d0
     Real*8 :: gravity_power           = 0.0d0
     Logical :: Dimensional = .true.  ! By Default code is dimensional
+    Character*120 :: custom_reference_file ='nothing'
 	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
-            & gravity_power, dimensional,heating_factor, heating_r0
+            & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file
 Contains
 
 	Subroutine Initialize_Reference()
@@ -74,6 +76,10 @@ Contains
 		If (reference_type .eq. 2) Then
 			Call Polytropic_Reference()
 		Endif
+
+        If (reference_type .eq. 3) Then
+            Call Get_Custom_Reference()
+        Endif
 
 		Call Write_Reference()
 	End Subroutine Initialize_Reference
@@ -301,6 +307,26 @@ Contains
         int_func = int_func+riweight*func(n_r)
 
     End Subroutine Integrate_in_radius
+
+    Subroutine Indefinite_Integral(func,int_func)
+        Implicit None
+        Real*8, Intent(In) :: func(1:)
+        Real*8, Intent(Out) :: int_func(1:)
+        Integer :: i
+        Real*8 :: delr
+        !computes indefinite integral func dr
+        int_func(1) = 0.0d0
+        Do i = 2, n_r-1
+            delr = (radius(i-1)-radius(i+1))/2.0d0
+            int_func(i) = int_func(i-1)+func(i-1)*delr
+        Enddo
+        delr = (radius(n_r-1)-radius(n_r))/2.0d0
+
+        int_func(n_r) = int_func(n_r-1)+delr*func(n_r-1)
+
+
+    End Subroutine Indefinite_Integral
+
 	Subroutine Write_Reference(filename)
 		Implicit None
 		Character*120, Optional, Intent(In) :: filename
@@ -330,6 +356,160 @@ Contains
 		Endif
 	End Subroutine Write_Reference
 
+	Subroutine Write_Profile(arr,filename)
+		Implicit None
+		Character*120, Optional, Intent(In) :: filename
+		Character*120 :: ref_file
+		Integer :: i,j,nq,sig = 314
+        Real*8, Intent(In) :: arr(1:,1:)
+        nq = size(arr,2)
+		If (my_rank .eq. 0) Then
+			Open(unit=15,file=filename,form='unformatted', status='replace',access='stream')
+            Write(15)sig
+			Write(15)n_r
+            Write(15)nq
+			Write(15)((arr(i,j),i=1,n_r),j = 1, nq)
+
+			Close(15)
+		Endif
+	End Subroutine Write_Profile
+
+    Subroutine Get_Custom_Reference()
+        Implicit None
+        Real*8, Allocatable :: ref_arr(:,:), integrand(:)
+        Allocate(ref_arr(1:n_r,1:9))
+        If (my_rank .eq. 0) Then
+            Call Read_Reference(custom_reference_file, ref_arr)
+        Endif
+        If (my_row_rank .eq. 0) Then
+            ! Broadcast along the column
+            Call BCAST2D(ref_arr,grp = pfi%ccomm)
+        Endif
+        Call BCAST2D(ref_arr,grp = pfi%rcomm)
+
+        ref%density(:) = ref_arr(:,1)
+        ref%dlnrho(:) = ref_arr(:,2) 
+        ref%d2lnrho(:) = ref_arr(:,3)
+        ref%pressure(:) = ref_arr(:,4)
+        ref%temperature(:) = ref_arr(:,5)
+        ref%dlnT(:) = ref_arr(:,6)
+        ref%dsdr(:) = ref_arr(:,7)
+        ref%entropy(:) = ref_arr(:,8)			
+        ref%gravity(:) = ref_arr(:,9)
+        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        DeAllocate(ref_arr)
+
+        ! This conductive profile is based on the assumption that kappa is constant
+        ! And it is modulo kappa (s_conductive/kappa)
+        Allocate(s_conductive(1:N_R))
+        s_conductive(:) = 0.0d0
+        Allocate(integrand(1:N_R))
+        integrand = 1.0d0/(ref%density*ref%temperature)
+        integrand = integrand*OneOverRSquared
+        !The routine below integrates r^2 * integrand, hence the extra division by r^2
+        Call Indefinite_Integral(integrand,s_conductive)
+        s_conductive = s_conductive-s_conductive(1)
+        s_conductive = s_conductive/s_conductive(N_R)
+        DeAllocate(integrand)
+    End Subroutine Get_Custom_Reference
+
+    Subroutine Read_Reference(filename,ref_arr)
+		Character*120, Intent(In), Optional :: filename
+        Character*120 :: ref_file
+        Integer :: pi_integer,nr_ref
+        Integer :: nqvals =9 ! Reference state file contains nqvals quantities + radius
+        Integer :: i, k
+        Real*8, Allocatable :: ref_arr_old(:,:), rtmp(:), rtmp2(:)
+        Real*8, Intent(InOut) :: ref_arr(:,:)
+        Real*8, Allocatable :: old_radius(:)
+        If (present(filename)) Then
+            ref_file = Trim(my_path)//filename
+        Else
+            ref_file = 'reference'
+        Endif
+		Open(unit=15,file=ref_file,form='unformatted', status='old',access='stream')
+        Read(15)pi_integer
+
+        If (pi_integer .ne. 314) Then
+            close(15)
+            Open(unit=15,file=ref_file,form='unformatted', status='old', &
+                 CONVERT = 'BIG_ENDIAN' , access='stream')
+            Read(15)pi_integer
+            If (pi_integer .ne. 314) Then
+                Close(15)
+                Open(unit=15,file=ref_file,form='unformatted', status='old', &
+                 CONVERT = 'LITTLE_ENDIAN' , access='stream')
+                Read(15)pi_integer
+            Endif
+        Endif
+                
+        If (pi_integer .eq. 314) Then 
+
+		    Read(15)nr_ref
+            Allocate(ref_arr_old(1:nr_ref,1:nqvals))  !10 quantities are stored in reference state
+            Allocate(old_radius(1:nr_ref))
+
+            Write(6,*)'nr_ref is: ', nr_ref
+
+            Read(15)(old_radius(i),i=1,nr_ref)
+            Do k = 1, nqvals
+		        Read(15)(ref_arr_old(i,k) , i=1 , nr_ref)
+            Enddo
+   		    
+
+            !Check to see if radius isn't reversed
+            !If it is not, then reverse it
+            If (old_radius(1) .lt. old_radius(nr_ref)) Then
+                Write(6,*)'Reversing Radial Indices in Custom Ref File!'
+                Allocate(rtmp(1:nr_ref))
+
+                Do i = 1, nr_ref
+                    old_radius(i) = rtmp(nr_ref-i+1)
+                Enddo
+
+                Do k = 1, nqvals
+                    rtmp(:) = ref_arr_old(:,k)
+                    Do i = 1, nr_ref
+                        ref_arr_old(i,k) = rtmp(nr_ref-i+1)
+                    Enddo
+                Enddo
+
+                DeAllocate(rtmp)
+
+            Endif
+
+            Close(15)
+
+
+            If (nr_ref .ne. n_r) Then 
+                !Interpolate onto the current radial grid if necessary
+                !Note that the underlying assumption here is that same # of grid points
+                ! means same grid - come back to this later for generality
+                Allocate(rtmp2(1:n_r))
+                Allocate(rtmp(1:nr_ref))
+                
+                Do k = 1, nqvals
+ 
+                    rtmp(:) = ref_arr_old(:,k)
+                    rtmp2(:) = 0.0d0
+                    Call Spline_Interpolate(rtmp, old_radius, rtmp2, radius)
+                    ref_arr(1:n_r,k) = rtmp2 
+                Enddo
+
+                DeAllocate(rtmp,rtmp2)
+            Else
+                ! Bit redundant here, but may want to do filtering on ref_arr array
+                ref_arr(1:n_r,1:nqvals) = ref_arr_old(1:n_r,1:nqvals)
+
+            Endif
+
+
+            DeAllocate(ref_arr_old,old_radius)
+        Endif
+	End Subroutine Read_Reference
+
+    
+
 	Subroutine Constant_Reference()
             Implicit None
             Integer :: i
@@ -355,5 +535,112 @@ Contains
             Enddo
 	End Subroutine Constant_Reference
 
+    Subroutine Read_Profile_File(filename,arr)
+		Character*120, Intent(In) :: filename
+        Character*120 :: ref_file, full_path
+        Integer :: pi_integer,nr_ref, ncolumns
+        Integer :: nqvals =9 ! Reference state file contains nqvals quantities + radius
+        Integer :: i, k
+        Real*8, Allocatable :: arr_old(:,:), rtmp(:), rtmp2(:)
+        Real*8, Intent(InOut) :: arr(:,:)
+        Real*8, Allocatable :: old_radius(:)
+        full_path = Trim(my_path)//filename
+        If (my_rank .eq. 0) Then
+            !Only one processes actually opens the file
+            !After that, the contents of the array are broadcast across columns and rows
+		    Open(unit=15,file=full_path,form='unformatted', status='old',access='stream')
+            Read(15)pi_integer
+
+            If (pi_integer .ne. 314) Then
+                close(15)
+                Open(unit=15,file=full_path,form='unformatted', status='old', &
+                     CONVERT = 'BIG_ENDIAN' , access='stream')
+                Read(15)pi_integer
+                If (pi_integer .ne. 314) Then
+                    Close(15)
+                    Open(unit=15,file=full_path,form='unformatted', status='old', &
+                     CONVERT = 'LITTLE_ENDIAN' , access='stream')
+                    Read(15)pi_integer
+                Endif
+            Endif
+                    
+            If (pi_integer .eq. 314) Then 
+
+		        Read(15)nr_ref
+                Read(15)ncolumns
+                nqvals = ncolumns-1
+                Allocate(arr_old(1:nr_ref,1:nqvals))  
+                !10 quantities are stored in reference state
+
+                Allocate(old_radius(1:nr_ref))
+
+                Write(6,*)'nr_ref is: ', nr_ref
+
+                Read(15)(old_radius(i),i=1,nr_ref)
+                
+                Do k = 1, nqvals
+		            Read(15)(arr_old(i,k) , i=1 , nr_ref)
+                Enddo
+       		    
+
+                !Check to see if radius isn't reversed
+                !If it is not, then reverse it
+                If (old_radius(1) .lt. old_radius(nr_ref)) Then
+                    Write(6,*)'Reversing Radial Indices in Custom Ref File!'
+                    Allocate(rtmp(1:nr_ref))
+                    rtmp(:) = old_radius(:)
+                    Do i = 1, nr_ref
+                        old_radius(i) = rtmp(nr_ref-i+1)
+                    Enddo
+
+                    Do k = 1, nqvals
+                        rtmp(:) = arr_old(:,k)
+                        Do i = 1, nr_ref
+                            arr_old(i,k) = rtmp(nr_ref-i+1)
+                        Enddo
+                    Enddo
+
+                    DeAllocate(rtmp)
+
+                Endif
+
+                Close(15)
+
+
+                If (nr_ref .ne. n_r) Then 
+                    !Interpolate onto the current radial grid if necessary
+                    !Note that the underlying assumption here is that same # of grid points
+                    ! means same grid - come back to this later for generality
+                    Allocate(rtmp2(1:n_r))
+                    Allocate(rtmp(1:nr_ref))
+                    
+                    Do k = 1, nqvals
+     
+                        rtmp(:) = arr_old(:,k)
+                        rtmp2(:) = 0.0d0
+                        Call Spline_Interpolate(rtmp, old_radius, rtmp2, radius)
+                        arr(1:n_r,k) = rtmp2 
+                    Enddo
+
+                    DeAllocate(rtmp,rtmp2)
+                Else
+                    ! Bit redundant here, but may want to do filtering on arr array
+                    arr(1:n_r,1:nqvals) = arr_old(1:n_r,1:nqvals)
+
+                Endif
+
+
+                DeAllocate(arr_old,old_radius)
+            Endif
+        Endif
+
+
+        If (my_row_rank .eq. 0) Then
+            ! Broadcast along the column
+            Call BCAST2D(arr,grp = pfi%ccomm)
+        Endif
+        Call BCAST2D(arr,grp = pfi%rcomm)
+
+	End Subroutine Read_Profile_File
 
 End Module ReferenceState

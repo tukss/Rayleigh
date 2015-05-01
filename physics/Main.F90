@@ -40,6 +40,7 @@ Contains
         Call Initialize_Controls()
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
+        Call Initialize_Boundary_Conditions
         Call Initialize_FFts()
 		Call Initialize_Reference()
 		

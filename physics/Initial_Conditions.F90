@@ -10,7 +10,9 @@ Module Initial_Conditions
 	Use Controls
 	Use Timers
     Use ReferenceState, Only : s_conductive
-    Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom, fix_dtdr_top, fix_dtdr_bottom
+    Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom,&
+         fix_dtdr_top, fix_dtdr_bottom, C10_bottom, C11_bottom, C1m1_bottom
+
 	Implicit None
 	Logical :: alt_check = .false.
 	Integer :: init_type = 1
@@ -97,6 +99,10 @@ Contains
 			If (magnetic_init_type .eq. 7) Then
 				call random_init_Mag()
 			Endif
+
+            If (magnetic_init_type .eq. 10) Then
+                call Dipole_Field_Init()
+            Endif
 		Endif
 		! Fields are now initialized and loaded into the RHS. 
 		! We are ready to enter the main loop
@@ -1006,7 +1012,58 @@ Contains
 	End Subroutine Random_Init
 
 
+	Subroutine Dipole_Field_Init()
+		Implicit None
 
+
+		Integer :: r, l, m, mp
+		Integer :: fcount(3,2)
+		type(SphericalBuffer) :: tempfield
+		fcount(:,:) = 1
+
+
+		! We put our temporary field in spectral space
+		Call tempfield%init(field_count = fcount, config = 's2b')		
+		Call tempfield%construct('s2b')		
+
+		! Set the ell = 1, m = 0 component of C streamfunction to fall off as 1/r	
+        ! Set other components to zero
+		Do mp = my_mp%min, my_mp%max
+			m = m_values(mp)
+			tempfield%s2b(mp)%data(:,:,:,:) = 0.0d0			
+            If (m .eq. 0) Then
+                Do r = my_r%min, my_r%max
+                    tempfield%s2b(mp)%data(1,r,1,1) = C10_bottom/radius(r)
+                Enddo
+            Endif
+
+            If (m .eq. 1) Then
+                Do r = my_r%min, my_r%max
+                    tempfield%s2b(mp)%data(1,r,1,1) = C11_bottom/radius(r)
+                    tempfield%s2b(mp)%data(1,r,2,1) = C1m1_bottom/radius(r)
+                Enddo
+            Endif
+
+		Enddo
+
+
+		Call tempfield%reform() ! goes to p1b
+		If (chebyshev) Then
+			! we need to load the chebyshev coefficients, and not the physical representation into the RHS
+			Call tempfield%construct('p1a')
+            If (finite_element) Then
+    			Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            Else
+    			Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
+            Endif
+			tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
+			Call tempfield%deconstruct('p1a')
+		Endif
+
+		Call Set_RHS(ceq,tempfield%p1b(:,:,:,1))
+
+		Call tempfield%deconstruct('p1b')
+	End Subroutine dipole_field_init
 
 	!////////////////////////////////////
 	!  Magnetic Initialization

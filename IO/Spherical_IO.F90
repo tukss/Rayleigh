@@ -150,7 +150,7 @@ Module Spherical_IO
     ! These variables are all private.
     Real*8, Allocatable,Private :: theta_integration_weights(:), r_integration_weights(:)
     Integer, Private :: my_theta_min, my_theta_max, my_rmin, my_rmax, my_mp_max, my_mp_min
-    Integer, Private :: nr, nphi, ntheta
+    Integer, Private :: nr, nphi, ntheta, my_ntheta
     Integer, Private :: nproc1, nproc2, myid, nproc, my_row_rank, my_column_rank, my_nr
     Real*8, Allocatable, Private :: radius(:),sintheta(:),costheta(:) 
 Contains
@@ -190,6 +190,7 @@ Contains
         my_mp_max = pfi%my_3s%max
 
 		my_nr = pfi%my_1p%delta
+        my_ntheta = pfi%my_2p%delta
         nproc  = pfi%gcomm%np
 		nproc1 = pfi%ccomm%np		! processor's per column (radius split among these)
 		nproc2 = pfi%rcomm%np      ! processor's per row  (theta split among these)
@@ -242,6 +243,7 @@ Contains
         if (my_row_rank .eq. 0) Then
             master_rank = shell_slices%shell_r_ids(1)
             Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
+            Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
         Endif
         Call Shell_Spectra%Shell_Balance()
         If (Shell_Spectra%nlevels .gt. 0) Then
@@ -544,13 +546,13 @@ Contains
 		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
-		Integer :: i, j, k,qq, p, sizecheck
+		Integer :: i, j, k,qq, p, sizecheck, t
 		Integer :: n, nn, this_nshell, nq_shell, shell_slice_tag
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
-		Integer :: nelem, buffsize
+		Integer :: nelem, buffsize, sirq, nrirqs, inds(1:4)
         Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
         Real*8, Allocatable :: out_radii(:)
-        Integer, Allocatable :: level_inds(:)
+        Integer, Allocatable :: level_inds(:), rirqs(:)
         
         integer :: ierr, rcount
 		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
@@ -566,60 +568,98 @@ Contains
         nq_shell = Shell_Slices%nq
         shell_slice_tag = Shell_Slices%mpi_tag
         funit = Shell_Slices%file_unit
-		! Later, we may want to generalize this, but for now just assume the process 0 handles the output
+
 		responsible = 0
 		If (my_row_rank .eq. 0) Then
             If (Shell_Slices%my_nlevels .gt. 0) Then
                 responsible = 1
             Endif
         Endif
-        ! I should replace this with a call to a method like Shell_Slices%comm
+
+
+
+
+        this_nshell = Shell_Slices%my_nlevels
 		If (responsible .eq. 1) Then
 			! Responsible node receives  all the pieces of the shell slices from the other nodes
+			Allocate(all_shell_slices(1:nphi,1:ntheta,1:Shell_Slices%my_nlevels,nq_shell))
 
-		
-			Allocate(all_shell_slices(1:nphi,1:ntheta,Shell_Slices%my_nlevels,Shell_Slices%nq))
+            Allocate(buff(1:nphi,1:this_nshell,1:nq_shell, 1:ntheta))            
 			all_shell_slices(:,:,:,:) = 0.0d0
+            buff(:,:,:,:) = 0.0d0
 
-
-			this_rid = my_column_rank
-			this_nshell = Shell_Slices%my_nlevels		
-
-
-
-			 Do nn = 0, nproc2-1
+            ! Post Ireceives
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))          
+            Write(6,*)'Going to loop' 
+            Do nn = 1, nproc2-1
 				your_id = nn
 
 				your_ntheta    = pfi%all_2p(nn)%delta
 				your_theta_min = pfi%all_2p(nn)%min
-				your_theta_max = pfi%all_2p(nn)%max
 
-			 	Allocate(buff(1:nphi,1:your_ntheta,1:this_nshell,1:Shell_Slices%nq))
-
+                inds(1) = 1
+                inds(2) = 1
+                inds(3) = 1
+                inds(4) = your_theta_min
 
 				nelem = nphi*your_ntheta*this_nshell*nq_shell
-			 	If (your_id .ne. io_node) then
-					! Receive and copy
+                Write(6,*)'NELEME', nelem, nphi, your_ntheta, this_nshell, nq_shell
+         		Call IReceive(buff, rirqs(nn),n_elements = nelem, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm, indstart = inds)
 
-         		    Call receive(buff, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm)
+            Enddo
 
-					all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:this_nshell,1:nq_shell) = &
-						& buff(1:nphi , 1:your_ntheta, 1:this_nshell, 1:nq_shell)
-				Else
-					If (Shell_Slices%my_nlevels .gt. 0) Then
-						! Copy my shells into the main output array
+            ! Stripe my own data into buff
 
-						all_shell_slices(1:nphi,your_theta_min:your_theta_max,1:this_nshell,1:nq_shell) &
-							& = shell_slice_outputs(:,:,:,:)
-                                !shell_slice_outputs(1:nphi,my_theta_min:my_theta_max,1:this_nshell,1:nq_shell)
-					Endif			
-				Endif
-				DeAllocate(buff)
-			Enddo
+            Do k = 1, nq_shell
+                Do j = 1, this_nshell
+                    Do t = my_theta_min, my_theta_max
+                        Do i = 1, nphi
+                            buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
+                        Enddo
+                    Enddo
+                Enddo
+            Enddo
+            
+
+            Call IWaitAll(nrirqs,rirqs)
+
+            Write(6,*)'max buff: ', maxval(buff)
+            Do k = 1, nq_shell
+                Do j = 1, this_nshell
+                    Do t = 1, ntheta
+                        Do i = 1, nphi
+                            all_shell_slices(i,t,j,k) = buff(i,j,k,t)
+                        Enddo
+                    Enddo
+                Enddo
+            Enddo
+
+            DeAllocate(buff)
+            DeAllocate(rirqs)
+            DeAllocate(shell_slice_outputs)
 		Else
 			!  Non responsible nodes send their info
 			If (Shell_Slices%my_nlevels .gt. 0) Then
-				Call send(shell_slice_outputs, dest = 0,tag=shell_slice_tag, grp = pfi%rcomm)
+                !Everyone needs to restripe their data before sending it down the row
+                !Stripe so that theta is slowest 
+                Allocate(buff(1:nphi,1:this_nshell,1:nq_shell, my_theta_min:my_theta_max))
+                Do t = my_theta_min, my_theta_max
+                    Do k = 1, nq_shell
+                        Do j = 1, this_nshell
+                            Do i = 1, nphi
+                                buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
+                            Enddo
+                        Enddo
+                    Enddo
+                Enddo
+                nelem = nphi*my_ntheta*this_nshell*nq_shell
+                inds(:) = 1
+				Call Isend(buff,sirq,n_elements = nelem,dest = 0,tag=shell_slice_tag, grp = pfi%rcomm, indstart = inds)
+            
+                Call IWait(sirq)
+                DeAllocate(shell_slice_outputs)
+                DeAllocate(buff)
 			Endif
 		Endif
 
@@ -639,12 +679,12 @@ Contains
                 ! The master rank (whoever owns the first output shell level) writes the header
                 dims(1) = ntheta
                 dims(2) = Shell_Slices%nlevels
-                dims(3) =  Shell_Slices%nq
+                dims(3) =  nq_shell
                 buffsize = 3
                 call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
                     mstatus, ierr) 
 
-                buffsize = Shell_Slices%nq
+                buffsize = nq_shell
                 call MPI_FILE_WRITE(funit,Shell_Slices%oqvals, buffsize, MPI_INTEGER, & 
                     mstatus, ierr) 
 
@@ -676,12 +716,12 @@ Contains
             ! I might really (really) want to look into file views later.
             ! Depending on the offset size mpi type, disp will crap out past 2GB
             hdisp = 24 ! dimensions+endian+version+record count
-            hdisp = hdisp+shell_slices%nq*4 ! nq
+            hdisp = hdisp+nq_shell*4 ! nq
             hdisp = hdisp+Shell_Slices%nlevels*12  ! level indices and level values
             hdisp = hdisp+ ntheta*8  ! costheta
 
             qdisp = ntheta*Shell_Slices%nlevels*nphi*8
-            full_disp = qdisp*Shell_Slices%nq+12  ! 12 is for the simtime+iteration at the end
+            full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
             disp = hdisp+full_disp*(Shell_Slices%current_rec-1)
             
             buffsize = Shell_Slices%my_nlevels*ntheta*nphi
@@ -695,7 +735,7 @@ Contains
                 Endif
             Enddo
             my_rdisp = rcount*ntheta*nphi*8
-            Do i = 1, Shell_Slices%nq
+            Do i = 1, nq_shell
                 new_disp = disp+qdisp*(i-1)+my_rdisp                
                 Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
                 
@@ -720,9 +760,7 @@ Contains
         Endif  ! Responsible
 
         If (my_row_rank .eq. 0) Call shell_slices%closefile_par()
-		If (Shell_Slices%my_nlevels .gt. 0) Then
-			DeAllocate(shell_slice_outputs)
-		Endif
+
 
 	End Subroutine Write_Shell_Slices
 
@@ -945,75 +983,181 @@ Contains
 	END Subroutine Get_Global_Average
 
 	Subroutine Write_Azimuthal_Average(this_iter,simtime)
+        USE MPI_BASE
 		Implicit None
-		Real*8, Allocatable :: buff(:,:,:), full_azavg(:,:,:)
-        Integer ::  file_pos, funit, error
-		Integer :: responsible
-		Integer :: i, j, k, nq_azav
-		Integer, Intent(In) :: this_iter
-		Real*8, Intent(In) :: simtime
-        Integer :: n, nn, az_avg_tag
-        Integer :: your_r_min, your_r_max, your_theta_min
-        Integer :: your_id, your_theta_max, your_nr, your_ntheta
-        nq_azav = AZ_Averages%nq
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:), all_azavgs(:,:,:)
+		Integer :: responsible, current_rec, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, p, sizecheck
+		Integer :: n, nn, this_nshell, nq_azav, az_avg_tag
+		Integer :: your_theta_min, your_theta_max, your_ntheta
+		Integer :: nelem, buffsize
+        Integer :: file_pos, funit, error, dims(1:3)
+        Integer :: inds(3), nirq,sirq
+        Integer, Allocatable :: rirqs(:)
+        
+        integer :: ierr, rcount
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        sizecheck = sizeof(disp)
+        if (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
+            Endif
+        endif 
+
+
 		responsible = 0
-        az_avg_tag = AZ_Averages%mpi_tag
-        funit = AZ_Averages%file_unit
-		If (myid .eq. io_node) responsible = 1
+        nq_azav     = AZ_Averages%nq
+        az_avg_tag  = AZ_Averages%mpi_tag
+        funit       = AZ_Averages%file_unit
+        
+
+		If (my_row_rank .eq. 0) Then
+                responsible = 1
+        Endif
+
+        !Everyone needs to restripe their data for the sends so that theta is slowest
+        Allocate(buff(my_rmin:my_rmax,1:nq_azav, my_theta_min:my_theta_max))
+        Do k = my_theta_min, my_theta_max
+            Do j = 1, nq_azav
+                Do i = my_rmin, my_rmax
+                    buff(i,j,k) = azav_outputs(i,k,j)  ! restripe
+                Enddo
+            Enddo
+        Enddo
+        DeAllocate(azav_outputs)
+
 
 		If (responsible .eq. 1) Then
-			! Responsible node receives  all the pieces of the az_averages from the other nodes
+			! Rank 0 in reach row receives from all other row members
+		
+			Allocate(all_azavgs(my_rmin:my_rmax,1:nq_azav, 1:ntheta))
+			all_azavgs(:,:,:) = 0.0d0
 
+            nirq = nproc2-1
+            Allocate(rirqs(1:nirq))
 
-            Allocate(full_azavg(nr,ntheta,nq_azav))
- 
-            Do n = 0, nproc1-1  
-                your_r_min = pfi%all_1p(n)%min
-                your_r_max = pfi%all_1p(n)%max
-                your_nr = pfi%all_1p(n)%delta                
+            Do nn = 1, nproc2-1
 
-					Do nn = 0, nproc2-1
-                    your_id = nn+n*nproc2
-                    your_ntheta    = pfi%all_2p(nn)%delta
-                    your_theta_min = pfi%all_2p(nn)%min
-                    your_theta_max = pfi%all_2p(nn)%max
+				your_ntheta    = pfi%all_2p(nn)%delta
+				your_theta_min = pfi%all_2p(nn)%min
+				your_theta_max = pfi%all_2p(nn)%max
+                inds(1) = 1
+                inds(2) = 1
+                inds(3) = your_theta_min
+                nelem = your_ntheta*my_nr*nq_azav
 
-                    Allocate(buff(your_r_min:your_r_max,your_theta_min:your_theta_max,1:nq_azav))
-				    If (your_id .ne. io_node) then		
-                        Call receive(buff, source= your_id,tag=az_avg_tag,grp = pfi%gcomm)
-				    Else
-					    buff(:,:,:) = azav_outputs(:,:,:)
-                        DeAllocate(azav_outputs)
-                    Endif
-                    full_azavg(your_r_min:your_r_max,your_theta_min:your_theta_max,1:nq_azav) &
-                        & = buff(:,:,:)
-                    DeAllocate(buff)
-                Enddo
-            Enddo			
+                Call IReceive(all_azavgs, rirqs(nn),n_elements = nelem, &
+                            &  source= nn,tag = az_avg_tag, grp = pfi%rcomm,indstart = inds)				
+			Enddo
 
+            all_azavgs(my_rmin:my_rmax,1:nq_azav,my_theta_min:my_theta_max) = &
+                & buff(my_rmin:my_rmax,1:nq_azav,my_theta_min:my_theta_max)
 
-
-            Call AZ_Averages%OpenFile(this_iter, error)
-            If (error .eq. 0) Then
-                If (AZ_Averages%current_rec .eq. 1) Then
-                    Write(funit)nr, ntheta,nq_azav
-                    Write(funit)(AZ_Averages%oqvals(i),i=1,nq_azav)
-                    Write(funit)(radius(i),i=1,nr)
-                    Write(funit)(costheta(i),i=1,ntheta)
-                    Call AZ_Averages%update_position()
-                Endif
-           
-                file_pos = AZ_Averages%file_position
-                Write(funit)(((full_azavg(i,j,k),i=1,nr),j=1,ntheta),k=1,nq_azav)
-		        Write(funit)simtime
-                Write(funit)this_iter
-                Call AZ_Averages%CloseFile()
-            Endif
+            Call IWaitAll(nirq, rirqs)
+            DeAllocate(rirqs)
 		Else
-            Call send(azav_outputs, dest = 0,tag=az_avg_tag, grp=pfi%gcomm)
-            DeAllocate(azav_outputs)
+			!  Rest of the row sends to process 0 within the row
+            inds(1) = 1 !my_rmin
+            inds(2) = 1
+            inds(3) = 1 ! my_theta_min
+            nelem = my_nr*my_ntheta*nq_azav
+            Call ISend(buff, sirq,n_elements = nelem, dest = 0, tag = az_avg_tag, & 
+                grp = pfi%rcomm, indstart = inds)
+            Call IWait(sirq)
 		Endif
-    End Subroutine Write_Azimuthal_Average
+        DeAllocate(buff)
+
+        ! Communication is complete.  Now we open the file using MPI-IO
+        
+
+      
+
+        If (responsible .eq. 1) Then   
+            Call AZ_Averages%OpenFile_Par(this_iter, error)
+            current_rec = AZ_Averages%current_rec
+            funit = AZ_Averages%file_unit
+            !before we do anything else, we need to restripe the data yet again (might be able to work around this later)
+
+            Allocate(buff( 1:ntheta,my_rmin:my_rmax, 1:nq_azav))
+            Do k = 1, ntheta
+                Do j = 1, nq_azav
+                    Do i = my_rmin, my_rmax    
+                        buff(k,i,j) = all_azavgs(i,j,k)
+                    Enddo
+                Enddo
+            Enddo        
+            DeAllocate(all_azavgs)
+            
+
+            If ((my_column_rank .eq. 0) .and. (current_rec .eq. 1) ) Then            
+                ! Rank 0 in column and row writes the header
+                dims(1) =  nr
+                dims(2) =  ntheta
+                dims(3) =  nq_azav
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_azav
+                call MPI_FILE_WRITE(funit,AZ_Averages%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nr
+                call MPI_FILE_WRITE(funit, radius, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+                buffsize = ntheta
+                call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+            Endif
+
+
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_azav*4 ! nq
+            hdisp = hdisp+nr*8  ! The radius array
+            hdisp = hdisp+ ntheta*8  ! costheta
+
+            qdisp = ntheta*nr*8
+            full_disp = qdisp*nq_azav+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(current_rec-1)
+            
+            buffsize = my_nr*ntheta
+            ! The file is striped with time step slowest, followed by q
+
+            my_rdisp = (my_rmin-1)*ntheta*8
+
+            Do i = 1, nq_azav
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, buff(1,my_rmin,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+
+            disp = hdisp+full_disp*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+            If (my_column_rank .eq. 0) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+			DeAllocate(buff)
+            Call AZ_Averages%closefile_par()
+        Endif  ! Responsible
+
+	End Subroutine Write_Azimuthal_Average
+
 
     Subroutine Write_Global_Average(this_iter,simtime)
         Implicit None

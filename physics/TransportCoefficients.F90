@@ -7,7 +7,7 @@ Module TransportCoefficients
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
 
 	!//////////
-	! These need to be relocated to transportcoefficients.F90 shortly
+
 	Real*8, Allocatable :: W_Diffusion_Coefs_0(:), W_Diffusion_Coefs_1(:)
 	Real*8, Allocatable :: dW_Diffusion_Coefs_0(:), dW_Diffusion_Coefs_1(:), dW_Diffusion_Coefs_2(:)
 	Real*8, Allocatable :: S_Diffusion_Coefs_1(:), Z_Diffusion_Coefs_0(:), Z_Diffusion_Coefs_1(:)
@@ -16,9 +16,16 @@ Module TransportCoefficients
 	Integer :: kappa_type =1, nu_type = 1, eta_type = 1
 	Real*8 :: nu_top = 1.0d0, kappa_top = 1.0d0, eta_top = 1.0d0
 	Real*8 :: nu_power = 0, eta_power = 0, kappa_power = 0
+    Real*8 :: eta_amp = 1.0d0
+
+    Character*120 :: custom_eta_file = 'nothing'
+    Character*120 :: custom_nu_file = 'nothing'
+    Character*120 :: custom_kappa_file = 'nothing'
 
 	Namelist /Transport_Namelist/ nu_type, kappa_type, eta_type, nu_power, kappa_power, eta_power, &
-			& nu_top, kappa_top, eta_top
+			& nu_top, kappa_top, eta_top, custom_nu_file, custom_eta_file, custom_kappa_file, &
+              eta_amp
+
 
 Contains
 
@@ -105,7 +112,9 @@ Contains
 				dlnu(:) = 0.0d0
 			Case(2)
 				Call vary_with_density(nu,dlnu,nu_top, nu_power)
-			!Case(3) -> Read from file
+			Case(3) 
+                Call get_custom_profile(nu,dlnu,custom_nu_file)
+                nu_top = nu(1)
 		End Select
 	End Subroutine Initialize_Nu
 
@@ -116,19 +125,51 @@ Contains
 				dlnkappa(:) = 0.0d0
 			Case(2)
 				Call vary_with_density(kappa,dlnkappa,kappa_top, kappa_power)
+            Case(3)
+                Call get_custom_profile(kappa,dlnkappa,custom_kappa_file)
+                kappa_top = kappa(1)
 		End Select
 	End Subroutine Initialize_Kappa
 
 	Subroutine Initialize_Eta()
+        Real*8, Allocatable :: tmp_arr(:,:)
+        Character*120 :: eta_file = 'Eta_variation'
 		Select Case(eta_type)
 			Case(1)	! Constant Eta
 				eta(:) = eta_top
 				dlneta(:) = 0.0d0
 			Case(2)
 				Call vary_with_density(eta,dlneta,eta_top, eta_power)
-			!Case(3) -> Read from file
+			Case(3)
+
+                Call get_custom_profile(eta,dlneta,custom_eta_file)
+                eta(:) = eta(:)*eta_amp
+                eta_top = eta(1)
+                If (my_rank .eq. 0) then
+                    Allocate(tmp_arr(1:N_R,1:3))
+                    tmp_arr(:,1) = radius(:)
+                    tmp_arr(:,2) = eta(:)
+                    tmp_arr(:,3) = dlneta(:)
+                    Call Write_Profile(tmp_arr,eta_file)
+                    DeAllocate(tmp_arr)
+                Endif
+
+
+
 		End Select
 	End Subroutine Initialize_Eta
+
+	Subroutine Get_Custom_Profile(coeff, dln, coeff_file)
+		Real*8, Intent(InOut) :: coeff(:), dln(:)
+        Real*8, Allocatable :: tmp_arr(:,:)
+        Character*120, Intent(In) :: coeff_file 
+		! Reads density from a Rayleigh Profile File
+        Allocate(tmp_arr(1:N_R,1:2))
+        Call Read_Profile_File(coeff_file,tmp_arr)
+        coeff(:) = tmp_arr(:,1)
+        dln(:) = tmp_arr(:,2)
+        DeAllocate(tmp_arr)
+	End Subroutine Get_Custom_Profile
 
 
 	Subroutine Vary_With_Density(coeff, dln, coeff_top, coeff_power)
