@@ -340,9 +340,9 @@ Contains
 
         If (Shell_Spectra%nlevels .gt. 0) Then
             shell_ind = Shell_Spectra%ind
-            If (myid .eq. 0) Then
+            !If (myid .eq. 0) Then
                 Shell_Spectra%oqvals(shell_ind) = current_qval
-            Endif
+            !Endif
         
 
 		    If (Shell_Spectra%my_nlevels .gt. 0) Then
@@ -387,9 +387,10 @@ Contains
         Real*8, Allocatable :: sendbuffer(:,:,:,:,:), out_radii(:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
 		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
-        Integer :: rone,  p, ncount, counter, nf
-		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag
-        Integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
+        Integer :: rone,  p,  counter, nf
+		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag, nmodes
+        Integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp
+        Integer(kind=MPI_OFFSET_KIND)  :: qsize, qdisp, rec_size
 		Integer :: your_mp_min, your_mp_max, your_nm, your_id
 		Integer :: nelem, m_ind, m_val, current_rec
         Integer :: funit, error, sirq, inds(5), dims(3)
@@ -406,6 +407,7 @@ Contains
         funit = Shell_Spectra%file_unit
         lmax = maxval(pfi%inds_3s)
         lp1 = lmax+1
+        nmodes = lp1*lp1
 		responsible = 0
 		If ( (my_row_rank .eq. 0) .and. (my_nlevels .gt. 0) )  responsible = 1
 
@@ -426,7 +428,7 @@ Contains
             Allocate(sendbuffer(0:lmax,my_nlevels,nq_shell,2, my_mp_min:my_mp_max ))
             sendbuffer = 0.0d0 
 
-            ncount = Shell_Spectra%my_nlevels*nq_shell
+
             
             nf = spectra_buffer%nf2b
             Do p = 1, 2  ! Real and imaginary parts
@@ -455,16 +457,17 @@ Contains
         If (responsible .eq. 1) Then
             ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
 
-            Allocate(all_spectra(0:lmax,0:lmax, nlevels,nq_shell, 1:2))
-            Allocate(buff(0:lmax,nlevels,nq_shell,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
+            Allocate(all_spectra(0:lmax,0:lmax, my_nlevels,nq_shell, 1:2))
+            Allocate(buff(0:lmax,my_nlevels,nq_shell,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
             all_spectra(:,:,:,:,:) = 0.0d0
-
+            buff(:,:,:,:,:) = 0.0d0
 
             nrirqs = nproc2-1
             Allocate(rirqs(1:nrirqs))
             rirqs(:) = 0
             ind5 = pfi%all_3s(0)%delta+1
             Do nn = 1, nrirqs
+                !Write(6,*)'Ind5: ', ind5
                 your_id = nn
 
                 your_nm     = pfi%all_3s(nn)%delta
@@ -472,7 +475,7 @@ Contains
                 your_mp_max = pfi%all_3s(nn)%max
 
 
-                nelem = your_nm*my_nlevels*2*(lp1)*nq_shell
+                nelem = your_nm*my_nlevels*2*lp1*nq_shell
 
                 inds(:) = 1
                 inds(5) = ind5  !This is the mp_index here.
@@ -483,25 +486,30 @@ Contains
             Enddo
 
             ! Stipe my own data into the receive buffer
-            Do p = 1, 2  ! Real and imaginary parts
-                Do mp = my_mp_min,my_mp_max
+
+
+            Do mp = my_mp_min,  my_mp_max
+                m = pfi%inds_3s(mp)
+                Do p = 1,2
                     Do f = 1, nq_shell
                         Do r = 1, my_nlevels   
+
                             buff(m:lmax,r,f,p,mp) = sendbuffer(m:lmax,r,f,p,mp) 
+
                         Enddo
                     Enddo
                 Enddo
 
             Enddo
-            DeAllocate(sendbuffer)
+            !DeAllocate(sendbuffer)
 
             Call IWaitAll(nrirqs,rirqs)
 
             !Stripe the receiver buffer into the spectra buffer
            
             Do mp = 1,lp1
+                m = pfi%inds_3s(mp)
                 Do p = 1, 2  ! Real and imaginary parts
-                    m = pfi%inds_3s(mp)
                     Do f = 1, nq_shell
                         Do r = 1, my_nlevels   
                             all_spectra(m:lmax,m,r,f,p) = buff(m:lmax,r,f,p,mp)  
@@ -510,6 +518,8 @@ Contains
                 Enddo
 
             Enddo
+
+            DeAllocate(sendbuffer)
             DeAllocate(buff)
             DeAllocate(rirqs)
         Else
@@ -529,10 +539,11 @@ Contains
 
 
         If (responsible .eq. 1) Then   
+            !Write(6,*)'I am responsible: ', my_column_rank
             funit = shell_spectra%file_unit
             current_rec = Shell_Spectra%current_rec  ! Note that we have to do this after the file is opened
             If  ( (current_rec .eq. 1) .and. (shell_spectra%master) ) Then                
-            
+                !Write(6,*)'I am master: ', my_column_rank
                 dims(1) =  lmax
                 dims(2) =  nlevels
                 dims(3) =  nq_shell
@@ -565,13 +576,7 @@ Contains
             hdisp = hdisp+nlevels*12  ! level indices and level values
             
 
-            qdisp = lp1*lp1*2*nlevels*8
-            full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
-            disp = hdisp+full_disp*(current_rec-1)
 
-!!!!!I WAS HERE -- almost there...
-            
-            buffsize = my_nlevels*lp1*lp1
             ! The file is striped with time step slowest, followed by q
 
 
@@ -581,22 +586,46 @@ Contains
                     rcount = rcount+ Shell_Spectra%nshells_at_rid(p)
                 Endif
             Enddo
-            my_rdisp = rcount*lp1*lp1*8
-            Do p = 1, 2
-            Do i = 1, nq_shell
-                new_disp = disp+qdisp*(i-1)+my_rdisp                
-                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+            my_rdisp = rcount*nmodes*8
+
                 
-                Call MPI_FILE_WRITE(funit, all_spectra(0,0,1,i,p), buffsize, & 
-                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+
+            ! This is the LOCAL number ELEMENTS in the real or imaginary component of
+            ! of a single quantity  (This is not in bytes)
+            buffsize = my_nlevels*nmodes 
+
+            !This is the half-size (bytes) of a single quantity's information
+            !Each quantity has real/imaginary components, and
+            ! so the full size is twice this value.  THIS IS GLOBAL
+            qsize = nlevels*nmodes*8
+
+            !This is the size (bytes) of a single iteration's record
+            rec_size = qsize*2*nq_shell+12  ! 12 is for the simtime+iteration at the end
+
+            disp = hdisp+rec_size*(current_rec-1)
+
+            !new_disp = disp+my_rdisp
+            Do p = 1, 2
+                new_disp = disp+my_rdisp +(p-1)*qsize*nq_shell
+                !write(6,*)'new_disp: ', new_disp, my_column_rank
+                Do i = 1, nq_shell
+                         
+          
+                    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                    
+                    Call MPI_FILE_WRITE(funit, all_spectra(0,0,1,i,p), buffsize, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+
+                    new_disp = new_disp+qsize
+                Enddo
             Enddo
-            Enddo
-            disp = hdisp+full_disp*current_rec
+            disp = hdisp+rec_size*current_rec
             disp = disp-12
             Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
 
 
             If (shell_spectra%master) Then
+
                 buffsize = 1
                 Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
                        MPI_DOUBLE_PRECISION, mstatus, ierr)
