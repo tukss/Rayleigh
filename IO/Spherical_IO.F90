@@ -244,6 +244,9 @@ Contains
             master_rank = shell_slices%shell_r_ids(1)
             Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
+
+            master_rank = shell_spectra%shell_r_ids(1)
+            Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
         Endif
         Call Shell_Spectra%Shell_Balance()
         If (Shell_Spectra%nlevels .gt. 0) Then
@@ -380,28 +383,34 @@ Contains
 		Real*8, Intent(in) :: simtime
 		Integer, Intent(in) :: this_iter
 		Real*8, Allocatable :: buff(:,:,:,:,:), all_spectra(:,:,:,:,:)
-        Real*8, Allocatable :: sendbuffer(:,:,:,:,:)
+        Real*8, Allocatable :: sendbuffer(:,:,:,:,:), out_radii(:)
 		Integer :: responsible, current_shell, s_start, s_end, this_rid
 		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
         Integer :: rone,  p, ncount, counter, nf
 		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag
-
+        Integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
 		Integer :: your_mp_min, your_mp_max, your_nm, your_id
-		Integer :: nelem, m_ind, m_val
-        Integer :: file_pos, funit, error
-        nq_shell = Shell_Spectra%nq
+		Integer :: nelem, m_ind, m_val, current_rec
+        Integer :: funit, error, sirq, inds(5), dims(3)
+        Integer :: my_nlevels, nlevels
+        Integer :: lp1, nrirqs, ind5
+        Integer :: ierr, rcount, buffsize
+        Integer, Allocatable :: rirqs(:)
+        Integer :: mstatus(MPI_STATUS_SIZE)       
+
+        nlevels = Shell_Spectra%nlevels             ! The total number of spectra levels that needs to be output
+        my_nlevels = Shell_Spectra%my_nlevels       ! The number of radial levels that this rank needs to write out
+        nq_shell = Shell_Spectra%nq                 ! The number of quantities 
         shell_spectra_tag = Shell_Spectra%mpi_tag
         funit = Shell_Spectra%file_unit
-		! Later, we may want to generalize this, but for now just assume the process 0 handles the output
+        lp1 = lmax+1
 		responsible = 0
-		If (myid .eq. io_node) responsible = 1
-
-
+		If ( (my_row_rank .eq. 0) .and. (my_nlevels .gt. 0) )  responsible = 1
 
 
         lmax = maxval(pfi%inds_3s)
         !/////////////
-        If (Shell_Spectra%my_nlevels .gt. 0) Then
+        If (my_nlevels .gt. 0) Then
             !//////////////////////
             ! First thing we do is FFT/reform the buffer/Legendre Transform
             !
@@ -412,33 +421,23 @@ Contains
             Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
             Call spectra_buffer%deconstruct('p2b')
 
-       
-            !Do mp = my_mp_min, my_mp_max
-            !    m = pfi%inds_3s(mp)
-            !    mode_count = mode_count+(l_max-m)+1
-            !Enddo
+            Allocate(sendbuffer(0:lmax,my_nlevels,nq_shell,2, my_mp_min:my_mp_max ))
+            sendbuffer = 0.0d0 
 
-
-            
-
-            Allocate(sendbuffer(0:lmax,my_mp_min:my_mp_max,shell_spectra%my_nlevels,shell_spectra%nq,2))
-            sendbuffer = 0.0d0 !Comment this out later
-
-            ! Do one pass of s2b to get the real parts
-            ncount = Shell_Spectra%my_nlevels*Shell_Spectra%nq
+            ncount = Shell_Spectra%my_nlevels*nq_shell
             
             nf = spectra_buffer%nf2b
-            Do p = 1, 2
+            Do p = 1, 2  ! Real and imaginary parts
             Do mp = my_mp_min,my_mp_max
                 m = pfi%inds_3s(mp)
                     counter = 0
-                    Do f = 1, Shell_Spectra%nq
+                    Do f = 1, nq_shell
 
                         field_ind = counter/my_nr+1
                         Do r = 1, shell_spectra%my_nlevels   
                                 
                             rind = MOD(counter,my_nr)+my_rmin
-                            sendbuffer(m:lmax,mp,r,f,p) = &
+                            sendbuffer(m:lmax,r,f,p,mp) = &
                                 & spectra_buffer%s2b(mp)%data(m:lmax,rind,p,field_ind)
                             counter = counter+1
                         Enddo
@@ -450,92 +449,165 @@ Contains
 
 
         Endif
-    !///////////
-    ! I should replace this with a call to a method like Shell_Slices%comm
+
         If (responsible .eq. 1) Then
-            ! Responsible node receives  all the pieces of the shell slices from the other nodes
+            ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
 
-
-            Allocate(all_spectra(0:lmax,0:lmax,Shell_Spectra%nlevels,Shell_Spectra%nq,1:2))
+            Allocate(all_spectra(0:lmax,0:lmax,nq_shell, 1:2, nlevels))
+            Allocate(buff(0:lmax,nq_shell,1:2,nlevels,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
             all_spectra(:,:,:,:,:) = 0.0d0
-            current_shell = 1
-            Do n = 1, Shell_Spectra%nshell_r_ids  
-                this_rid = Shell_Spectra%shell_r_ids(n)
-                this_nshell = Shell_Spectra%nshells_at_rid(n)		
-                s_start = current_shell
-                s_end = s_start+this_nshell-1 
 
 
-                Do nn = 0, nproc2-1
-                    your_id = nn+this_rid*nproc2
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))
+            rirqs(:) = 0
+            ind5 = pfi%all_3s(0)%delta+1
+            Do nn = 1, nrirqs
+                your_id = nn
 
-                    your_nm     = pfi%all_3s(nn)%delta
-                    your_mp_min = pfi%all_3s(nn)%min
-                    your_mp_max = pfi%all_3s(nn)%max
-
-                    Allocate(buff(1:lmax+1,1:your_nm,1:this_nshell,1:Shell_Spectra%nq,1:2))
-
-
-                    nelem = nphi*your_nm*this_nshell*nq_shell
-                    If (your_id .ne. io_node) then
-                        ! Receive and copy
+                your_nm     = pfi%all_3s(nn)%delta
+                your_mp_min = pfi%all_3s(nn)%min
+                your_mp_max = pfi%all_3s(nn)%max
 
 
-                        Call receive(buff, source= your_id,tag=shell_spectra_tag,grp = pfi%gcomm)
-                        Do m_ind = 1, your_nm
-                            m_val = pfi%inds_3s(your_mp_min+m_ind-1)
-                            all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) = &
-                                & buff(m_val+1:lmax+1 , m_ind, 1:this_nshell, 1:nq_shell,1:2)
-                        Enddo
-                    Else
-                        If (Shell_Spectra%my_nlevels .gt. 0) Then
-                        ! Copy my shells into the main output array
+                nelem = your_nm*my_nlevels*2*(lp1)*nq_shell
 
-                            Do m_ind = my_mp_min, my_mp_max
-                                m_val = pfi%inds_3s(m_ind)
+                inds(:) = 1
+                inds(5) = ind5  !This is the mp_index here.
 
-                                all_spectra(m_val:lmax,m_val,s_start:s_end,1:nq_shell,1:2) &
-                                    & = sendbuffer(m_val:lmax,m_ind,1:this_nshell,1:nq_shell,1:2)
-
-                            Enddo
-                        Endif			
-                    Endif
-                    DeAllocate(buff)
-                Enddo
-                current_shell = s_end+1
+                Call Ireceive(buff, rirqs(nn), n_elements = nelem,source= your_id, &
+                    &  tag=shell_spectra_tag,grp = pfi%rcomm, indstart = inds)
+                ind5 = ind5+your_nm
             Enddo
-            Call Shell_Spectra%OpenFile(this_iter, error)
-            If (error .eq. 0) Then
-                If (Shell_Spectra%current_rec .eq. 1) Then            
-                    Write(funit)lmax,Shell_Spectra%nlevels,Shell_Spectra%nq
-                    Write(funit)(Shell_Spectra%oqvals(i),i=1,Shell_Spectra%nq)
-                    Write(funit)(radius(Shell_Spectra%levels(i)),i=1,Shell_Spectra%nlevels)
-                    Write(funit)(Shell_Spectra%levels(i),i=1,Shell_Spectra%nlevels)
-                    Call Shell_Spectra%update_position() ! important to do after header has been written
-                Endif
 
+            ! Stipe my own data into the receive buffer
+            Do p = 1, 2  ! Real and imaginary parts
+                Do mp = my_mp_min,my_mp_max
+                    Do f = 1, nq_shell
+                        Do r = 1, my_nlevels   
+                            buff(m:lmax,r,f,p,mp) = sendbuffer(m:lmax,r,f,p,mp) 
+                        Enddo
+                    Enddo
+                Enddo
 
-                Write(funit)(((((all_spectra(k,j,i,qq,p),k=0,lmax), &
-                & j=0,lmax),i=1,Shell_Spectra%nlevels),qq=1,Shell_Spectra%nq),p=1,2)
-                Write(funit)simtime
-                Write(funit)this_iter
-                Call Shell_Spectra%CloseFile()
-            Endif
+            Enddo
+            DeAllocate(sendbuffer)
 
-            DeAllocate(all_spectra)
+            Call IWaitAll(nrirqs,rirqs)
 
+            !Stripe the receiver buffer into the spectra buffer
+           
+            Do mp = 1,lp1
+                Do p = 1, 2  ! Real and imaginary parts
+                    m = pfi%inds_3s(mp)
+                    Do f = 1, nq_shell
+                        Do r = 1, my_nlevels   
+                            all_spectra(m:lmax,m,f,p,r) = buff(m:lmax,r,f,p,mp)  
+                        Enddo
+                    Enddo
+                Enddo
+
+            Enddo
+            DeAllocate(buff)
+            DeAllocate(rirqs)
         Else
 			!  Non responsible nodes send their info
-			If (Shell_Spectra%my_nlevels .gt. 0) Then
-				Call send(sendbuffer, dest = 0,tag=shell_spectra_tag, grp = pfi%gcomm)
+			If (my_nlevels .gt. 0) Then
+                inds(:) = 1
+				Call send(sendbuffer,sirq, dest = 0,tag=shell_spectra_tag, grp = pfi%rcomm, indstart = inds)
+                Call IWait(sirq)
+                DeAllocate(sendbuffer)
 			Endif
 		Endif
-		If (Shell_Spectra%my_nlevels .gt. 0) Then
-			DeAllocate(sendbuffer)
-		Endif
+
+
+        If (my_row_rank .eq. 0) Call Shell_Spectra%OpenFile_Par(this_iter, error)
+
+
+
+        If (responsible .eq. 1) Then   
+            funit = shell_spectra%file_unit
+            current_rec = Shell_Spectra%current_rec  ! Note that we have to do this after the file is opened
+            If  ( (current_rec .eq. 1) .and. (shell_spectra%master) ) Then                
+            
+                dims(1) =  lmax
+                dims(2) =  nlevels
+                dims(3) =  nq_shell
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_shell
+                call MPI_FILE_WRITE(funit,Shell_Spectra%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                allocate(out_radii(1:nlevels))
+                Do i = 1, nlevels
+                    out_radii(i) = radius(Shell_Spectra%levels(i))
+                Enddo
+                buffsize = nlevels
+	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+                DeAllocate(out_radii)
+                
+	            call MPI_FILE_WRITE(funit, Shell_Spectra%levels, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+            Endif
+
+            ! I might really (really) want to look into file views later.
+            ! Depending on the offset size mpi type, disp will crap out past 2GB
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_shell*4 ! nq
+            hdisp = hdisp+nlevels*12  ! level indices and level values
+            
+
+            qdisp = lp1*lp1*2*nlevels*8
+            full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(current_rec-1)
+
+!!!!!I WAS HERE -- almost there...
+            
+            buffsize = my_nlevels*lp1*lp1
+            ! The file is striped with time step slowest, followed by q
+
+
+            rcount = 0
+            Do p = 1, Shell_Spectra%nshell_r_ids
+                if (Shell_Spectra%shell_r_ids(p) .lt. my_column_rank) Then
+                    rcount = rcount+ Shell_Spectra%nshells_at_rid(p)
+                Endif
+            Enddo
+            my_rdisp = rcount*lp1*lp1*8
+            Do p = 1, 2
+            Do i = 1, nq_shell
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, all_spectra(0,0,1,i,p), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+            Enddo
+            disp = hdisp+full_disp*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+            If (shell_spectra%master) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+
+			DeAllocate(all_spectra)
+        Endif  ! Responsible
+
+        If (my_row_rank .eq. 0) Call shell_spectra%closefile_par()
 
 	End Subroutine Write_Shell_Spectra
-
 
 
 
@@ -604,7 +676,7 @@ Contains
                 inds(4) = your_theta_min
 
 				nelem = nphi*your_ntheta*this_nshell*nq_shell
-                Write(6,*)'NELEME', nelem, nphi, your_ntheta, this_nshell, nq_shell
+
          		Call IReceive(buff, rirqs(nn),n_elements = nelem, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm, indstart = inds)
 
             Enddo
@@ -624,7 +696,7 @@ Contains
 
             Call IWaitAll(nrirqs,rirqs)
 
-            Write(6,*)'max buff: ', maxval(buff)
+
             Do k = 1, nq_shell
                 Do j = 1, this_nshell
                     Do t = 1, ntheta
