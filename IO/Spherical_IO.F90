@@ -240,6 +240,7 @@ Contains
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
+        Call Shell_Spectra%Shell_Balance()
         if (my_row_rank .eq. 0) Then
             master_rank = shell_slices%shell_r_ids(1)
             Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
@@ -248,7 +249,7 @@ Contains
             master_rank = shell_spectra%shell_r_ids(1)
             Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
         Endif
-        Call Shell_Spectra%Shell_Balance()
+        
         If (Shell_Spectra%nlevels .gt. 0) Then
             !Shell spectra require an additional step
             !Initialize the buffer object that we use for transposing spectra
@@ -403,12 +404,13 @@ Contains
         nq_shell = Shell_Spectra%nq                 ! The number of quantities 
         shell_spectra_tag = Shell_Spectra%mpi_tag
         funit = Shell_Spectra%file_unit
+        lmax = maxval(pfi%inds_3s)
         lp1 = lmax+1
 		responsible = 0
 		If ( (my_row_rank .eq. 0) .and. (my_nlevels .gt. 0) )  responsible = 1
 
 
-        lmax = maxval(pfi%inds_3s)
+        
         !/////////////
         If (my_nlevels .gt. 0) Then
             !//////////////////////
@@ -454,7 +456,7 @@ Contains
             ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
 
             Allocate(all_spectra(0:lmax,0:lmax,nq_shell, 1:2, nlevels))
-            Allocate(buff(0:lmax,nq_shell,1:2,nlevels,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
+            Allocate(buff(0:lmax,nlevels,nq_shell,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
             all_spectra(:,:,:,:,:) = 0.0d0
 
 
