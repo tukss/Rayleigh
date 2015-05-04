@@ -455,7 +455,7 @@ Contains
         If (responsible .eq. 1) Then
             ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
 
-            Allocate(all_spectra(0:lmax,0:lmax,nq_shell, 1:2, nlevels))
+            Allocate(all_spectra(0:lmax,0:lmax, nlevels,nq_shell, 1:2))
             Allocate(buff(0:lmax,nlevels,nq_shell,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
             all_spectra(:,:,:,:,:) = 0.0d0
 
@@ -504,7 +504,7 @@ Contains
                     m = pfi%inds_3s(mp)
                     Do f = 1, nq_shell
                         Do r = 1, my_nlevels   
-                            all_spectra(m:lmax,m,f,p,r) = buff(m:lmax,r,f,p,mp)  
+                            all_spectra(m:lmax,m,r,f,p) = buff(m:lmax,r,f,p,mp)  
                         Enddo
                     Enddo
                 Enddo
@@ -516,7 +516,8 @@ Contains
 			!  Non responsible nodes send their info
 			If (my_nlevels .gt. 0) Then
                 inds(:) = 1
-				Call send(sendbuffer,sirq, dest = 0,tag=shell_spectra_tag, grp = pfi%rcomm, indstart = inds)
+
+				Call Isend(sendbuffer,sirq, dest = 0,tag=shell_spectra_tag, grp = pfi%rcomm, indstart = inds)
                 Call IWait(sirq)
                 DeAllocate(sendbuffer)
 			Endif
