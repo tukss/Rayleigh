@@ -695,7 +695,7 @@ Contains
             ! Post Ireceives
             nrirqs = nproc2-1
             Allocate(rirqs(1:nrirqs))          
-            Write(6,*)'Going to loop' 
+
             Do nn = 1, nproc2-1
 				your_id = nn
 
