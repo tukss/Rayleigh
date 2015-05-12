@@ -76,25 +76,21 @@ def plot_azav(fig,axis,field,radius,costheta,sintheta,r_bcz=0.71,mini=-1,maxi=-1
 
 ########################################################################
 # Read in the data
-b = AzAverage(filename='00280010',path='AZ_Avgs/')
+b = AzAverage(filename='00095000',path='AZ_Avgs/')
 print b.qv
 
        
-ind = 1
+ind = 1 # record number to grab
 
 
 
 n_r = b.nr
 n_t = b.ntheta
-vphi = b.vals[0:n_r,0:n_t,b.lut[3]].reshape(n_r,n_t)
-vphi = np.transpose(vphi)
-entropy = b.vals[0:n_r,0:n_t,b.lut[4]].reshape(n_r,n_t)
-entropy = np.transpose(entropy)
+vphi = b.vals[:,:,b.lut[3],ind].reshape(n_t,n_r)
+entropy = b.vals[:,:,b.lut[4],ind].reshape(n_t,n_r)
 
-rhovr = b.vals[0:n_r,0:n_t,b.lut[13]].reshape(n_r,n_t)
-rhovt = b.vals[0:n_r,0:n_t,b.lut[14]].reshape(n_r,n_t)
-rhovr = np.transpose(rhovr)
-rhovt = np.transpose(rhovt)
+rhovr = b.vals[:,:,b.lut[13],ind].reshape(n_t,n_r)
+rhovt = b.vals[:,:,b.lut[14],ind].reshape(n_t,n_r)
 
 
 sintheta = b.sintheta
