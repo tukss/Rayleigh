@@ -12,6 +12,7 @@ Contains
 		!Call Initialize_Chebyshev(colocx,1.0d0,1.5d0)
 		!scaling = colocx(1)-colocx(N_R))
 		!colocx = 0.5d0*(colocx)
+        !write(6,*)'colocx: ', colocx
 		Call Test_Transform_1d()
 		Call Test_Transform_2d()
 		Call Test_Transform_3d()
@@ -291,7 +292,8 @@ Contains
 		f = 0.0d0
 		Do j = 1, n3		
 		Do i = 1, n2
-			f(:,i,j,1) = i*j*exp(-4.0d0*(colocx)**2)
+			!f(:,i,j,1) = i*j*exp(-4.0d0*(colocx)**2)
+            f(:,i,j,1) = exp(-1.0d0*colocx)
 		Enddo
 		Enddo
 		ans = 0.0d0
@@ -301,6 +303,9 @@ Contains
 			ans(:,i,j,2) = -8.0d0*colocx*f(:,i,j,1)	! 1st derivative
 			ans(:,i,j,3) = f(:,i,j,1)*(64.0d0*colocx**2-8.0d0)			! 2nd derivative
 			ans(:,i,j,4) = f(:,i,j,1)*(192.0d0*colocx-512.0d0*colocx**3)	! 3rd derivative
+            ans(:,i,j,2) = -f(:,i,j,1)
+            ans(:,i,j,3) = f(:,i,j,1)
+            ans(:,i,j,4) = -f(:,i,j,1)
 		Enddo
 		Enddo
 		parity = .false.
@@ -317,7 +322,7 @@ Contains
 			Write(6,*)'Checking Chebyshev Derivative of 4-D array.'
 			Do i = 1, 3
 				Call reldiff3d2(f(:,:,:,i+1),ans(:,:,:,i+1),rdiff,ind,worst,worsta)
-				Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
+				Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff, maxval(f), maxval(ans)
 				!Write(6,*)'Worst results at ind: ', ind, colocx(ind), worst, worsta
 			Enddo
 			! Can uncomment this to quickly check visually in IDL.

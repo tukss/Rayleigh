@@ -64,7 +64,9 @@ Contains
 
 
 	Subroutine Finalization()
-        If (my_rank .eq. 0) Call stdout%finalize()
+        If (.not. test_mode) Then
+         If (my_rank .eq. 0) Call stdout%finalize()
+        Endif
 		Call pfi%exit()
 	End Subroutine Finalization
 End Program Main
