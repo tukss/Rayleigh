@@ -14,11 +14,11 @@ Module Chebyshev_Polynomials
 	Logical :: initialized = .false.
 	Real*8, Private :: scaling ! x runs from -0.5 to 0.5 by default
 	Interface Cheby_To_Spectral
-		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D
+		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D2
 	End Interface
 
 	Interface Cheby_From_Spectral
-		Module Procedure From_Spectral_1D, From_Spectral_2D, From_Spectral_3D, From_Spectral_4D
+		Module Procedure From_Spectral_1D, From_Spectral_2D, From_Spectral_3D, From_Spectral_4D !2
 	End Interface
 
 	Interface Cheby_From_SpectralFE
@@ -38,6 +38,85 @@ Module Chebyshev_Polynomials
 	End Interface
 
 Contains
+
+    Subroutine To_Spectral_4D2(c_in,f_out)
+        Implicit None
+        Include 'fftw3.f'
+		Real*8, Intent(In) :: c_in(:,:,:,:)
+		Real*8, Intent(InOut) :: f_out(:,:,:,:)
+		Integer*8 :: fresh_plan
+		Integer :: n, howmany
+		Integer :: inembed, istride, idist
+		Integer :: onembed, ostride, odist
+		Integer :: xshape(4)
+        Real*8 :: over_2n
+
+
+		! X will typically be deallocated and reallocated (unfortunately)
+		! So we will need to recreate the plan (because x's memory location may change)
+		xshape = shape(c_in)
+		n = xshape(1)  ! We assume nphi is even that the arrays has been padded by 2
+		howmany = xshape(2)*xshape(3)*xshape(4)
+		inembed = 0
+		onembed = 0
+		istride = 1
+		ostride = 1
+		! idist is the distance between successive arrays to be transformed are stored
+		! odist is the distance between where successive results stored
+		!	-- we assume the stride is 1 here, so this is just the length of the first dimension of the array
+		idist = n		! In place transforms require extra padding - 2 extra for even n.  1 extra for odd n.
+		odist = n			! This is the size of the corresponding complex arrays
+									! At least it would be if we weren't doing this in place
+		
+		call dfftw_plan_many_r2r(fresh_plan,1,n, howmany, &
+								 & c_in, inembed, istride, idist, &
+								 & f_out, onembed, ostride, odist, &
+								 & FFTW_REDFT10, FFTW_ESTIMATE)
+        
+		call dfftw_execute(fresh_plan)
+		call dfftw_destroy_plan(fresh_plan)
+        over_2n = 1.0d0/n ! (2*n)
+        f_out = f_out*over_2n
+        !f_out = f_out/maxval(abs(f_out))
+    End Subroutine To_Spectral_4D2
+
+    Subroutine From_Spectral_4D2(c_in,f_out)
+        Implicit None
+        Include 'fftw3.f'
+		Real*8, Intent(In) :: c_in(:,:,:,:)
+		Real*8, Intent(InOut) :: f_out(:,:,:,:)
+		Integer*8 :: fresh_plan
+		Integer :: n, howmany
+		Integer :: inembed, istride, idist
+		Integer :: onembed, ostride, odist
+		Integer :: xshape(4)
+
+
+		! X will typically be deallocated and reallocated (unfortunately)
+		! So we will need to recreate the plan (because x's memory location may change)
+		xshape = shape(c_in)
+		n = xshape(1)  ! We assume nphi is even that the arrays has been padded by 2
+		howmany = xshape(2)*xshape(3)*xshape(4)
+		inembed = 0
+		onembed = 0
+		istride = 1
+		ostride = 1
+		! idist is the distance between successive arrays to be transformed are stored
+		! odist is the distance between where successive results stored
+		!	-- we assume the stride is 1 here, so this is just the length of the first dimension of the array
+		idist = n		! In place transforms require extra padding - 2 extra for even n.  1 extra for odd n.
+		odist = n			! This is the size of the corresponding complex arrays
+									! At least it would be if we weren't doing this in place
+		
+		call dfftw_plan_many_r2r(fresh_plan,1,n, howmany, &
+								 & c_in, inembed, istride, idist, &
+								 & f_out, onembed, ostride, odist, &
+								 & FFTW_REDFT01, FFTW_ESTIMATE)
+        
+		call dfftw_execute(fresh_plan)
+		call dfftw_destroy_plan(fresh_plan)
+        !f_out = f_out/maxval(abs(f_out))
+    End Subroutine From_Spectral_4D2
 
 	Subroutine Initialize_Chebyshev(grid, xmin,xmax, integration_weights,nthread)
 		Implicit None
@@ -555,6 +634,8 @@ Contains
 		Enddo
 	End Subroutine From_Spectral_3D
 
+
+
 	Subroutine From_Spectral_4D(c_in,f_out)
 		Implicit None
 		Real*8, Intent(In) :: c_in(:,:,:,:)
@@ -663,10 +744,14 @@ Contains
 			Do k = 1, n3
 				Do j = 1, n2
 					buffer(n-1,j,k,dind) = 0.0d0
-					buffer(n-2,j,k,dind) = 2.0d0*(n-1)*buffer(n-1,j,k,ind)*scaling
+					buffer(n-2,j,k,dind) = 2*(n-1)*buffer(n-1,j,k,ind)*scaling
+                    buffer(n-2,j,k,dind) = 0.0d0
 					Do i = n-3,0, -1
-						buffer(i,j,k,dind) = buffer(i+2,j,k,dind)+2.0d0*(i+1)*buffer(i+1,j,k,ind)*scaling
+						buffer(i,j,k,dind) = buffer(i+2,j,k,dind)+2*(i+1)*buffer(i+1,j,k,ind) !*scaling
 					Enddo
+                    Do i = 0,n-3
+                        buffer(i,j,k,dind) = buffer(i,j,k,dind)*scaling
+                    Enddo
 				Enddo
 			Enddo
          !$OMP END PARALLEL DO
@@ -689,11 +774,16 @@ Contains
 						dbuffer(:,1,trank) = buffer(:,j,k,dind)
 						Do order = 2, dorder
 							dbuffer(n-1,order,trank) = 0.0d0
-							dbuffer(n-2,order,trank) = 2.0d0*(n-1)*dbuffer(n-1,order-1,trank)*scaling
+							dbuffer(n-2,order,trank) = 2*(n-1)*dbuffer(n-1,order-1,trank) !*scaling
+                            dbuffer(n-2,order,trank) = 0.0d0
 							Do i = n -3, 0, -1
 								dbuffer(i,order,trank) = dbuffer(i+2,order,trank)+ &
-									& 2.0d0*(i+1)*dbuffer(i+1,order-1,trank)*scaling						
+									& 2*(i+1)*dbuffer(i+1,order-1,trank) !*scaling						
 							Enddo
+                            Do i = 0,n-3
+                                dbuffer(i,order,trank) = dbuffer(i,order,trank)*scaling
+                            Enddo
+
 						Enddo
 						buffer(:,j,k,dind) = dbuffer(:,dorder,trank)
 					Enddo
