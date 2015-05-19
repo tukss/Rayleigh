@@ -297,10 +297,10 @@ Contains
 				Call add_implicit_term(teq,tvar,1,amp,lp)
 
                 !Reference State Advection (only do this if reference state is non-adiabatic)
-                If (advect_reference_state) Then
-                    amp = -H_Laplacian/ref%density*ref%dsdr
-                    Call add_implicit_term(teq,wvar,0,amp,lp)
-                Endif
+                !If (advect_reference_state) Then
+                !    amp = -H_Laplacian/ref%density*ref%dsdr
+                !    Call add_implicit_term(teq,wvar,0,amp,lp)
+                !Endif
 				
 				!=====================================================
 				!	Z Equation

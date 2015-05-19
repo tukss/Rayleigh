@@ -96,6 +96,8 @@ Contains
         315         If (eof_err) Then 
                         If (global_rank .eq. 0) Then
                             Write(6,*)'Multi-run error:  Dirs expected, found: ',nruns, rcount
+			    Write(6,*)'dirs found: '
+			    Write(6,*)rundirs
                         Endif
                         multi_run_mode = .false.
                     Endif

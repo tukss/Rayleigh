@@ -1,5 +1,5 @@
 F90 = mpixlf2003_r
-F90FLAGS = -r8 -O2 -fpp -FR -fp-model strict -I$(FFTWINC)
+F90FLAGS = -r8 -O3 -fpp -FR -fp-model strict -I$(FFTWINC)
 FFTWINC = /soft/libraries/alcf/current/xl/FFTW3/include
 FFTWLIB = /soft/libraries/alcf/current/xl/FFTW3/lib
 ##FFTWINC = /soft/libraries/essl/current/essl/5.1/FFTW3/include
@@ -13,11 +13,21 @@ LESSL = /soft/libraries/essl/current/lib64
 ILESSL = /soft/libraries/essl/current/include
 
 # The first set of flags has the build path hard-coded.  This is error prone!
-##F90FLAGS =  -qfree=f90 -O2 -I/projects/cig_dynamo/rayleigh_dev/build -I$(FFTWINC) 
+#F90FLAGS =  -qfree=f90 -O2 -I/projects/cig_dynamo/rayleigh_dev/build -I$(FFTWINC) 
+##F90FLAGS =  -qessl -qfree=f90 -qnosmp  -O3 -I .  -I$(FFTWINC)
+#NOTE -- turned off qstrict above
 F90FLAGS =  -qfree=f90 -O2 -I .  -I$(FFTWINC)
-
 LIBFLAGS = -L$(FFTWLIB) -lfftw3 -L$(LALIB) -llapack -L$(BLLIB) -lblas
+ifeq ($(RAYLEIGH_OPT1),O3)
+        F90FLAGS =  -qfree=f90 -O3 -I .  -I$(FFTWINC)
+endif
 
+ifeq ($(RAYLEIGH_OPT1),debug)
+        F90FLAGS =  -qfree=f90 -O2 -g -traceback -I .  -I$(FFTWINC)
+endif
+
+
+#LIBFLAGS = -L$(FFTWLIB) -lfftw3 -L/soft/libraries/essl/current/lib64/ -L/soft/libraries/alcf/current/xl/LAPACK/lib -lesslbg -llapack -lesslbg -L$(BLLIB) -lblas
 
 PROG =	rayleigh
 
