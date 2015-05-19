@@ -37,9 +37,10 @@ Module Controls
 	Logical :: lorentz_forces = .true.     ! Turn Lorentz forces on or off
     Logical :: viscous_heating = .true.     ! Turns viscous heating on/off
     Logical :: ohmic_heating = .true.
-
+    Logical :: advect_reference_state = .true.  ! Set to true to advect the reference state
+                                                ! Generally only do this if reference state is not adiabatic
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
-                & viscous_heating, ohmic_heating
+                & viscous_heating, ohmic_heating, advect_reference_state
 
     !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls
