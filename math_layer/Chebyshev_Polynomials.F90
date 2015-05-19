@@ -14,7 +14,7 @@ Module Chebyshev_Polynomials
 	Logical :: initialized = .false.
 	Real*8, Private :: scaling ! x runs from -0.5 to 0.5 by default
 	Interface Cheby_To_Spectral
-		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D2
+		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D !2
 	End Interface
 
 	Interface Cheby_From_Spectral
