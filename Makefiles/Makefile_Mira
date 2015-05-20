@@ -29,7 +29,10 @@ endif
 ifeq ($(RAYLEIGH_OPT1), omp)
 
 
-        F90FLAGS = -qessl -qipa -qprefetch -qfree=f90 -qsmp=omp:noauto -O3 -qhot -qstrict -qarch=auto -qcache=auto -qtune=auto -q64 -I .  -I$(FFTWINC)
+##        F90FLAGS = -qessl -qipa -qprefetch -qfree=f90 -qsmp=omp:noauto -O3 -qhot -qstrict -qarch=auto -qcache=auto -qtune=auto -q64 -I .  -I$(FFTWINC)
+
+        F90FLAGS = -qessl -qprefetch -qfree=f90 -qsmp=omp:noauto -O3 -qhot -qarch=auto -qcache=auto -qtune=auto -q64 -I .  -I$(FFTWINC)
+
 
         LIBFLAGS =  -L$(FFTWLIB) -lfftw3 -lfftw3_omp -L$(LALIB) -L$(LESSL) -lesslsmpbg -llapack -lesslsmpbg -L$(BLLIB) -lblas /soft/compilers/ibmcmp-nov2014/vacpp/bg/12.1/lib/libibmc++.a /bgsys/drivers/ppcfloor/gnu-linux/powerpc64-bgq-linux/lib/libstdc++.a
 

@@ -9,6 +9,7 @@ Module Initial_Conditions
 	Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
 	Use Controls
 	Use Timers
+    Use General_MPI, Only : BCAST2D
     Use ReferenceState, Only : s_conductive
     Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom,&
          fix_dtdr_top, fix_dtdr_bottom, C10_bottom, C11_bottom, C1m1_bottom
@@ -193,7 +194,7 @@ Contains
         Integer, Intent(In) :: field_ind
         Real*8, Intent(In) :: rand_amp
         Real*8, Intent(In), Optional :: rprofile(my_r%min:), ell0_profile(1:)
-		Real*8, Allocatable :: rand(:), rfunc(:), lpow(:)
+		Real*8, Allocatable :: rand(:,:), rfunc(:), lpow(:)
 		Real*8 :: amp, phase, lmid, alpha,x
 
         type(SphericalBuffer), Intent(InOut) :: infield
@@ -225,7 +226,7 @@ Contains
 		Enddo
 
 		!Set up the random phases and amplitudes
-		Allocate(rand(1:ncombinations*2))
+		Allocate(rand(1:ncombinations*2,1))
 
 		If (my_rank .eq. 0) Then
 			Call system_clock(seed(1))		
@@ -233,18 +234,26 @@ Contains
 			Call random_number(rand)
 
 			Do i = 1, ncombinations
-				rand(i) = 2*temp_amp*(rand(i)-0.5d0)		! first half of rand contains the amplitude
+				rand(i,1) = 2*temp_amp*(rand(i,1)-0.5d0)		! first half of rand contains the amplitude
 			Enddo
 			! We leave the second half alone (contains phases)
 
 			! Send rand
-			Do n = 1, ncpu -1
-				Call send(rand, dest = n,tag=init_tag, grp=pfi%gcomm)
-			Enddo
-		Else
+			!Do n = 1, ncpu -1
+			!	Call send(rand, dest = n,tag=init_tag, grp=pfi%gcomm)
+			!Enddo
+		ENDIF
+		!Else
 			! receive rand
-			Call receive(rand, source= 0,tag=init_tag,grp = pfi%gcomm)
-		Endif	
+		!	Call receive(rand, source= 0,tag=init_tag,grp = pfi%gcomm)
+		!Endif	
+
+	        If (my_row_rank .eq. 0) Then
+	            ! Broadcast along the column
+	            Call BCAST2D(rand,grp = pfi%ccomm)
+	        Endif
+	        Call BCAST2D(rand,grp = pfi%rcomm)
+
 
 		! Everyone establishes their range of random phases		
 		mode_count = 0
@@ -273,8 +282,8 @@ Contains
 			m = m_values(mp)			
 			Do l = m, l_max
 				tempfield%s2b(mp)%data(l,:,:,:) = 0.0d0
-				amp = rand(ind1)*lpow(l)
-				phase = rand(ind2)
+				amp = rand(ind1,1)*lpow(l)
+				phase = rand(ind2,1)
 				ind1 = ind1+1
 				ind2 = ind2+1
 				Do r = my_r%min, my_r%max
