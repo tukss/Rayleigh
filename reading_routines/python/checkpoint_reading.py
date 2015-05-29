@@ -221,22 +221,5 @@ def translate_checkpoint(iteration,indir,outdir,magnetism=False, tonative= False
             print 'Translating '+ifile+' to '+ofile
             swap_translate(ifile,ofile,item_count,dtype='float64',bswap = not tonative)
 
-#code for rewriting the grid
-the_file = '00000002_grid_etc'
-agrid = Grid_Info(the_file)
 
-print agrid.gpars, agrid.simtime, agrid.tpars
-print agrid.radius
-
-print ' '
-print '//////////////////////'
-print ' '
-swp = False
-agrid.write_grid('test',bswap = swp)
-a_new_grid = Grid_Info('test',byteswap = swp)
-
-print a_new_grid.gpars, a_new_grid.simtime, a_new_grid.tpars
-print a_new_grid.radius
-
-#translate_checkpoint(iteration, '','translation')
 
