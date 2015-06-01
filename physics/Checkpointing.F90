@@ -17,11 +17,13 @@ Module Checkpointing
 	Integer,private,Allocatable :: mode_count(:)
 	Integer,private :: nlm_total, checkpoint_tag = 425
 	Integer, Allocatable, Private :: lmstart(:)
-	Integer :: buffsize, buffsize2 ! These cannot be long (8) - MPI-IO goes haywire.
+	Integer :: buffsize, buffsize2 ! These cannot be long (8 byte) - MPI-IO goes haywire.
 	Integer*8, Private :: my_check_disp,full_disp		! These need to be long ! for writing checkpoints
 	Integer*8, Private :: my_check_disp2
 	Integer*8, Private :: my_in_disp, full_in_disp		! for reading checkpoints
 	Character*3 :: wchar = 'W', pchar = 'P', tchar = 'T', zchar = 'Z', achar = 'A', cchar = 'C'
+    Character*120 :: checkpoint_prefix ='nothing'
+
 	Integer :: checkpoint_iter = 0
 	Real*8 :: checkpoint_dt, checkpoint_newdt
     Real*8 :: checkpoint_time 
@@ -30,13 +32,34 @@ Module Checkpointing
 	Integer :: Noutputs_per_row, Nradii_per_output
 	Integer, Allocatable :: Nradii_at_rank(:), Rstart_at_rank(:)
 	Logical :: I_Will_Output = .False.
+
+    !////////////////////////////////////////////
+    ! These variables are based around
+    Logical :: ItIsTimeForACheckpoint = .false.
+    Logical :: ItIsTimeForAQuickSave = .false.
+    Integer :: quick_save_num = -1
+    
     Type(Cheby_Transform_Interface) :: cheby_info
 Contains
 
-	Subroutine Initialize_Checkpointing_old()
+	!//////////////////////////////////////////////////////////
+	! Modifications related to the new Memory-Friendly Checkpointing Style
+	Subroutine Initialize_Checkpointing()
 		Implicit None
 		Integer :: nfs(6)
-		Integer :: p, np, nl, m, mp
+		Integer :: p, np, nl, m, mp, rextra
+        
+        If (checkpoint_interval .lt. 1) Then
+            !this is for backwards compatibility
+            !If checkpoint_interval is unspecified, use check_frequency
+            checkpoint_interval = check_frequency
+        Endif
+
+        If (num_quick_saves .gt. 100) Then
+            !Maximum number of quick saves is 100 (hopefully far more than needed).
+            num_quick_saves = 100
+        Endif
+
 		if (magnetism) Then
 			numfields = 6
 		Endif
@@ -44,6 +67,40 @@ Contains
 		Call chktmp%init(field_count = nfs, config = 'p1a')			! This structure hangs around through the entire run
 
 		!////////////////////////
+
+		!//////////////////////////////////////////////////
+		! Revisions for mem-friendly I/O
+
+		!Write(6,*)'NPOUT: ', npout
+		Noutputs_per_row = npout! # of processors outputting within row
+		If (Noutputs_per_row .gt. my_r%delta) Then
+			Noutputs_per_row = my_r%delta		
+		Endif
+		If (Noutputs_per_row .gt. nprow) Then
+				Noutputs_per_row = nprow
+		Endif
+		Nradii_per_output = my_r%delta/Noutputs_per_row	! Number of radii each processor outputs
+		rextra = Mod(my_r%delta,Noutputs_per_row)		   ! Remainder
+		Allocate(nradii_at_rank(0:Noutputs_per_row-1))	! Number of radii output by each rank
+		Allocate(rstart_at_rank(0:Noutputs_per_row-1))	! First radial index (local) this rank receives
+		Do p = 0, Noutputs_per_row -1 
+			Nradii_at_rank(p) = Nradii_per_output
+			If (rextra .gt. 0) Then
+				If (p .lt. rextra) Then
+					Nradii_at_rank(p) = Nradii_at_rank(p)+1
+				Endif
+			Endif
+		Enddo
+		rstart_at_rank(0) = 1
+		Do p = 1, Noutputs_per_row-1
+			rstart_at_rank(p) = rstart_at_rank(p-1)+nradii_at_rank(p-1)
+		Enddo
+		! Determine if each rank will output
+		If (my_row_rank .lt. Noutputs_per_row) Then
+			I_Will_Output = .true.
+		Endif
+
+
 		np = pfi%rcomm%np
 		Allocate(mode_count(0:np-1))
 		mode_count(:)  = 0	! This is how many total l-m combinations rank p of a row owns
@@ -59,7 +116,7 @@ Contains
 				nlm_total = nlm_total+nl
 			Enddo
 		Enddo
-		if (my_row_rank .eq. 0) Then
+		if (I_Will_Output) Then
 			Allocate(lmstart(0:l_max))
 			lmstart(0) = 1
 			do m = 0, l_max-1
@@ -71,12 +128,15 @@ Contains
 			Do p = 1, my_column_rank
 				my_check_disp = my_check_disp+pfi%all_1p(p-1)%delta
 			enddo
-			my_check_disp = my_check_disp*nlm_total !*2
-			buffsize = nlm_total*my_r%delta
+			my_check_disp2 = (my_check_disp+rstart_at_rank(my_row_rank)-1)*nlm_total	! for new checkpointing style
+			my_check_disp = my_check_disp*nlm_total  ! for old Checkpointing style
+			buffsize2 = nlm_total*nradii_at_rank(my_row_rank)	! for new
+			buffsize = nlm_total*my_r%delta  ! for old
 			full_disp = N_r
 			full_disp = full_disp*nlm_total
 		Endif
-	End Subroutine Initialize_Checkpointing_old
+
+	End Subroutine Initialize_Checkpointing
 
 
 
@@ -89,6 +149,7 @@ Contains
 		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
         Real*8 :: elapsed_time
+        Character*2 :: autostring
 		Character*8 :: iterstring
 		Character*120 :: cfile
 		np = pfi%rcomm%np
@@ -156,6 +217,14 @@ Contains
 					Enddo										
 					DeAllocate(myarr)
 			Enddo
+                If (ItIsTimeForAQuickSave) Then
+                    write(autostring,'(i2.2)') quick_save_num
+                    checkpoint_prefix = 'Checkpoints/quicksave_'//trim(autostring)
+                Else
+                    write(iterstring,'(i8.8)') iteration
+                    checkpoint_prefix = 'Checkpoints/'//trim(iterstring)
+                Endif
+
 				Call Write_Field(rowstrip,1,wchar, iteration)
 				Call Write_Field(rowstrip,2,pchar, iteration)
 				Call Write_Field(rowstrip,3,tchar, iteration)
@@ -176,23 +245,33 @@ Contains
 					Call Write_Field(rowstrip,offset_index+6,'AAB', iteration)
 				Endif
             DeAllocate(rowstrip)
-				If (my_column_rank .eq. 0) Then
-					! row/column 0 writes out a file with the grid, etc.
-					! This file should contain everything that needs to be known
-	         	write(iterstring,'(i8.8)') iteration
-            	cfile = 'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
-                cfile = Trim(my_path)//cfile
-	            open(unit=15,file=cfile,form='unformatted', status='replace')
-	            Write(15)n_r
-					Write(15)grid_type
-					Write(15)l_max
-					Write(15)dt
-					Write(15)new_dt
-	            Write(15)(radius(i),i=1,N_R)
-                Write(15)elapsed_time
-	            Close(15)
+            If (my_column_rank .eq. 0) Then
+                ! row/column 0 writes out a file with the grid, etc.
+                ! This file should contain everything that needs to be known
 
-				Endif
+
+                cfile = Trim(my_path)//trim(checkpoint_prefix)//'_'//'grid_etc'
+
+                open(unit=15,file=cfile,form='unformatted', status='replace')
+                Write(15)n_r
+                Write(15)grid_type
+                Write(15)l_max
+                Write(15)dt
+                Write(15)new_dt
+                Write(15)(radius(i),i=1,N_R)
+                Write(15)elapsed_time
+                Close(15)
+
+                open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='replace')
+                If (ItIsTimeForAQuickSave) Then
+                    Write(15,'(i9.8)')-iteration
+                    Write(15,'(i2.2)')quick_save_num
+                Else
+                    Write(15,'(i8.8)')iteration
+                Endif
+                Close(15)
+
+            Endif
 		Endif
 
 		
@@ -205,23 +284,51 @@ Contains
 		Integer :: n_r_old, l_max_old, grid_type_old, nr_read
 		Integer :: i, ierr, nlm_total_old, m, nl,p, np, mxread
 		Integer :: maxl, dim2,offset, nl_load,lstart,mp, offset_index
-		Integer :: old_pars(3)
+		Integer :: old_pars(5)
 		Integer, Allocatable :: lmstart_old(:)
 		Real*8, Allocatable :: old_radius(:), radius_old(:)
 		Real*8, Allocatable :: rowstrip(:,:), myarr(:,:), sendarr(:,:)
 		Real*8 :: dt_pars(3),dt,new_dt
         Real*8, Allocatable :: tempfield1(:,:,:,:), tempfield2(:,:,:,:)
 		Character*8 :: iterstring
+        Character*2 :: autostring
 		Character*120 :: cfile
         Integer :: fcount(3,2)
         Integer :: lb,ub, f, imi, r, ind
+        Integer :: last_iter, last_auto
         Real*8 :: mxvt, mxvp
 		dim2 = tnr*numfields*2
 		checkpoint_iter = iteration
-		Write(iterstring,'(i8.8)') iteration
+		!Write(iterstring,'(i8.8)') iteration
         If (my_rank .eq. 0) Then
+            old_pars(4) = checkpoint_iter
+            old_pars(5) = -1
+            If (checkpoint_iter .eq. -1) Then
+                ! Get rid of these print statements momentarily
+                open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='old')
+                read(15,'(i9.8)')last_iter
+                If (last_iter .lt. 0) Then  !Indicates a quicksave
+                    Read(15,'(i2.2)')last_auto
+                    old_pars(4) = -last_iter
+                    old_pars(5) = last_auto
+                    Write(autostring,'(i2.2)')last_auto
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+                Else
+                    !Not a quicksave
+                    old_pars(4) = last_iter
+                    Write(iterstring,'(i8.8)') last_iter  
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)                
+                Endif
+
+                Close(15)
+            Else
+                Write(iterstring,'(i8.8)') iteration 
+                checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
+            Endif
+
+
             !process zero reads all the old info and broadcasts to all other ranks
-            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
+            cfile = Trim(checkpoint_prefix)//'_'//'grid_etc'
             open(unit=15,file=cfile,form='unformatted', status='old')
             Read(15)n_r_old
             Read(15)grid_type_old
@@ -267,21 +374,43 @@ Contains
 					Write(6,*)' '
 			Endif
 		Endif
-		Call MPI_Bcast(old_pars,3, MPI_INTEGER, 0, pfi%gcomm%comm, ierr)
+
+        If (my_row_rank .eq. 0) Then    !2-D broadcast pattern
+    		Call MPI_Bcast(old_pars,5, MPI_INTEGER, 0, pfi%ccomm%comm, ierr)
+        Endif
+        Call MPI_Bcast(old_pars,5, MPI_INTEGER, 0, pfi%rcomm%comm, ierr)
 
 		n_r_old       = old_pars(1)
 		grid_type_old = old_pars(2)
 		l_max_old     = old_pars(3)
+        checkpoint_iter = old_pars(4)
+        last_auto = old_pars(5)
 
+        If (last_auto .ne. -1) Then
+            !The prefix should be formed using quicksave
+            Write(autostring,'(i2.2)')last_auto
+            checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+        Else
+            !The prefix should reflect that this is a normal checkpoint file
+            Write(iterstring,'(i8.8)') checkpoint_iter  
+            checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
+        Endif
 
-
+    
 		!///////// Later we only want to do this if the grid is actually different
 		If (my_rank .ne. 0) Then
 			Allocate(old_radius(1:n_r_old))
 		Endif
 
-		Call MPI_Bcast(old_radius,n_r_old, MPI_DOUBLE_PRECISION, 0, pfi%gcomm%comm, ierr)
-		Call MPI_Bcast(dt_pars,2, MPI_DOUBLE_PRECISION, 0, pfi%gcomm%comm, ierr)
+        If (my_row_rank .eq. 0) Then
+    		Call MPI_Bcast(old_radius,n_r_old, MPI_DOUBLE_PRECISION, 0, pfi%ccomm%comm, ierr)
+        Endif
+    	Call MPI_Bcast(old_radius,n_r_old, MPI_DOUBLE_PRECISION, 0, pfi%rcomm%comm, ierr)
+
+        If (my_row_rank .eq. 0) Then
+    		Call MPI_Bcast(dt_pars,2, MPI_DOUBLE_PRECISION, 0, pfi%ccomm%comm, ierr)
+        Endif
+    	Call MPI_Bcast(dt_pars,2, MPI_DOUBLE_PRECISION, 0, pfi%rcomm%comm, ierr)
 
 		checkpoint_dt    = dt_pars(1)
 		checkpoint_newdt = dt_pars(2)
@@ -523,6 +652,7 @@ Contains
 				Implicit None
 				Integer, Intent(In) :: ind, iter
 				Real*8, Intent(In) :: arr(1:,1:)
+                Character*2 :: autostring
 				Character*8 :: iterstring
 				Character*3, Intent(In) :: tag
 				Character*120 :: cfile
@@ -530,10 +660,10 @@ Contains
 				integer ierr, funit , v_offset1, v_offset2
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
-	         write(iterstring,'(i8.8)') iter
-            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
 
 
+
+                cfile = Trim(my_path)//Trim(checkpoint_prefix)//'_'//Trim(tag)
  				! We have to be careful here.  Each processor does TWO writes. 
 				! The first write places the real part of the field into the file.
 				! The view then changes and advances to the appropriate location of the
@@ -581,70 +711,7 @@ Contains
 	End Subroutine Write_Field
 
 
-	Subroutine Write_Field_Orig(arr,ind,tag,iter)
-				Implicit None
-				Integer, Intent(In) :: ind, iter
-				Real*8, Intent(In) :: arr(1:,1:)
-				Character*8 :: iterstring
-				Character*3, Intent(In) :: tag
-				Character*120 :: cfile
 
-				integer ierr, funit , v_offset1, v_offset2
-				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
-				Integer :: mstatus(MPI_STATUS_SIZE)
-	         write(iterstring,'(i8.8)') iter
-            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
-
-
- 				! We have to be careful here.  Each processor does TWO writes. 
-				! The first write places the real part of the field into the file.
-				! The view then changes and advances to the appropriate location of the
-				! imaginary part.  This step is crucial for checkpoints to work with
-				! Different processor configurations.
- 				v_offset1 = (ind-1)*tnr+1
-				v_offset2 = v_offset1+my_r%delta
-
-				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
-                       MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
-                       MPI_INFO_NULL, funit, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Opening File: ', pfi%ccomm%rank
-                Endif
-
-				disp1 = my_check_disp*8
-				disp2 = (my_check_disp+full_disp)*8
-
-				call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 	! Real part
-                           MPI_DOUBLE_PRECISION, 'native', & 
-                           MPI_INFO_NULL, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Setting View 1: ', pfi%ccomm%rank
-                Endif
-				call MPI_FILE_WRITE(funit, arr(1,v_offset1), buffsize, MPI_DOUBLE_PRECISION, & 
-                        mstatus, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Writing 1: ', pfi%ccomm%rank
-                Endif
-				call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 	! Imaginary part
-                           MPI_DOUBLE_PRECISION, 'native', & 
-                           MPI_INFO_NULL, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Setting View 2: ', pfi%ccomm%rank
-                Endif
-				call MPI_FILE_WRITE(funit, arr(1,v_offset2), buffsize, MPI_DOUBLE_PRECISION, & 
-                        mstatus, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Writing 2: ', pfi%ccomm%rank
-                Endif
-				call MPI_FILE_CLOSE(funit, ierr) 
-                if (ierr .ne. 0) Then
-                    Write(6,*)'Error Closing File: ', pfi%ccomm%rank
-                Endif
-     			
-
-                                      
-                                          
-	End Subroutine Write_Field_Orig
 
 
     Subroutine Read_Field(arr,ind,tag,iter,nread,nlm)
@@ -659,9 +726,9 @@ Contains
         integer ierr, funit , v_offset1, v_offset2
         integer(kind=MPI_OFFSET_KIND) disp1,disp2 
         Integer :: mstatus(MPI_STATUS_SIZE)
-        write(iterstring,'(i8.8)') iter
-        cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
-
+        !write(iterstring,'(i8.8)') iter
+        !cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+        cfile = Trim(checkpoint_prefix)//'_'//trim(tag)
   
         v_offset1 = (ind-1)*tnr+1
         v_offset2 = v_offset1+my_r%delta
@@ -716,93 +783,30 @@ Contains
 	End Subroutine Read_Field
 
 
+    Subroutine IsItTimeForACheckpoint(iter)
+        Implicit None
+        Integer, Intent(In) :: iter
+        ItIsTimeForACheckpoint = .false.
+        ItIsTimeForAQuickSave = .false.
+        If (Mod(iter,checkpoint_interval) .eq. 0) Then
+            ItIsTimeForACheckpoint = .true.
+            !If the long interval check is satisfied, nothing,
+            ! nothing related to the short interval is executed.
+        Else
+            If (quick_save_interval .gt. 0) Then
+                If (Mod(iter,quick_save_interval) .eq. 0) Then
+                    ItIsTimeForACheckpoint = .true. 
+                    ItIsTimeForAQuickSave = .true.
+                    quick_save_num = quick_save_num+1
+                    quick_save_num = Mod(quick_save_num,num_quick_saves)
 
-
-	!//////////////////////////////////////////////////////////
-	! Modifications related to the new Memory-Friendly Checkpointing Style
-	Subroutine Initialize_Checkpointing()
-		Implicit None
-		Integer :: nfs(6)
-		Integer :: p, np, nl, m, mp, rextra
-		if (magnetism) Then
-			numfields = 6
-		Endif
-		nfs(:) = numfields*2
-		Call chktmp%init(field_count = nfs, config = 'p1a')			! This structure hangs around through the entire run
-
-		!////////////////////////
-
-		!//////////////////////////////////////////////////
-		! Revisions for mem-friendly I/O
-
-		!Write(6,*)'NPOUT: ', npout
-		Noutputs_per_row = npout! # of processors outputting within row
-		If (Noutputs_per_row .gt. my_r%delta) Then
-			Noutputs_per_row = my_r%delta		
-		Endif
-		If (Noutputs_per_row .gt. nprow) Then
-				Noutputs_per_row = nprow
-		Endif
-		Nradii_per_output = my_r%delta/Noutputs_per_row	! Number of radii each processor outputs
-		rextra = Mod(my_r%delta,Noutputs_per_row)		   ! Remainder
-		Allocate(nradii_at_rank(0:Noutputs_per_row-1))	! Number of radii output by each rank
-		Allocate(rstart_at_rank(0:Noutputs_per_row-1))	! First radial index (local) this rank receives
-		Do p = 0, Noutputs_per_row -1 
-			Nradii_at_rank(p) = Nradii_per_output
-			If (rextra .gt. 0) Then
-				If (p .lt. rextra) Then
-					Nradii_at_rank(p) = Nradii_at_rank(p)+1
-				Endif
-			Endif
-		Enddo
-		rstart_at_rank(0) = 1
-		Do p = 1, Noutputs_per_row-1
-			rstart_at_rank(p) = rstart_at_rank(p-1)+nradii_at_rank(p-1)
-		Enddo
-		! Determine if each rank will output
-		If (my_row_rank .lt. Noutputs_per_row) Then
-			I_Will_Output = .true.
-		Endif
-
-
-		np = pfi%rcomm%np
-		Allocate(mode_count(0:np-1))
-		mode_count(:)  = 0	! This is how many total l-m combinations rank p of a row owns
-
-		
-		
-		nlm_total = 0			! This is the total number of l-m combinations
-		Do p = 0, np -1
-			Do mp = pfi%all_3s(p)%min, pfi%all_3s(p)%max
-				m = m_values(mp)			
-				nl = l_max-m+1
-				mode_count(p) = mode_count(p)+nl
-				nlm_total = nlm_total+nl
-			Enddo
-		Enddo
-		if (I_Will_Output) Then
-			Allocate(lmstart(0:l_max))
-			lmstart(0) = 1
-			do m = 0, l_max-1
-				nl = l_max-m+1
-				lmstart(m+1) = lmstart(m)+nl
-			enddo
-			np = pfi%ccomm%np
-			my_check_disp = 0
-			Do p = 1, my_column_rank
-				my_check_disp = my_check_disp+pfi%all_1p(p-1)%delta
-			enddo
-			my_check_disp2 = (my_check_disp+rstart_at_rank(my_row_rank)-1)*nlm_total	! for new checkpointing style
-			my_check_disp = my_check_disp*nlm_total  ! for old Checkpointing style
-			buffsize2 = nlm_total*nradii_at_rank(my_row_rank)	! for new
-			buffsize = nlm_total*my_r%delta  ! for old
-			full_disp = N_r
-			full_disp = full_disp*nlm_total
-		Endif
-
-	End Subroutine Initialize_Checkpointing
-
-
+                    !
+                    !This is also where we might handle the global walltime,
+                    ! but I need to implement "cargo" in the spherical buffer
+                Endif
+            Endif
+        Endif
+    End Subroutine 
 
 	Subroutine Write_Spectral_Field3D(arrin,ind,tag,iter)
 		! Parallel Writing Routine For Fields in Spectral rlm configuration
@@ -1379,4 +1383,116 @@ Contains
 
 	End Subroutine Read_Checkpoint_Alt
 
+!///////////////////////////////////////////////////////////
+! Routines below the dashed-double line are "staged" for deletion
+!==================================================================
+	Subroutine Initialize_Checkpointing_old()
+		Implicit None
+		Integer :: nfs(6)
+		Integer :: p, np, nl, m, mp
+		if (magnetism) Then
+			numfields = 6
+		Endif
+		nfs(:) = numfields*2
+		Call chktmp%init(field_count = nfs, config = 'p1a')			! This structure hangs around through the entire run
+
+		!////////////////////////
+		np = pfi%rcomm%np
+		Allocate(mode_count(0:np-1))
+		mode_count(:)  = 0	! This is how many total l-m combinations rank p of a row owns
+
+		
+		
+		nlm_total = 0			! This is the total number of l-m combinations
+		Do p = 0, np -1
+			Do mp = pfi%all_3s(p)%min, pfi%all_3s(p)%max
+				m = m_values(mp)			
+				nl = l_max-m+1
+				mode_count(p) = mode_count(p)+nl
+				nlm_total = nlm_total+nl
+			Enddo
+		Enddo
+		if (my_row_rank .eq. 0) Then
+			Allocate(lmstart(0:l_max))
+			lmstart(0) = 1
+			do m = 0, l_max-1
+				nl = l_max-m+1
+				lmstart(m+1) = lmstart(m)+nl
+			enddo
+			np = pfi%ccomm%np
+			my_check_disp = 0
+			Do p = 1, my_column_rank
+				my_check_disp = my_check_disp+pfi%all_1p(p-1)%delta
+			enddo
+			my_check_disp = my_check_disp*nlm_total !*2
+			buffsize = nlm_total*my_r%delta
+			full_disp = N_r
+			full_disp = full_disp*nlm_total
+		Endif
+	End Subroutine Initialize_Checkpointing_old
+
+	Subroutine Write_Field_Orig(arr,ind,tag,iter)
+				Implicit None
+				Integer, Intent(In) :: ind, iter
+				Real*8, Intent(In) :: arr(1:,1:)
+				Character*8 :: iterstring
+				Character*3, Intent(In) :: tag
+				Character*120 :: cfile
+
+				integer ierr, funit , v_offset1, v_offset2
+				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
+				Integer :: mstatus(MPI_STATUS_SIZE)
+	         write(iterstring,'(i8.8)') iter
+            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+
+
+ 				! We have to be careful here.  Each processor does TWO writes. 
+				! The first write places the real part of the field into the file.
+				! The view then changes and advances to the appropriate location of the
+				! imaginary part.  This step is crucial for checkpoints to work with
+				! Different processor configurations.
+ 				v_offset1 = (ind-1)*tnr+1
+				v_offset2 = v_offset1+my_r%delta
+
+				call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
+                       MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
+                       MPI_INFO_NULL, funit, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Opening File: ', pfi%ccomm%rank
+                Endif
+
+				disp1 = my_check_disp*8
+				disp2 = (my_check_disp+full_disp)*8
+
+				call MPI_FILE_SET_VIEW(funit, disp1, MPI_DOUBLE_PRECISION, & 	! Real part
+                           MPI_DOUBLE_PRECISION, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Setting View 1: ', pfi%ccomm%rank
+                Endif
+				call MPI_FILE_WRITE(funit, arr(1,v_offset1), buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Writing 1: ', pfi%ccomm%rank
+                Endif
+				call MPI_FILE_SET_VIEW(funit, disp2, MPI_DOUBLE_PRECISION, & 	! Imaginary part
+                           MPI_DOUBLE_PRECISION, 'native', & 
+                           MPI_INFO_NULL, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Setting View 2: ', pfi%ccomm%rank
+                Endif
+				call MPI_FILE_WRITE(funit, arr(1,v_offset2), buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Writing 2: ', pfi%ccomm%rank
+                Endif
+				call MPI_FILE_CLOSE(funit, ierr) 
+                if (ierr .ne. 0) Then
+                    Write(6,*)'Error Closing File: ', pfi%ccomm%rank
+                Endif
+     			
+
+                                      
+                                          
+	End Subroutine Write_Field_Orig
 End Module Checkpointing

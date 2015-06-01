@@ -94,7 +94,9 @@ Contains
 
 			Call AdvanceTime()
 
-			If (Mod(iteration,check_frequency) .eq. 0) Then
+            Call IsItTimeForACheckpoint(iteration)
+			!If (Mod(iteration,check_frequency) .eq. 0) Then
+            If (ItIsTimeForACheckpoint) Then
                 Call StopWatch(cwrite_time)%StartClock()
                 If (chk_type .ne. 2) Then
                     Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat,simulation_time)                    
