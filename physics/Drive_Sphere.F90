@@ -103,6 +103,7 @@ Contains
             !       1.) It's time to check for the reboot file (based on diagnostic_reboot_interval)
             !       2.) The appropriately named reboot file exists (reboot_diagnostics0, reboot_diagnostics1, etc.)
 
+
             Call StopWatch(walltime)%increment() ! Keep track of the walltime
             Call StopWatch(walltime)%startclock()
 
