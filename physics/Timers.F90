@@ -9,10 +9,11 @@ Module Timers
 	Integer, Parameter :: rlmb_time = 7, rlma_time = 8, pspace_time = 9,psolve_time = 10
 	Integer, Parameter :: dphi_time = 11, nl_time = 12, sdiv_time = 13, ts_time = 14
 	Integer, Parameter :: ar_time = 15, seteq_time = 16, init_time = 17, cread_time = 18, cwrite_time = 19
+    Integer, Parameter :: walltime = 20  ! This contains local elapsed time since mpi was initialized
 
-	Integer, Parameter :: ntimers = 20
+	Integer, Parameter :: ntimers = 21
 	Type(Timer), Allocatable :: StopWatch(:)
-
+    Real*8 :: timer_ticklength !Length of 1 tick in seconds
 Contains
 	Subroutine Initialize_Timers()
 		Integer :: i
@@ -20,6 +21,7 @@ Contains
 		Do i = 1, ntimers
 			Call StopWatch(i)%init()
 		Enddo
+        call get_ticklength(timer_ticklength)
 	End Subroutine Initialize_Timers
 	
 	Subroutine Finalize_Timing(nr_in,lmax_in,niter)

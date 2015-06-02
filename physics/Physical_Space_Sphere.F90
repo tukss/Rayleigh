@@ -69,7 +69,7 @@ Contains
 
 
 		Call Find_MyMinDT()	! Piggyback CFL communication on transposes
-
+		
 		
 		! We are now ready to build the nonlinear terms
 		Call wsp%construct('p3b')
@@ -104,6 +104,7 @@ Contains
 		Call StopWatch(fft_time)%increment()
 
 		
+        Call wsp%load_cargo(global_msgs)
 
 		Call StopWatch(rtranspose_time)%startclock()
 		Call wsp%reform()	! Move to p2b
@@ -585,7 +586,8 @@ Contains
 			Enddo
 		Endif
 
-		Call wsp%set_mrv(ovt2)
+        global_msgs(1) = ovt2
+
 
 		Call StopWatch(ts_time)%increment()
 	End Subroutine Find_MyMinDT

@@ -53,10 +53,15 @@ Module Spherical_Buffer
 		Real*8, Allocatable :: recv_buff(:), send_buff(:)
 		Integer :: max_recv, max_send
 
-        !For piggyback values on transposes (max timestep)
-        Logical :: do_piggy = .false.
-		Real*8 :: mrv =0.0d0	! "max reduce value"
+        !Additional information can be loaded into the transpose buffers.
+        !This can timestep information, kill signals, or global walltime etc. 
+        !Following the cargo transposes 3b2b and 2b1b, each element of the cargo
+        ! is replaced by the row-max (3b2b) or column-max (2b1b) value of that element
+        Logical :: have_cargo = .false.
+        Real*8, Allocatable :: cargo(:), tmp_cargo(:)
         Integer, Allocatable :: istop(:)
+        Integer :: ncargo
+
 
 		!scount12(0) => number I send to rank 0 when going FROM 1 TO 2
 		!scount21(0) => number I send to rank 0 when going FROM 2 TO 1
@@ -72,24 +77,26 @@ Module Spherical_Buffer
 		Procedure :: transpose_3b2b
 		Procedure :: transpose_2b1b
 		Procedure :: write_space
-		Procedure :: set_mrv
-		Procedure :: get_mrv
+		Procedure :: load_cargo
+		Procedure :: unload_cargo
 	End Type SphericalBuffer
 
 Contains
 
-	Subroutine set_mrv(self,val)
+	Subroutine load_cargo(self,vals)
 		Implicit None
-		Real*8, Intent(In) :: val
+		Real*8, Intent(In) :: vals(1:)
 		Class(SphericalBuffer) :: self
-		self%mrv = val
-	End Subroutine set_mrv
-	Subroutine get_mrv(self,val)
+		self%cargo(1:self%ncargo) = vals(1:self%ncargo)
+	End Subroutine load_cargo
+
+	Subroutine unload_cargo(self,vals)
 		Implicit None
-		Real*8, Intent(InOut) :: val
+		Real*8, Intent(InOut) :: vals(1:)
 		Class(SphericalBuffer) :: self
-		val = self%mrv 
-	End Subroutine get_mrv
+		vals(1:self%ncargo) = self%cargo(1:self%ncargo) 
+	End Subroutine unload_cargo
+
 	Subroutine Set_Buffer_Sizes(self)
 			Implicit None
 			Class(SphericalBuffer) :: self
@@ -255,9 +262,9 @@ Contains
 			Enddo
 			Enddo
 			Enddo
-         if (self%do_piggy) Then
-         	self%send_buff(ii) = self%mrv
-         	ii = ii+1
+         if (self%have_cargo) Then
+         	self%send_buff(ii:ii+self%ncargo-1) = self%cargo(1:self%ncargo) !self%mrv
+         	ii = ii+self%ncargo ! 1
          Endif
 		Enddo
 
@@ -305,9 +312,15 @@ Contains
 			Enddo
 			Enddo
 			Enddo
-            if (self%do_piggy) then
-                self%mrv = max(self%mrv,self%recv_buff(ii))
-                ii = ii+1
+            if (self%have_cargo) then
+                self%tmp_cargo(1:self%ncargo) = self%recv_buff(ii:ii+self%ncargo-1)
+                Do i = 1, self%ncargo
+                    If ( self%tmp_cargo(i) .gt. self%cargo(i) ) self%cargo(i) = self%tmp_cargo(i)                                
+                Enddo
+
+
+                !self%mrv = max(self%mrv,self%cargo(1))  ! not quite sure how to handle mrv yet
+                ii = ii+self%ncargo ! 1
             endif
 		Enddo
 
@@ -329,7 +342,7 @@ Contains
         Real*8, Allocatable :: send_buff(:),recv_buff(:)
         Integer :: tnr, send_offset
 
-        ! piggyback information
+        ! cargo information
         Integer :: inext, pcurrent
 
         Class(SphericalBuffer) :: self
@@ -374,14 +387,18 @@ Contains
                 Enddo
             Enddo
             If (i .eq. inext) Then
-                If (self%do_piggy) Then
-                    ! load the piggyback value into the next buffer slot.
-                    send_buff(send_offset) = self%mrv  
-                    send_offset = send_offset+1            
+                If (self%have_cargo) Then
+                    ! load the cargo values into the next buffer slot.
+                    send_buff(send_offset:send_offset+self%ncargo-1) = self%cargo(1:self%ncargo)
+                    send_offset = send_offset+self%ncargo
+
+                    !send_buff(send_offset) = self%mrv  
+                    !send_offset = send_offset+1            
                 Endif
+                !I think the next 3 lines work with the new cargo structure
                 pcurrent = pcurrent+1
                 inext = self%istop(pcurrent)
-                If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1 
+                If (i .lt. lm_count) send_offset = self%sdisp21(pcurrent) + 1   
             Endif
         Enddo
 
@@ -422,9 +439,15 @@ Contains
                 Enddo
                 cnt = cnt+1
             Enddo
-            if (self%do_piggy) then
-                self%mrv = max(self%mrv,recv_buff(indx))
-                indx = indx+1
+            if (self%have_cargo) then
+                self%tmp_cargo(1:self%ncargo) = recv_buff(indx:indx+self%ncargo-1)
+                Do i = 1, self%ncargo
+                    If ( self%tmp_cargo(i) .gt. self%cargo(i) ) self%cargo(i) = self%tmp_cargo(i)                                
+                Enddo
+                indx = indx+self%ncargo
+
+                !self%mrv = max(self%mrv,recv_buff(indx))
+                !indx = indx+1
             endif
         EndDo
 
@@ -587,13 +610,13 @@ Contains
 
 	Subroutine Initialize_Spherical_Buffer(self,report, field_count, & 
 														config,dynamic_transpose, dynamic_config, &
-                                            piggyback,padding)
+                                            hold_cargo,padding,num_cargo)
 		! Buffer initialization
 		! Handles send/receive disp/counts
 		Implicit None
 		Integer :: np, p
-		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, piggyback, padding
-		Integer, Intent(In), Optional :: field_count(3,2)
+		Logical, Intent(In), Optional :: report, dynamic_transpose,dynamic_config, hold_cargo, padding
+		Integer, Intent(In), Optional :: field_count(3,2), num_cargo
 		Character*120 :: report_tag
 		Character*10 :: gtag, rtag, ctag
 		Character*3, Intent(In), Optional :: config
@@ -784,32 +807,35 @@ Contains
 		self%recv_size21 = sum(self%rcount21)
 
 
-        If (present(piggyback)) Then
-            If (piggyback) Then
-
-                self%do_piggy = .true.
+        If (present(hold_cargo)) Then
+            If (hold_cargo) Then
+                
+                self%have_cargo = .true.
+                Allocate(self%cargo(1:num_cargo))
+                Allocate(self%tmp_cargo(1:num_cargo))
+                self%ncargo = num_cargo
                 ! modify the send and receive sizes for 3b2b
                 np = pfi%rcomm%np
-                self%scount32 = self%scount32+1
-                self%rcount32 = self%rcount32+1
+                self%scount32 = self%scount32+num_cargo
+                self%rcount32 = self%rcount32+num_cargo
                 ! Adjust the send and receive displacements
                 Do p = 1, np-1
                     self%sdisp32(p) = self%sdisp32(p-1)+self%scount32(p-1)
                     self%rdisp32(p) = self%rdisp32(p-1)+self%rcount32(p-1)
                 Enddo
-					 self%send_size32 = self%send_size32+np
-					 self%recv_size32 = self%recv_size32+np
+					 self%send_size32 = self%send_size32+np*num_cargo
+					 self%recv_size32 = self%recv_size32+np*num_cargo
 
                 !Now do the same for 2b1b transposes
                 np = pfi%ccomm%np
-                self%scount21 = self%scount21+1
-                self%rcount21 = self%rcount21+1
+                self%scount21 = self%scount21+num_cargo
+                self%rcount21 = self%rcount21+num_cargo
                 Do p = 1, np -1
                     self%sdisp21(p) = self%sdisp21(p-1)+self%scount21(p-1)
                     self%rdisp21(p) = self%rdisp21(p-1)+self%rcount21(p-1)
                 enddo
-					 self%send_size21 = self%send_size21+np
-					 self%recv_size21 = self%recv_size21+np
+					 self%send_size21 = self%send_size21+np*num_cargo
+					 self%recv_size21 = self%recv_size21+np*num_cargo
 
 
             Endif

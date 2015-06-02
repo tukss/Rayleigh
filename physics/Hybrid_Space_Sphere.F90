@@ -445,7 +445,11 @@ Contains
 		Real*8 :: maxt2, maxt
 		Character*8 :: dtfmt ='(ES10.4)'
         Character*14 :: tmstr, tmstr2
-		Call wsp%get_mrv(maxt2)
+
+        Call wsp%unload_cargo(global_msgs)
+
+
+        maxt2 = global_msgs(1)
 		if (maxt2 .gt. 0.0d0) Then
 			maxt = 1.0d0/sqrt(maxt2)
 

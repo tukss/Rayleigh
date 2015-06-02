@@ -1,5 +1,5 @@
 Module Timing
-USE MPI_BASE, Only : MPI_WTIME
+USE MPI_BASE, Only : MPI_WTIME, MPI_WTICK
 Type, Public :: Timer
 	Real*8 :: delta, elapsed
     Real*8 :: t1
@@ -14,6 +14,11 @@ End Type Timer
 
 Contains
 
+Subroutine get_ticklength(tl)
+    Implicit None
+    Real*8, Intent(InOUt) :: tl
+    tl = mpi_wtick()
+End Subroutine get_ticklength
 
 
 Subroutine Initialize_Timer(self)

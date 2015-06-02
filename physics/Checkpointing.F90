@@ -1,4 +1,5 @@
 Module Checkpointing
+    Use Timers, Only : stopwatch
 	Use ProblemSize
 	Use Parallel_Framework
     Use Spherical_Buffer
@@ -33,11 +34,14 @@ Module Checkpointing
 	Integer, Allocatable :: Nradii_at_rank(:), Rstart_at_rank(:)
 	Logical :: I_Will_Output = .False.
 
-    !////////////////////////////////////////////
-    ! These variables are based around
+    !///////////////////////////////////////////////////////////
+    ! These variables are used for determining if it's time for a checkpoint
     Logical :: ItIsTimeForACheckpoint = .false.
     Logical :: ItIsTimeForAQuickSave = .false.
     Integer :: quick_save_num = -1
+    Real*8  :: checkpoint_t0 = 0.0d0
+    Real*8  :: checkpoint_elapsed = 0.0d0  ! Time elapsed since checkpoint_t0
+    Real*8  :: quick_save_seconds = -1  ! Time between quick saves
     
     Type(Cheby_Transform_Interface) :: cheby_info
 Contains
@@ -48,16 +52,21 @@ Contains
 		Implicit None
 		Integer :: nfs(6)
 		Integer :: p, np, nl, m, mp, rextra
-        
-        If (checkpoint_interval .lt. 1) Then
+        checkpoint_t0 = stopwatch(walltime)%elapsed 
+        If (check_frequency .gt. 0) Then
             !this is for backwards compatibility
-            !If checkpoint_interval is unspecified, use check_frequency
+            !If specified, use check_frequency
             checkpoint_interval = check_frequency
         Endif
 
         If (num_quick_saves .gt. 100) Then
             !Maximum number of quick saves is 100 (hopefully far more than needed).
             num_quick_saves = 100
+        Endif
+
+        If (quick_save_minutes .gt. 0) Then
+            quick_save_seconds = quick_save_minutes*60
+            quick_save_interval = -1
         Endif
 
 		if (magnetism) Then
@@ -790,9 +799,15 @@ Contains
         ItIsTimeForAQuickSave = .false.
         If (Mod(iter,checkpoint_interval) .eq. 0) Then
             ItIsTimeForACheckpoint = .true.
+            checkpoint_t0 = checkpoint_elapsed      ! quicksaves not written
+            checkpoint_elapsed = 0.0d0          
             !If the long interval check is satisfied, nothing,
             ! nothing related to the short interval is executed.
         Else
+
+            !Check for quick-save status.  This will be based on either iteration #
+            ! OR on the time since the last checkpoint
+
             If (quick_save_interval .gt. 0) Then
                 If (Mod(iter,quick_save_interval) .eq. 0) Then
                     ItIsTimeForACheckpoint = .true. 
@@ -800,11 +815,24 @@ Contains
                     quick_save_num = quick_save_num+1
                     quick_save_num = Mod(quick_save_num,num_quick_saves)
 
-                    !
-                    !This is also where we might handle the global walltime,
-                    ! but I need to implement "cargo" in the spherical buffer
                 Endif
             Endif
+
+            If (quick_save_seconds .gt. 0) Then
+                checkpoint_elapsed = global_msgs(2) - checkpoint_t0
+                If (checkpoint_elapsed .gt. quick_save_seconds) Then
+
+                    checkpoint_t0 = global_msgs(2)
+                    checkpoint_elapsed = 0.0d0          
+                    ItIsTimeForACheckpoint = .true. 
+                    ItIsTimeForAQuickSave = .true.
+                    quick_save_num = quick_save_num+1
+                    quick_save_num = Mod(quick_save_num,num_quick_saves)
+
+                Endif
+
+            Endif
+
         Endif
     End Subroutine 
 

@@ -44,7 +44,7 @@ Contains
 	Subroutine Main_Loop_Sphere()
 		Implicit None
 		Integer ::  last_iteration, first_iteration,i
-		Real*8  :: captured_time		
+		Real*8  :: captured_time, max_time_seconds	
         Character*14 :: tmstr
         Character*8 :: istr, dtfmt ='(ES10.4)'
         Character*7 :: fmtstr = '(F14.4)', ifmtstr = '(i8.8)' 
@@ -71,8 +71,10 @@ Contains
 
 		Call Hybrid_Init()
 		Call StopWatch(loop_time)%StartClock()
-		Do iteration = first_iteration, last_iteration
-
+        max_time_seconds = 60*max_time_minutes
+		!Do iteration = first_iteration, last_iteration
+        iteration = first_iteration
+        Do while (iteration .le. last_iteration)    
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
             Else If (finite_element) Then
@@ -94,8 +96,33 @@ Contains
 
 			Call AdvanceTime()
 
+            
+
+            Call Reboot_Diagnostics(iteration)
+            !Note:  The above only reboots the diagnostics if: 
+            !       1.) It's time to check for the reboot file (based on diagnostic_reboot_interval)
+            !       2.) The appropriately named reboot file exists (reboot_diagnostics0, reboot_diagnostics1, etc.)
+
+            Call StopWatch(walltime)%increment() ! Keep track of the walltime
+            Call StopWatch(walltime)%startclock()
+
+
+            !////////////////////////////////////////////////////////////////////
+            !   The final part of the loop just deals with cleaning up if it's 
+            !      time to end the run.
+            global_msgs(2) = stopwatch(walltime)%elapsed !/timer_ticklength
+            If (global_msgs(2) .gt. max_time_seconds) Then
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(' User-specified maximum walltime exceeded.  Cleaning up.')
+                Endif
+                last_iteration = iteration !force loop to end
+            Endif
+
+            If(iteration .eq. last_iteration) Then
+                checkpoint_interval = iteration ! force a checkpoint on final iteration
+            Endif
+
             Call IsItTimeForACheckpoint(iteration)
-			!If (Mod(iteration,check_frequency) .eq. 0) Then
             If (ItIsTimeForACheckpoint) Then
                 Call StopWatch(cwrite_time)%StartClock()
                 If (chk_type .ne. 2) Then
@@ -107,11 +134,10 @@ Contains
                 Endif
 				Call StopWatch(cwrite_time)%Increment()
             Endif
-            Call Reboot_Diagnostics(iteration)
-            !Note:  The above only reboots the diagnostics if: 
-            !       1.) It's time to check for the reboot file (based on diagnostic_reboot_interval)
-            !       2.) The appropriately named reboot file exists (reboot_diagnostics0, reboot_diagnostics1, etc.)
+
+            iteration = iteration+1
 		Enddo
+        Call StopWatch(walltime)%increment()
 		Call StopWatch(loop_time)%Increment()
 		if (my_rank .eq. 0) Then
             Call stdout%print('  ')

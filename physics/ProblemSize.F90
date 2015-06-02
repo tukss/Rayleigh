@@ -115,6 +115,7 @@ Contains
 
 		Call Initialize_Timers()
 		Call StopWatch(init_time)%startclock()
+		Call StopWatch(walltime)%startclock()
 		Call Map_Indices()
 		my_rank = pfi%gcomm%rank
 		my_row_rank = pfi%rcomm%rank
