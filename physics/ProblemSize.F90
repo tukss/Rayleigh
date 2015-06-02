@@ -20,7 +20,8 @@ Module ProblemSize
 	!//////////////////////////////////////////////////////////////
 	! Horizontal Grid Variables
 	Integer              :: n_theta, n_phi
-	Integer              :: l_max, m_max, n_l, n_m
+    Integer              :: l_max = -1
+	Integer              :: m_max, n_l, n_m
 	Logical              :: dealias = .True.
 	Integer, Allocatable :: m_values(:)
 	Real*8, Allocatable  :: l_l_plus1(:), over_l_l_plus1(:)
@@ -47,7 +48,7 @@ Module ProblemSize
 	Logical :: finite_element = .false.
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
-            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby
+            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -68,12 +69,24 @@ Contains
             finite_element = .true.
         Endif
 
+        If (l_max .le. 0) Then
+
+
+		    If (dealias) Then
+			    l_max = (2*n_theta-1)/3
+		    Else
+			    l_max = n_theta-1
+		    Endif
+
+        Else
+            !base n_theta on l_max
+            If (dealias) Then
+                n_theta = (3*(l_max+1))/2
+            Else
+                n_theta = l_max+1
+            Endif
+        Endif
 		n_phi = 2*n_theta
-		If (dealias) Then
-			l_max = (2*n_theta-1)/3
-		Else
-			l_max = n_theta-1
-		Endif
 		m_max = l_max
 		n_l = l_max+1
 		n_m = m_max+1
