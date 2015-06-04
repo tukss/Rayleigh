@@ -34,6 +34,8 @@ Module ProblemSize
 	Integer             :: n_r, tnr
 	Integer             :: grid_type = 1
 	Real*8              :: rmin, rmax, r_inner, r_outer
+    Real*8              :: aspect_ratio = -1.0d0
+    Real*8              :: shell_depth = -1.0d0
     Real*8              :: stretch_factor = 0.0d0
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
@@ -48,7 +50,8 @@ Module ProblemSize
 	Logical :: finite_element = .false.
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
-            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max
+            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max, &
+            &  aspect_ratio, shell_depth
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -59,7 +62,15 @@ Contains
 		Real*8 :: ell
         Character*120 :: grid_file
         Integer :: cpu_tmp(1)
-        if (precise_bounds .eq. 1) Then
+
+        If ((aspect_ratio .gt. 0.0d0) .and. (shell_depth .gt. 0.0d0) ) Then
+            ! Set the bounds based on the aspect ratio and shell depth
+            rmax = shell_depth/(1-aspect_ratio)
+            rmin = rmax*aspect_ratio
+
+        Endif
+
+        if (precise_bounds .eq. 1) Then ! This will be deprecated soon -- use aspect_ratio/shell_depth instead
 		    rmin = (7.0d0)/13.0d0		! Benchmark bounds have infinite decimal places
 		    rmax = (20.0d0)/13.0d0      ! We override (if desired) the inputs for accuracy
         Endif
@@ -86,6 +97,8 @@ Contains
                 n_theta = l_max+1
             Endif
         Endif
+
+
 		n_phi = 2*n_theta
 		m_max = l_max
 		n_l = l_max+1
