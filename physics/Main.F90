@@ -40,11 +40,12 @@ Contains
         Call Initialize_Controls()
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
-        Call Initialize_Boundary_Conditions
         Call Initialize_FFts()
 		Call Initialize_Reference()
-		
+
 		Call Initialize_Transport_Coefficients()
+        Call Initialize_Boundary_Conditions()
+
 		Call NonDimensionalize()
         Call Compute_Diffusion_Coefs()
         Call Init_Equation_Coefficients()

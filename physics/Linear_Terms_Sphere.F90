@@ -406,6 +406,11 @@ Contains
                 If (fix_dtdr_bottom) Then
                     Call Load_BC(lp,r,teq,tvar,one,1)
                 Endif	    
+                If (fix_tdt_bottom) Then
+                    Call Load_BC(lp,r,teq,tvar,one,1)
+                    Call Clear_Row(teq,lp,N_R-1)
+                    Call Load_BC(lp,N_R-1,teq,tvar,one,0)
+                Endif
 
 
 				! The ell=0 pressure is really a diagnostic of the system.
@@ -729,6 +734,11 @@ Contains
 				equation_set(1,weq)%RHS(N_R+ii,1,indx) = T_Bottom*sqrt(4.0D0*Pi)
                 Endif
             
+                If (fix_tdt_bottom) Then
+				    equation_set(1,weq)%RHS(N_R+ii,1,indx) = dTdr_Bottom*sqrt(4.0D0*Pi)
+                    equation_set(1,weq)%RHS(N_R-1+ii,1,indx) = T_Bottom*sqrt(4.0D0*Pi)
+                Endif
+
                 If (fix_dtdr_bottom) Then
 				!Bottom Temperature
 				equation_set(1,weq)%RHS(N_R+ii,1,indx) = dTdr_Bottom*sqrt(4.0D0*Pi)

@@ -1,6 +1,8 @@
 Module BoundaryConditions
     Use Math_Constants
     Use ProblemSize
+    Use ReferenceState
+    Use TransportCoefficients
 	Implicit None
 
 	Logical :: Fix_Tvar_Top    = .True.
@@ -14,6 +16,8 @@ Module BoundaryConditions
     Logical :: Fix_poloidalfield_top = .False.
     Logical :: Fix_poloidalfield_bottom = .False.
     Logical :: Impose_Dipole_Field = .False.
+    Logical :: fix_tdt_bottom = .false.
+ 
 	Real*8  :: T_Bottom     = 1.0d0
 	Real*8  :: T_Top        = 0.0d0
     Real*8  :: dTdr_Top     = 0.0d0
@@ -34,13 +38,14 @@ Module BoundaryConditions
 		fix_dtdr_bottom, fix_dtdr_top, fix_divrt_top, fix_divt_top, fix_divrfc_top, fix_divfc_top, &
         no_slip_boundaries, strict_L_Conservation, fix_poloidalfield_top, fix_poloidalfield_bottom, &
         C10_bottom, C10_top, C11_bottom, C11_top, C1m1_bottom, C1m1_top, Br_bottom, &
-        dipole_tilt_degrees, impose_dipole_field
+        dipole_tilt_degrees, impose_dipole_field, fix_tdt_bottom
 
 Contains
 
     Subroutine Initialize_Boundary_Conditions()
         Implicit None
         Real*8 :: tilt_angle_radians,a,b
+        Real*8 :: fsun
         If (impose_dipole_field) Then
             fix_poloidalfield_top = .true.
             fix_poloidalfield_bottom = .true.
@@ -60,6 +65,12 @@ Contains
             C1m1_bottom = 0.0d0*Br_bottom/2.0d0*(radius(N_r)**3)
             C1m1_top = C1m1_bottom*(radius(N_R)/radius(1))
 
+        Endif
+        If (fix_tdt_bottom) Then
+            
+            fsun = luminosity/four_pi/radius(1)/radius(1)
+            dtdr_top = -fsun/kappa(1)/ref%density(1)/ref%temperature(1)
+            Write(6,*)'Setting dtdr_top to: ', dtdr_top
         Endif
     End Subroutine Initialize_Boundary_Conditions
 End Module BoundaryConditions
