@@ -316,7 +316,7 @@ Contains
 	End Subroutine Z_ISend_1D
 
 Subroutine D_ISend_2D(x, irq,n_elements, dest, tag, grp,indstart)
-    Real(8), Intent(in)  :: x(:,:)
+    Real(8), Intent(in)  :: x(1:,1:)
 
     Integer, Optional :: dest, n_elements, tag, indstart(2)
     Type(communicator), optional :: grp
@@ -573,7 +573,7 @@ Subroutine Z_ISend_3D(x, irq,n_elements, dest, tag, grp, indstart)
   End Subroutine Z_IReceive_1D
 
 	Subroutine D_IReceive_2D(x, irq, n_elements, source, tag, grp, indstart)
-		Real(8), Intent(out)  :: x(:,:)
+		Real(8), Intent(out)  :: x(1:,1:)
     Integer, Optional :: source, n_elements, tag, indstart(1:2)
 	 Integer :: ione, jone
     Type(communicator), optional :: grp
