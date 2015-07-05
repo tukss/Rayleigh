@@ -11,6 +11,7 @@ Module ReferenceState
     Use Math_Constants
     Use Math_Utility
     Use General_MPI, Only : BCAST2D
+	Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
 	Implicit None
 	Type ReferenceInfo
 		Real*8, Allocatable :: Density(:)
@@ -50,6 +51,7 @@ Module ReferenceState
     Real*8 :: Angular_Velocity = 1.0d0
 
 
+
     
 	!/////////////////////////////////////////////////////////////////////////////////////
 	! Nondimensional Parameters
@@ -60,10 +62,12 @@ Module ReferenceState
     Real*8 :: gravity_power           = 0.0d0
     Logical :: Dimensional = .true.  ! By Default code is dimensional
     Character*120 :: custom_reference_file ='nothing'
+	Integer :: custom_reference_type = 1
 	Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
-            & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file
+            & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file, &
+			& custom_reference_type
 Contains
 
 	Subroutine Initialize_Reference()
@@ -78,7 +82,12 @@ Contains
 		Endif
 
         If (reference_type .eq. 3) Then
-            Call Get_Custom_Reference()
+			If (custom_reference_type .eq. 1) Then
+	            Call Get_Custom_Reference()
+			Endif
+			If (custom_reference_type .eq. 2) Then
+				Call Get_Custom_Reference2()
+			Endif
         Endif
 
 		Call Write_Reference()
@@ -413,6 +422,65 @@ Contains
         DeAllocate(integrand)
     End Subroutine Get_Custom_Reference
 
+    Subroutine Get_Custom_Reference2()
+        Implicit None
+        Real*8, Allocatable :: integrand(:), ref_arr(:,:)
+		Real*8, Allocatable :: dtemp(:,:,:,:), dtemp2(:,:,:,:)
+        Allocate(ref_arr(1:n_r,1:7)) 
+		Allocate(dtemp(1:n_r,1,1,2))
+		Allocate(dtemp2(1:n_r,1,1,2))
+		dtemp = 0.0d0
+		dtemp2 = 0.0d0
+
+        Call Read_Profile_File(custom_reference_file, ref_arr)
+
+		Write(6,*)'Passed broadcast'
+        ref%density(:) = ref_arr(:,1)
+
+        ref%pressure(:) = ref_arr(:,2)
+        ref%temperature(:) = ref_arr(:,3)
+
+        ref%dsdr(:) = ref_arr(:,4)
+        ref%entropy(:) = 0.0
+        ref%gravity(:) = ref_arr(:,5)
+        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        ref%dlnT(:) = ref_arr(:,6)                
+
+        ref%dlnrho(:) = ref_arr(:,7)
+        
+
+
+        DeAllocate(ref_arr)
+
+		dtemp(:,1,1,1) = ref%dlnrho(:)
+
+		! transform to spectral
+		Call Cheby_To_Spectral(dtemp,dtemp2)
+		!Take derivative of 4th dimension, index 1 of dtemp2 (first 1)
+		! store it in 4th dimension, index 2
+		! Take a first derivative (second 1)
+		Call d_by_dr_cp(1,2,dtemp2,1)
+		!dtemp2((n_r*2)/3:n_r,1,1,2) = 0.0d0  ! de-alias
+		!transform back to physical
+		Call Cheby_From_Spectral(dtemp2,dtemp)
+
+        ref%d2lnrho(:) = dtemp(:,1,1,2)		
+
+        ! This conductive profile is based on the assumption that kappa is constant
+        ! And it is modulo kappa (s_conductive/kappa)
+        Allocate(s_conductive(1:N_R))
+        s_conductive(:) = 0.0d0
+        Allocate(integrand(1:N_R))
+        integrand = 1.0d0/(ref%density*ref%temperature)
+        integrand = integrand*OneOverRSquared
+        !The routine below integrates r^2 * integrand, hence the extra division by r^2
+        Call Indefinite_Integral(integrand,s_conductive)
+        s_conductive = s_conductive-s_conductive(1)
+        s_conductive = s_conductive/s_conductive(N_R)
+        DeAllocate(integrand)
+    End Subroutine Get_Custom_Reference2    
+    
+
     Subroutine Read_Reference(filename,ref_arr)
 		Character*120, Intent(In), Optional :: filename
         Character*120 :: ref_file
@@ -536,7 +604,7 @@ Contains
 	End Subroutine Constant_Reference
 
     Subroutine Read_Profile_File(filename,arr)
-		Character*120, Intent(In) :: filename
+	Character*120, Intent(In) :: filename
         Character*120 :: ref_file, full_path
         Integer :: pi_integer,nr_ref, ncolumns
         Integer :: nqvals =9 ! Reference state file contains nqvals quantities + radius

@@ -21,6 +21,15 @@ Module Diagnostics
     Integer, Parameter, Private :: thermalE_flux_radial = 16, radial_ke = 17
     Integer, Parameter, Private :: ke_flux_radial = 18, enth_flux_radial = 19
     Integer, Parameter, Private :: buoyancy_work = 20
+
+    Integer, Parameter, Private :: vort_r = 21, vort_theta = 22, vort_phi = 23
+    Integer, Parameter, Private :: enstrophy = 24
+
+    !MKB check
+    Integer, Parameter, Private :: amom_fluct_r = 25, amom_fluct_theta = 26, &
+         amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
+         
+
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
     Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
@@ -33,6 +42,7 @@ Module Diagnostics
 
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
+    Real*8, Allocatable :: tmp1(:,:,:)
     Real*8, Allocatable :: rweights(:)
     Real*8 :: over_eight_pi
     !//////////////////////////////////
@@ -41,21 +51,69 @@ Module Diagnostics
     
 Contains
 
+    !//////////////////////////////////////////////////////////////////////////////////////////
+    ! When entering PS_OUTPUT, the indices below may be used to reference the 4th dimension of
+    ! the buffer array.  That array is dimensioned as:
+    !   buffer(1:n_phi+2, my_r%min:my_r%max, my_theta%min:my_theta%max,1:nvariables)
+    ! 
+    ! The extra 2 in the first index is needed for the in-place FFTs.  Care should be taken
+    !   to only loop over 1 to n_phi.   
+    !
+    ! Each index along the 4th dimension of buffer corresponds to a different variable.  
+    !  These indices (left) and the variables they correspond to (right) are given below.
+
+    ! Field variables:
+    !   vr      -- radial velocity
+    !   vtheta  -- theta velocity
+    !   vphi    -- phi velocity
+    !   tout    -- temperature or entropy
+    !   pvar    -- pressure
+    !   zvar    -- l(l+1)*Z/r^2  where Z is the streamfunction
+
+    ! Radial Derivatives:
+    !   dvrdr   -- d(v_r)/dr
+    !   dvtdr   -- d(v_theta)/dr
+    !   dvpdr   -- d(v_phi)/dr
+    !   dtdr    -- d(temperature or entropy)/dr
+
+    
+    ! Theta Derivatives:
+    !   dvrdt   -- d(v_r)/dtheta
+    !   dvtdt   -- d(v_theta)/dtheta
+    !   dvpdt   -- d(v_phi)/dtheta
+    !   dtdt    -- (1/r)*d(temperature or entropy)/dtheta (<--- Note 1/r)
+    !
+
+    ! Phi Derivatives:
+    !   dvrdp   --  d(v_r)/dphi
+    !   dvtdp   --  d(v_theta)/dphi
+    !   dvpdp   --  d(v_phi)/dphi
+    !   dtdp    --  (1/r)*d(temperature or entropy)/dphi   (<--- Note 1/r)
+
+
+    ! If Magnetism is On, six additional variables are present:
+    !   br      -- radial magnetic field
+    !   btheta  -- theta magnetic field
+    !   bphi    -- phi magnetic field
+    !   jr      -- radial current density
+    !   jtheta  -- theta current density
+    !   jphi    -- phi current density
 
     Subroutine PS_Output(buffer,iteration, current_time)
         Implicit None
         Integer, Intent(In) :: iteration
         Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
         Real*8, Intent(In) :: current_time
-        Real*8 :: mypi, over_n_phi, tmp, tmp2, dt_by_dp, dt_by_ds, tpert
+        Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3, dt_by_dp, dt_by_ds, tpert
+        !MKB check *****
+        Real*8, Allocatable :: Vr_mean(:,:), Vtheta_mean(:,:), Vphi_mean(:,:)
+        ! ******
         Integer :: p,t,r
 		
         If (time_to_output(iteration)) Then
             Call Begin_Outputting(iteration)
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
-
-
 
             If (compute_quantity(v_r)) Then
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
@@ -302,6 +360,229 @@ Contains
                 Call Add_Quantity(qty)
             Endif	
 
+            If (compute_quantity(enstrophy)) Then
+                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+            Endif
+
+            If (compute_quantity(vort_r) .or. compute_quantity(enstrophy)) Then
+
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,zvar)
+
+                If (compute_quantity(vort_r)) Call Add_Quantity(qty)
+                If (compute_quantity(enstrophy)) Then
+                    tmp1 = qty**2
+                Endif
+            Endif
+
+            If (compute_quantity(vort_theta) .or. compute_quantity(enstrophy)) Then
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi
+                            qty(p,r,t) = buffer(p,r,t,dvrdp)*csctheta(t) &
+                             & - buffer(p,r,t,dvpdr) &
+                             & - buffer(p,r,t,vphi)*one_over_r(r)
+
+                        Enddo
+                    Enddo
+                Enddo
+
+                If (compute_quantity(vort_theta)) Call Add_Quantity(qty)
+                If (compute_quantity(enstrophy)) Then
+                    tmp1 = tmp1+qty**2
+                Endif
+
+            Endif
+
+		
+            If (compute_quantity(vort_phi) .or. compute_quantity(enstrophy)) Then
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi
+                            qty(p,r,t) = buffer(p,r,t,vtheta)*one_over_r(r) &
+                             & + buffer(p,r,t,dvtdr) &
+                             & - buffer(p,r,t,dvrdt)*one_over_r(r)
+
+                        Enddo
+                    Enddo
+                Enddo
+
+                If (compute_quantity(vort_phi)) Call Add_Quantity(qty)
+
+                If (compute_quantity(enstrophy)) Then
+                    tmp1 = tmp1+qty**2
+                Endif
+
+            Endif
+
+            If (compute_quantity(enstrophy)) Then
+                Call Add_Quantity(tmp1)
+                DeAllocate(tmp1)
+            Endif
+
+            !MKB check
+            ! would be better to split this all off into subroutine, probably
+            If (compute_quantity(amom_fluct_r)) Then 
+
+               Do t = my_theta%min, my_theta%max
+                  Do r = my_r%min, my_r%max
+                     ! compute mean v_phi and vtheta
+                     tmp = 0.0d0
+                     tmp2 = 0.0d0
+                     Do p = 1, n_phi
+                        tmp = tmp+buffer(p,r,t,vr)
+                        tmp2 = tmp2+buffer(p,r,t,vtheta)
+                        tmp3 = tmp3+buffer(p,r,t,vphi)
+                     Enddo
+                     tmp = tmp*over_n_phi
+                     tmp2 = tmp2*over_n_phi
+                     tmp3 = tmp3*over_n_phi
+
+                     ! post-cond: tmp has azimuthal mean vr at this (t,r), tmp2 has mean vtheta,
+                     ! tmp3 has mean vphi
+                     
+                     qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                          *((buffer(p,r,t,vr)-tmp)*(buffer(p,r,t,vphi)-tmp3))
+                  Enddo
+               Enddo
+               Call Add_Quantity(qty)
+            Endif	
+            
+
+            
+            If (compute_quantity(amom_fluct_r) .or. compute_quantity(amom_fluct_theta) &
+                 .or. compute_quantity(amom_dr_r) .or. compute_quantity(amom_dr_theta) &
+                 .or. compute_quantity(amom_mean_r) .or. compute_quantity(amom_mean_theta)) Then
+               
+               Allocate(Vr_mean(my_r%min:my_r%max, my_theta%min:my_theta%max))
+               Allocate(Vtheta_mean(my_r%min:my_r%max, my_theta%min:my_theta%max))
+               Allocate(Vphi_mean(my_r%min:my_r%max, my_theta%min:my_theta%max))            
+               
+               Do t = my_theta%min, my_theta%max
+                  Do r = my_r%min, my_r%max
+                     ! compute mean v_phi and vtheta
+                     Vr_mean(r,t) = 0.0d0
+                     Vtheta_mean(r,t) = 0.0d0
+                     Vphi_mean(r,t) = 0.0d0
+                     tmp1 =0.0d0
+                     tmp2 = 0.0d0
+                     tmp3 = 0.0d0
+                     Do p = 1, n_phi
+                        tmp = tmp+buffer(p,r,t,vr)
+                        tmp2 = tmp2+buffer(p,r,t,vtheta)
+                        tmp3 = tmp3+buffer(p,r,t,vphi)
+                     Enddo
+                     
+                     tmp = tmp*over_n_phi
+                     tmp2 = tmp2*over_n_phi
+                     tmp3 = tmp3*over_n_phi
+                     
+                     Vr_mean(r,t) = tmp
+                     Vtheta_mean(r,t) = tmp2
+                     Vphi_mean(r,t) = tmp3
+                     
+                     
+                     ! post-cond: Vr_mean(r,t) has azimuthal mean vr at this (t,r), Vtheta_mean has mean vtheta,
+                     ! Vphi_mean(r,t) has mean vphi 
+                     
+                     
+                  Enddo
+               Enddo
+
+               If (compute_quantity(amom_fluct_r)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                             *((buffer(p,r,t,vr)-Vr_mean(r,t))*(buffer(p,r,t,vphi)-Vphi_mean(r,t)))
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_fluct_r
+
+               If (compute_quantity(amom_fluct_theta)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                             *((buffer(p,r,t,vtheta)-Vtheta_mean(r,t))*(buffer(p,r,t,vphi)-Vphi_mean(r,t)))
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_fluct_theta
+
+               If (compute_quantity(amom_fluct_theta)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                             *((buffer(p,r,t,vtheta)-Vtheta_mean(r,t))*(buffer(p,r,t,vphi)-Vphi_mean(r,t)))
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_fluct_theta
+
+               If (compute_quantity(amom_dr_r)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                             *(Vr_mean(r,t)*Vphi_mean(r,t))
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_dr_r
+
+               If (compute_quantity(amom_dr_theta)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
+                             *(Vtheta_mean(r,t)*Vphi_mean(r,t))
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_dr_theta
+
+               If (compute_quantity(amom_mean_r)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
+                             *(Vr_mean(r,t)*Angular_Velocity)
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_dr_r
+
+               If (compute_quantity(amom_mean_theta)) Then
+
+                  Do t = my_theta%min, my_theta%max
+                     Do r = my_r%min, my_r%max
+                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
+                             *(Vtheta_mean(r,t)*Angular_Velocity)
+                     EndDo
+                  EndDo
+
+                  Call Add_Quantity(qty)
+               Endif ! amom_dr_theta               
+                             
+               
+
+               
+               
+               
+         Endif ! all the angular momentum flux stuff
+               
+         ! ***** End MKB
+
+            !////////////////////////////////////////////////////////
+            ! Diagnostics for verifying output is working
             If (compute_quantity(diagnostic1)) Then
                 mypi = acos(-1.0d0)
                 Do t = my_theta%min, my_theta%max
