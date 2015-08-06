@@ -74,6 +74,9 @@ Contains
         max_time_seconds = 60*max_time_minutes
 		!Do iteration = first_iteration, last_iteration
         iteration = first_iteration
+        If (iteration .eq. 1) Then
+            Euler_step = .true.
+        Endif
         Do while (iteration .le. last_iteration)    
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()

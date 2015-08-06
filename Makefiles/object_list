@@ -3,8 +3,8 @@ PFOBJ = MPI_Base.o All_to_All.o SendReceive.o ISendReceive.o General_MPI.o MPI_L
 MOBJ  = Timing.o Finite_Difference.o Chebyshev_Polynomials.o Chebyshev_Polynomials_Alt.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o Math_Utility.o \
         Fourier_Transform.o Spectral_Derivatives.o
 IOOBJ = Spherical_IO.o
-POBJ  = Math_Constants.o Controls.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o NonDimensionalization.o\
-        Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o Diagnostics.o ClockInfo.o Linear_Terms_Sphere.o \
+POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o NonDimensionalization.o\
+        Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o Diagnostics.o Linear_Terms_Sphere.o \
         Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
 MAINOBJ = Input.o Main.o

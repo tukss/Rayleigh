@@ -13,6 +13,7 @@ Module Initial_Conditions
     Use ReferenceState, Only : s_conductive
     Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom,&
          fix_dtdr_top, fix_dtdr_bottom, C10_bottom, C11_bottom, C1m1_bottom
+    Use ClockInfo, Only : Euler_Step
 
     Implicit None
     Logical :: alt_check = .false.
@@ -57,10 +58,16 @@ Contains
         ! The equation set RHS's stays allocated throughout - it is effectively how we save the AB terms.
         Call Allocate_RHS(zero_rhs=.true.)
 
-        If (init_type .eq. -1) Then
+
+        !////////////////////////////////////////
+        ! Read in checkpoint files as appropriate
+        If ( (init_type .eq. -1) .or. (magnetic_init_type .eq. -1) ) Then
             Call restart_from_checkpoint(restart_iter)
         Endif
-    
+
+
+        !////////////////////////////////////
+        ! Initialize the hydro variables
         If (init_type .eq. 1) Then
             call benchmark_init_hydro()
         Endif
@@ -71,18 +78,10 @@ Contains
         If (init_Type .eq. 7) Then
             call random_thermal_init()
         Endif
-        If (magnetism) Then
-            If (magnetic_init_type .eq. -1) Then
-                !Call restart_from_checkpointMag(restart_iter)
-            Else
-                If (init_type .eq. -1) Then
-                    ! We are restarting from a checkpoint, but using a new magnetic field configuration,
-                    ! so we zero out the magnetic AB terms (which would be inconsistent with the new field).
-                   ! wsp%p1b(:,:,:,cvar) = 0.0d0
-                    !wsp%p1b(:,:,:,avar) = 0.0d0
-                Endif
-            Endif
 
+
+        If (magnetism) Then
+            ! Initialize the magnetic variables
             If (magnetic_init_type .eq. 1) Then
                 call benchmark_insulating_init()
             Endif
@@ -102,7 +101,28 @@ Contains
         Implicit None
         Integer, Intent(In) :: iteration
         type(SphericalBuffer) :: tempfield
-        Integer :: fcount(3,2)
+        Integer :: fcount(3,2), rpars(1:2),prod
+        !rpars(1) = 1 if hydro variables are to be read (0 otherwise)
+        !rpars(2) = 1 if magnetic variables are to be read (0 otherwise)
+        rpars(1:2) = 0
+        
+        If (magnetism) Then
+
+            If (init_type .eq. -1) rpars(1) = 1
+            If (magnetic_init_type .eq. -1) rpars(2) = 1
+
+            !If both variable types are not read in, an euler_step is taken on restart
+            prod = rpars(1)*rpars(2)
+            if (prod .eq. 0) euler_step = .true. 
+
+        Else
+            If ( init_type .eq. -1) Then
+                rpars(1) = 1
+            Endif
+        Endif
+        !//////////////////////
+
+
         ! This routine also reads in the relevant magnetic quantities
         ! They are overwritten later by whatever the magnetic initialization does
         fcount(:,:) = 4
@@ -118,9 +138,9 @@ Contains
 
         Call StopWatch(cread_time)%StartClock()
         If (chk_type .eq. 2) Then
-            Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
+            Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration,rpars)
         Else
-            Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration)
+            Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration,rpars)
         Endif
         Call StopWatch(cread_time)%Increment()
 
@@ -131,46 +151,7 @@ Contains
 
     End Subroutine Restart_From_Checkpoint
 
-    Subroutine Restart_From_CheckpointMag(iteration)
-        Implicit None
-        Integer, Intent(In) :: iteration
-        type(SphericalBuffer) :: tempfield
-        Integer :: fcount(3,2)
 
-        ! If init_type was -1, we don't need to do anything
-        ! because the magnetic data was read in already.
-        ! However, if the init type was something else, we
-        ! can still initialize using an old magnetic field. 
-        If (init_type .ne. -1) Then
-
-            fcount(:,:) = 4
-            If (magnetism) Then
-                fcount(:,:) = 6
-            Endif
-
-            Call tempfield%init(field_count = fcount, config = 'p1a')
-            Call tempfield%construct('p1a')
-            Call tempfield%construct('p1b')
-            tempfield%p1b(:,:,:,:) = 0.0d0
-            tempfield%p1a(:,:,:,:) = 0.0d0
-
-            
-            !Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration)
-           
-
-            ! We do a full checkpoint read, but copy only the magnetic stream functions.
-            ! We do not copy hydro data or the magnetic AB terms.
-            Call StopWatch(cread_time)%StartClock()
-            Call Read_Checkpoint(tempfield%p1a,tempfield%p1b,iteration)
-            Call StopWatch(cread_time)%Increment()
-
-            Call Set_RHS(ceq,tempfield%p1a(:,:,:,5))
-            Call Set_RHS(aeq,tempfield%p1a(:,:,:,6))
-
-            Call tempfield%deconstruct('p1a')
-            Call tempfield%deconstruct('p1b')
-        Endif
-    End Subroutine Restart_From_CheckpointMag
 
     !///////////////////////////////////////////////////////////
     !       Random Perturbation Initializaton Routines

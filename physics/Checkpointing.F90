@@ -286,9 +286,9 @@ Contains
 		
 	End Subroutine Write_Checkpoint
 
-	Subroutine Read_Checkpoint(fields, abterms,iteration)
+	Subroutine Read_Checkpoint(fields, abterms,iteration,read_pars)
 		Implicit None
-		Integer, Intent(In) :: iteration
+		Integer, Intent(In) :: iteration, read_pars(1:2)
 		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
 		Integer :: n_r_old, l_max_old, grid_type_old, nr_read
 		Integer :: i, ierr, nlm_total_old, m, nl,p, np, mxread
@@ -306,6 +306,11 @@ Contains
         Integer :: lb,ub, f, imi, r, ind
         Integer :: last_iter, last_auto
         Real*8 :: mxvt, mxvp
+        Integer :: read_magnetism = 0, read_hydro = 0
+
+        read_hydro = read_pars(1)
+        read_magnetism = read_pars(2)
+
 		dim2 = tnr*numfields*2
 		checkpoint_iter = iteration
 		!Write(iterstring,'(i8.8)') iteration
@@ -472,25 +477,33 @@ Contains
 
 			    Allocate( rowstrip(1:nlm_total_old, 1:tnr*numfields*2))	
 			    rowstrip(:,:) = 0
-                
-			    Call Read_Field(rowstrip,1,wchar, iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,2,pchar, iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,3,tchar, iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,4,zchar, iteration,nr_read,nlm_total_old)
+
+                If (read_hydro .eq. 1) Then                
+		            Call Read_Field(rowstrip,1,wchar, iteration,nr_read,nlm_total_old)
+		            Call Read_Field(rowstrip,2,pchar, iteration,nr_read,nlm_total_old)
+		            Call Read_Field(rowstrip,3,tchar, iteration,nr_read,nlm_total_old)
+		            Call Read_Field(rowstrip,4,zchar, iteration,nr_read,nlm_total_old)
+                Endif
 			    offset_index = 4
 			    If (magnetism) Then
-				    Call Read_Field(rowstrip,5,cchar, iteration,nr_read,nlm_total_old)
-				    Call Read_Field(rowstrip,6,achar, iteration,nr_read,nlm_total_old)
+                    If (read_magnetism .eq. 1) Then
+				        Call Read_Field(rowstrip,5,cchar, iteration,nr_read,nlm_total_old)
+				        Call Read_Field(rowstrip,6,achar, iteration,nr_read,nlm_total_old)
+                    Endif
 				    offset_index = 6
 			    Endif
 
-			    Call Read_Field(rowstrip,offset_index+1,'WAB', iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,offset_index+2,'PAB', iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,offset_index+3,'TAB', iteration,nr_read,nlm_total_old)
-			    Call Read_Field(rowstrip,offset_index+4,'ZAB', iteration,nr_read,nlm_total_old)			
+                If (read_hydro .eq. 1) Then
+			        Call Read_Field(rowstrip,offset_index+1,'WAB', iteration,nr_read,nlm_total_old)
+			        Call Read_Field(rowstrip,offset_index+2,'PAB', iteration,nr_read,nlm_total_old)
+			        Call Read_Field(rowstrip,offset_index+3,'TAB', iteration,nr_read,nlm_total_old)
+			        Call Read_Field(rowstrip,offset_index+4,'ZAB', iteration,nr_read,nlm_total_old)
+                Endif
 			    If (magnetism) Then
-				    Call Read_Field(rowstrip,offset_index+5,'CAB', iteration,nr_read,nlm_total_old)
-				    Call Read_Field(rowstrip,offset_index+6,'AAB', iteration,nr_read,nlm_total_old)
+                    If (read_magnetism .eq. 1) Then
+				        Call Read_Field(rowstrip,offset_index+5,'CAB', iteration,nr_read,nlm_total_old)
+				        Call Read_Field(rowstrip,offset_index+6,'AAB', iteration,nr_read,nlm_total_old)
+                    Endif
 			    Endif
 
 			    ! Now the head of each row owns all modes of each field at the
@@ -1258,12 +1271,12 @@ Contains
 
 	End Subroutine Read_Spectral_Field3D
 
-	Subroutine Read_Checkpoint_Alt(fields, abterms,iteration)
+	Subroutine Read_Checkpoint_Alt(fields, abterms,iteration,read_pars)
 		Implicit None
 		!///////////////////////////////////////
 		! DOES NOT YET PROPERLY HANDLE CHANGE IN RESOLUTION
 		! NEW MEMORY FRIENDLY VERSION FOR MIRA
-		Integer, Intent(In) :: iteration
+		Integer, Intent(In) :: iteration, read_pars(1:2)
 		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
 		Integer :: n_r_old, l_max_old, grid_type_old
 		Integer :: i, ierr,  m, nl, r, f, imi, ind
@@ -1275,6 +1288,11 @@ Contains
 		Real*8 :: dt_pars(2),dt,new_dt
 		Character*8 :: iterstring
 		Character*120 :: cfile
+        Integer :: read_hydro = 0, read_magnetism = 0
+
+        read_hydro = read_pars(1)
+        read_magnetism = read_pars(2)
+
 		dim2 = tnr*numfields*2
 		checkpoint_iter = iteration
 		Write(iterstring,'(i8.8)') iteration
@@ -1341,25 +1359,33 @@ Contains
 		! Next, each process stripes their s2a array into a true 2-D array
 		dim2 = tnr*numfields*2
 		Allocate(myarr(1:mode_count(my_row_rank),1:dim2))
-
-		Call Read_Spectral_Field3D(myarr,1,wchar, iteration)
-		Call Read_Spectral_Field3D(myarr,2,pchar, iteration)
-		Call Read_Spectral_Field3D(myarr,3,tchar, iteration)
-		Call Read_Spectral_Field3D(myarr,4,zchar, iteration)
+        myarr(:,:) = 0.0d0
+        If (read_hydro .eq. 1) Then
+		    Call Read_Spectral_Field3D(myarr,1,wchar, iteration)
+		    Call Read_Spectral_Field3D(myarr,2,pchar, iteration)
+		    Call Read_Spectral_Field3D(myarr,3,tchar, iteration)
+		    Call Read_Spectral_Field3D(myarr,4,zchar, iteration)
+        Endif
 		offset_index = 4
 		If (magnetism) Then
-			Call Read_Spectral_Field3D(myarr,5,cchar, iteration)
-			Call Read_Spectral_Field3D(myarr,6,achar, iteration)
+            If (read_magnetism .eq. 1) Then
+			    Call Read_Spectral_Field3D(myarr,5,cchar, iteration)
+			    Call Read_Spectral_Field3D(myarr,6,achar, iteration)
+            Endif
 			offset_index = 6
 		Endif
 
-		Call Read_Spectral_Field3D(myarr,offset_index+1,'WAB', iteration)
-		Call Read_Spectral_Field3D(myarr,offset_index+2,'PAB', iteration)
-		Call Read_Spectral_Field3D(myarr,offset_index+3,'TAB', iteration)
-		Call Read_Spectral_Field3D(myarr,offset_index+4,'ZAB', iteration)
+        If (read_hydro .eq. 1) Then
+		    Call Read_Spectral_Field3D(myarr,offset_index+1,'WAB', iteration)
+		    Call Read_Spectral_Field3D(myarr,offset_index+2,'PAB', iteration)
+		    Call Read_Spectral_Field3D(myarr,offset_index+3,'TAB', iteration)
+		    Call Read_Spectral_Field3D(myarr,offset_index+4,'ZAB', iteration)
+        Endif
 		If (magnetism) Then
-			Call Read_Spectral_Field3D(myarr,offset_index+5,'CAB', iteration)
-			Call Read_Spectral_Field3D(myarr,offset_index+6,'AAB', iteration)
+            If (read_magnetism .eq. 1) Then
+			    Call Read_Spectral_Field3D(myarr,offset_index+5,'CAB', iteration)
+			    Call Read_Spectral_Field3D(myarr,offset_index+6,'AAB', iteration)
+            Endif
 		Endif
 
 

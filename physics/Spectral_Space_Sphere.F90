@@ -40,15 +40,15 @@ Contains
 			Call Reset_Linear_Equations()
 			Call StopWatch(seteq_time)%increment()
 		Endif
-		if (iteration .eq. 1) then
+		if (euler_step) then
 				!Euler Step
 				new_ab_factor = deltat
 				old_ab_factor = 0.0d0
+                euler_step = .false.
 		else
 				new_ab_factor = 0.5d0*deltat*(2 + deltat/old_deltat)
 				old_ab_factor = -0.5d0*deltat**2/old_deltat
 		endif
-		!Write(6,*)'new, old', new_ab_factor, old_ab_factor
 		wsp%p1b = wsp%p1b*old_ab_factor	
 		
 		!Copy each variable out of the RHS into the top part of the buffer

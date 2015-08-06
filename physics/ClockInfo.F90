@@ -2,6 +2,7 @@ Module ClockInfo
 	Use Controls, Only : max_time_step
 	Implicit None
 	Logical :: new_timestep = .true.
+    Logical :: euler_step = .false.
 	Real*8  :: new_deltat, deltat, old_deltat
 	Real*8  :: min_dt_change = 0.1d0
 	!Real*8  :: max_time_step = 5.0d-4
