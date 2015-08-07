@@ -6,6 +6,7 @@ Module Diagnostics
     Use Legendre_Polynomials, Only : gl_weights
     Use ReferenceState
     Use TransportCoefficients
+    Use General_MPI, Only : DSUM2D
     Implicit None
     !/////////////////////////////////////////////////////////
     !  Quantity Codes (some care must be taken to
@@ -43,8 +44,8 @@ Module Diagnostics
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: tmp1(:,:,:)
-    Real*8, Allocatable :: rweights(:)
-    Real*8 :: over_eight_pi
+    Real*8, Allocatable :: rweights(:), tweights(:)
+    Real*8 :: over_eight_pi, over_nphi_double
     !//////////////////////////////////
 
     Integer, private :: reboot_count = 0  ! Number of times diagnostics has been rebooted during this run
@@ -715,8 +716,9 @@ Contains
         Implicit None
         Integer :: i
         Real*8 :: delr
-        Real*8, Allocatable :: tweights(:)
+
         over_eight_pi = 1.0d0/(8.0d0*pi)
+        over_nphi_double = 1.0d0/n_phi
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
 
@@ -735,10 +737,57 @@ Contains
         Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
 
-        DeAllocate(tweights)
-        DeAllocate(rweights)
+        !DeAllocate(tweights)  !<---- Used to deallocate these.  We now use these for the computing the ell0 components
+        !DeAllocate(rweights)
+        
         !Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
     End Subroutine Initialize_Diagnostics
+
+
+    Subroutine ComputeEll0(inbuff,outbuff)
+        Real*8, Intent(In) :: inbuff(1:,my_r%min:,my_theta%min:,1:)
+        Real*8, Intent(InOut) :: outbuff(my_r%min:,1:)
+        Real*8, Allocatable :: tmp_buffer(:,:)
+        Integer :: bdims(1:4)
+        Integer :: q,nq,r,t,p
+        !Averages over theta and phi to get the spherically symmetric mean of all
+        ! fields in inbuff at each radii
+        ! inbuff is expected to be dimensioned as (1:nphi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,1:nfields)
+        ! ** Note that this routine should be used sparingly because it requires 
+        ! **   a collective operation (allreduce) across process rows
+        ! ** One way to do this is to aggregate several fields into the inbuff when calling this routine
+
+
+        bdims = shape(inbuff)
+        nq = bdims(4)
+
+        Allocate(tmp_buffer(my_r%min:my_r%max,1:nq))
+        tmp_buffer(:,:) = 0.0d0
+        outbuff(:,:) = 0.0d0
+
+        ! Perform phi-integration and partial averaging in theta
+        Do q = 1, nq
+            Do t = my_theta%min, my_theta%max
+                Do r = my_r%min, my_r%max
+                    Do p = 1, n_phi
+                        tmp_buffer(r,q) = tmp_buffer(r,q)+inbuff(p,r,t,q)*tweights(t)
+                    Enddo
+                Enddo
+            Enddo
+        Enddo
+
+        ! Turn phi-integration into an average
+        tmp_buffer(:,:) = tmp_buffer(:,:)*over_nphi_double
+
+        ! Complete the averaging process in theta
+        Call DALLSUM2D(tmp_buffer, outbuff, pfi%rcomm)
+
+        DeAllocate(tmp_buffer)
+
+    End Subroutine ComputeEll0
+
+
     Function count_digits(n) result(ndigits)
         !Counts the number of digits in the integer n
         Implicit None
