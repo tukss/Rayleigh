@@ -7,6 +7,6 @@ POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o Reference
         Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o Diagnostics.o Linear_Terms_Sphere.o \
         Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
-MAINOBJ = Input.o Main.o
+MAINOBJ = Input.o Benchmarking.o Main.o
 
 

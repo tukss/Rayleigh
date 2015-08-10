@@ -66,6 +66,26 @@ Subroutine DSUM1D(sendbuf, recvbuf, grp, dest)
   
 End Subroutine DSUM1D
 
+Subroutine DALLSUM1D(sendbuf, recvbuf, grp)
+  Real*8 :: sendbuf(1:), recvbuf(1:)
+  Type(communicator), Optional :: grp
+  Integer :: icount,  comm
+  Integer :: MPI_err
+
+
+  icount = size(sendbuf)
+  
+  If (Present(grp)) Then
+     comm = grp%comm
+  Else
+     comm = MPI_COMM_WORLD
+  End If
+
+
+  Call MPI_ALLREDUCE(sendbuf, recvbuf, icount, MPI_DOUBLE_PRECISION, MPI_SUM, comm, MPI_err)
+  
+End Subroutine DALLSUM1D
+
 Subroutine DSUM2D(sendbuf, recvbuf, grp, dest)
   Real*8 :: sendbuf(:,:), recvbuf(:,:)
   Type(communicator), Optional :: grp

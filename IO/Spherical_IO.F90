@@ -1901,6 +1901,44 @@ Contains
         DeAllocate(tmp_buffer)
 
     End Subroutine ComputeEll0
+
+    Subroutine Compute_Radial_Average(inbuff,outbuff)
+        Real*8, Intent(In) :: inbuff(my_rmin:,1:)
+        Real*8, Intent(InOut) :: outbuff(1:)
+        Real*8, Allocatable :: tmp_buffer(:)
+        Integer :: bdims(1:2)
+        Integer :: q,nq,r,t,p
+        !Averages over radius for all fields contained in inbuff
+        ! fields in inbuff at each radii
+        ! inbuff is expected to be dimensioned as (1:nphi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,1:nfields)
+        ! ** Note that this routine should be used sparingly because it requires 
+        ! **   a collective operation (allreduce) across process rows
+        ! ** One way to do this is to aggregate several fields into the inbuff when calling this routine
+
+
+        bdims = shape(inbuff)
+        nq = bdims(2)
+
+        Allocate(tmp_buffer(1:nq))
+        tmp_buffer(:) = 0.0d0
+        outbuff(:) = 0.0d0
+
+        ! Perform partial averaging in r
+        Do q = 1, nq
+            Do r = my_rmin, my_rmax
+                tmp_buffer(q) = tmp_buffer(q)+inbuff(r,q) &
+                    & *r_integration_weights(r)
+            Enddo
+        Enddo
+
+        ! Complete the averaging process in theta
+        Call DALLSUM1D(tmp_buffer, outbuff, pfi%ccomm)
+
+        DeAllocate(tmp_buffer)
+
+    End Subroutine Compute_Radial_Average
+
     Subroutine ComputeM0(inbuff,outbuff)
         Real*8, Intent(In) :: inbuff(1:,my_rmin:,my_theta_min:,1:)
         Real*8, Intent(InOut) :: outbuff(my_rmin:,my_theta_min:,1:)

@@ -39,6 +39,11 @@ Module Controls
     Logical :: ohmic_heating = .true.
     Logical :: advect_reference_state = .false.  ! Set to true to advect the reference state
                                                 ! Generally only do this if reference state is not adiabatic
+
+    ! --- This flag determines if the code is run in benchmark mode
+    !     0 (default) is no benchmarking.  1-5 are various accuracy benchmarks (see documentation)
+    Integer :: benchmark_mode = 0 
+
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
                 & viscous_heating, ohmic_heating, advect_reference_state
 

@@ -6,7 +6,7 @@ Module Diagnostics
     Use Legendre_Polynomials, Only : gl_weights
     Use ReferenceState
     Use TransportCoefficients
-    Use General_MPI, Only : DSUM2D
+    Use Math_Constants
     Implicit None
     !/////////////////////////////////////////////////////////
     !  Quantity Codes (some care must be taken to
@@ -26,7 +26,7 @@ Module Diagnostics
     Integer, Parameter, Private :: vort_r = 21, vort_theta = 22, vort_phi = 23
     Integer, Parameter, Private :: enstrophy = 24
 
-    !MKB check
+    !Angular Momentum Transport Diagnostics
     Integer, Parameter, Private :: amom_fluct_r = 25, amom_fluct_theta = 26, &
          amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
          
@@ -45,7 +45,7 @@ Module Diagnostics
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: tmp1(:,:,:)
     Real*8, Allocatable :: rweights(:), tweights(:)
-    Real*8 :: over_eight_pi
+
     !//////////////////////////////////
 
     Integer, private :: reboot_count = 0  ! Number of times diagnostics has been rebooted during this run
@@ -644,8 +644,6 @@ Contains
         Implicit None
         Integer :: i
         Real*8 :: delr
-
-        over_eight_pi = 1.0d0/(8.0d0*pi)
         
         Allocate(tweights(1:n_theta))
         tweights(:) = gl_weights(:)/2.0d0
