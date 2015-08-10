@@ -153,6 +153,7 @@ Module Spherical_IO
     Integer, Private :: nr, nphi, ntheta, my_ntheta
     Integer, Private :: nproc1, nproc2, myid, nproc, my_row_rank, my_column_rank, my_nr
     Real*8, Allocatable, Private :: radius(:),sintheta(:),costheta(:) 
+    Real*8 :: over_nphi_double
 Contains
 
     Subroutine Begin_Outputting(iter)
@@ -191,6 +192,7 @@ Contains
 
 		my_nr = pfi%my_1p%delta
         my_ntheta = pfi%my_2p%delta
+
         nproc  = pfi%gcomm%np
 		nproc1 = pfi%ccomm%np		! processor's per column (radius split among these)
 		nproc2 = pfi%rcomm%np      ! processor's per row  (theta split among these)
@@ -200,6 +202,8 @@ Contains
 		nphi = pfi%n3p
 		ntheta = pfi%n2p
 		nr = pfi%n1p
+
+        over_nphi_double = 1.0d0/nphi
 
 		Allocate(sintheta(1:ntheta))
 		Allocate(costheta(1:ntheta))
@@ -1853,6 +1857,83 @@ Contains
     End Subroutine getq_now
 
     !/////////////////////////////////////////
+    ! (Presently) Random Utility routines
+    Subroutine ComputeEll0(inbuff,outbuff)
+        Real*8, Intent(In) :: inbuff(1:,my_rmin:,my_theta_min:,1:)
+        Real*8, Intent(InOut) :: outbuff(my_rmin:,1:)
+        Real*8, Allocatable :: tmp_buffer(:,:)
+        Integer :: bdims(1:4)
+        Integer :: q,nq,r,t,p
+        !Averages over theta and phi to get the spherically symmetric mean of all
+        ! fields in inbuff at each radii
+        ! inbuff is expected to be dimensioned as (1:nphi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,1:nfields)
+        ! ** Note that this routine should be used sparingly because it requires 
+        ! **   a collective operation (allreduce) across process rows
+        ! ** One way to do this is to aggregate several fields into the inbuff when calling this routine
+
+
+        bdims = shape(inbuff)
+        nq = bdims(4)
+
+        Allocate(tmp_buffer(my_rmin:my_rmax,1:nq))
+        tmp_buffer(:,:) = 0.0d0
+        outbuff(:,:) = 0.0d0
+
+        ! Perform phi-integration and partial averaging in theta
+        Do q = 1, nq
+            Do t = my_theta_min, my_theta_max
+                Do r = my_rmin, my_rmax
+                    Do p = 1, nphi
+                        tmp_buffer(r,q) = tmp_buffer(r,q)+inbuff(p,r,t,q) &
+                            & *theta_integration_weights(t)
+                    Enddo
+                Enddo
+            Enddo
+        Enddo
+
+        ! Turn phi-integration into an average
+        tmp_buffer(:,:) = tmp_buffer(:,:)*over_nphi_double
+
+        ! Complete the averaging process in theta
+        Call DALLSUM2D(tmp_buffer, outbuff, pfi%rcomm)
+
+        DeAllocate(tmp_buffer)
+
+    End Subroutine ComputeEll0
+    Subroutine ComputeM0(inbuff,outbuff)
+        Real*8, Intent(In) :: inbuff(1:,my_rmin:,my_theta_min:,1:)
+        Real*8, Intent(InOut) :: outbuff(my_rmin:,my_theta_min:,1:)
+
+        Integer :: bdims(1:4)
+        Integer :: q,nq,r,t,p
+        !Averages over phi to get the azimuthally symmetric mean of all
+        ! fields in inbuff at each radii and theta value.
+        ! inbuff is expected to be dimensioned as (1:nphi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,my_theta_min:my_theta_max,1:nfields)
+
+        bdims = shape(inbuff)
+        nq = bdims(4)
+
+        outbuff(:,:,:) = 0.0d0
+
+        ! Perform phi-integration and partial averaging in theta
+        Do q = 1, nq
+            Do t = my_theta_min, my_theta_max
+                Do r = my_rmin, my_rmax
+                    Do p = 1, nphi
+                        outbuff(r,t,q) = outbuff(r,t,q)+inbuff(p,r,t,q)
+                    Enddo
+                Enddo
+            Enddo
+        Enddo
+
+        ! Turn phi-integration into an average
+        outbuff = outbuff*over_nphi_double
+
+    End Subroutine ComputeM0
+
+    !/////////////////////////////////////////
     ! Cleanup Routines
     Subroutine CleanUp(self)
         Implicit None
@@ -1960,5 +2041,8 @@ Contains
         !Call spectra_buffer%cleanup
 
     End Subroutine CleanUP_Spherical_IO
+
+
+
 
 End Module Spherical_IO
