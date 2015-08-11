@@ -45,7 +45,7 @@ Module Controls
     Integer :: benchmark_mode = 0 
 
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
-                & viscous_heating, ohmic_heating, advect_reference_state
+                & viscous_heating, ohmic_heating, advect_reference_state, benchmark_mode
 
     !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls

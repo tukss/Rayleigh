@@ -19,6 +19,7 @@ Module Physical_Space_Sphere
 	Use TransportCoefficients
 	Use NonDimensionalization
     Use Math_Constants
+    Use Benchmarking, Only : benchmark_checkup
 	Implicit None
 
 Contains
@@ -65,6 +66,7 @@ Contains
 		!since velocity components, Pressure, and Temperature are all 
 		!in memory and in physical space at this point in time.
 		Call ps_output(wsp%p3a, iteration,simulation_time)
+        Call Benchmark_Checkup(wsp%p3a, iteration,simulation_time)
 		!////////////////////////////////////////////////////////////////////////
 
 

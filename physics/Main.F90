@@ -13,6 +13,7 @@ Program Main
 	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Use Timers
     Use Fourier_Transform, Only : Initialize_FFTs
+    Use Benchmarking, Only : Initialize_Benchmarking
 	Implicit None
 
     Call Main_MPI_Init(global_rank)    !Initialize MPI
@@ -37,9 +38,13 @@ Contains
 	Subroutine Main_Initialization()
 		Implicit None
 		Character*120 :: ndrf='reference_nd'
+
         Call Initialize_Controls()
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
+
+        Call Initialize_Benchmarking()
+
         Call Initialize_FFts()
 		Call Initialize_Reference()
 
