@@ -31,6 +31,33 @@ class RayleighProfile:
 
         fd.close()
 
+class RayleighArray:
+    """Rayleigh 2-D Array Structure
+    ----------------------------------
+    self.nx         : number of x
+    self.ny         : number of y-values in the 2-D structure file
+    self.vals        : vals[0:nr-1,0:nq-1]
+
+    """
+
+    def __init__(self,filename):
+        """filename  : The reference state file to read.
+           path      : The directory where the file is located (if full path not in filename
+        """
+
+        fd = open(filename,'rb')
+        # We read an integer to assess which endian the file was written in...
+        bs = check_endian(fd,314,'int32')
+        
+        nx = swapread(fd,dtype='int32',count=1,swap=bs)
+        ny = swapread(fd,dtype='int32',count=1,swap=bs)
+        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
+        self.nx = nx
+        self.ny = ny
+        self.vals = tmp2[:,:]
+
+        fd.close()
+
 
 
 class ReferenceState:
