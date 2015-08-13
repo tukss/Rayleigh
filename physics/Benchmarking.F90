@@ -24,13 +24,17 @@ Module Benchmarking
     Integer, Private :: drift_check_interval = 5 , integration_interval = 50
     Real*8 :: mag_factor
     Real*8, Allocatable :: time_series(:,:), time_saves(:)
-
+    Integer :: drift_sign
     Integer :: r_one, r_two, theta_one, theta_two
     Integer :: strip_owners(1:4), btags(1:4), tvals(1:4), rvals(1:4)
     Integer :: num_strips = 4  !The number of strips we intend to average over
-    Logical :: have_strip(1:4) 
+    Logical :: have_strip(1:4) , have_reference_strips = .false.
     Real*8, Allocatable :: strips(:,:) ! equatorial-mid-shell strips used for tracking pattern drift rate
+    Real*8, Allocatable :: reference_strips(:,:)
     Real*8, Allocatable :: observations(:)
+    Real*8 :: drift
+    Real*8 :: drift_reference_time
+    Integer :: kprev
 Contains
 
     Subroutine Initialize_Benchmarking
@@ -54,9 +58,10 @@ Contains
      
         If (benchmark_mode .eq. 1) Then
 
+            drift_sign = -1 ! Retrograde Drift
             max_numt = 1000
-            integration_interval = 5 !0
-            report_interval = 50 !000
+            integration_interval = 10 !0
+            report_interval = 100 !000
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4
             ! Ideally, we override namelist values with benchmark values here
@@ -121,6 +126,7 @@ Contains
 
         If (my_rank .eq. 0) Then 
             Allocate(strips(1:n_phi,1:nobs))
+            Allocate(reference_strips(1:n_phi,1:nobs))
             Allocate(observations(1:nobs))
             Do p = 0, (npcol*nprow)-1
 		        your_row_rank = mod(p,nprow)
@@ -164,8 +170,6 @@ Contains
 
             Enddo
         Endif
-
-
 
     End Subroutine Initialize_Benchmarking
 
@@ -300,7 +304,14 @@ Contains
             Call Assemble_Strips(buffer)
             If (my_rank .eq. 0) Then
                 Call Point_Observations()
-                !Call Calculate_Drift()
+                If (have_reference_strips) Then
+                    Call Calculate_Drift(current_time)
+                Else
+                    reference_strips(:,:) = strips(:,:)
+                    drift_reference_time = current_Time
+                    have_reference_strips = .true.
+                    kprev = 1
+                Endif
             Endif
 
             If (Mod(iteration,report_interval) .eq. 0) Then
@@ -323,9 +334,11 @@ Contains
                 If (my_rank .eq. 0) Then
                     Write(6,*)'Kinetic Energy: ', volume_integrals(1)
                     Write(6,*)'Magnetic Energy: ', volume_integrals(4)*mag_factor
-                    Call Write_Array(strips,strip_file)
-                    Write(6,*)maxval(strips(:,1)), maxval(strips(:,2)), maxval(strips(:,3)), maxval(strips(:,4))
+                    !Call Write_Array(strips,strip_file)
+                    !Write(6,*)maxval(strips(:,1)), maxval(strips(:,2)), maxval(strips(:,3)), maxval(strips(:,4))
                     Write(6,*)observations
+                    Write(6,*)' '
+                    Write(6,*)drift, kprev
                 Endif
 
             Endif
@@ -348,7 +361,7 @@ Contains
         Allocate(obs_inds(1:nobs))
         obs_inds(1) = vr
         obs_inds(2) = vphi
-        obs_inds(3) = tvar
+        obs_inds(3) = tout 
         if (magnetism) obs_inds(4) = btheta
 
         indst(:) = 1
@@ -431,6 +444,7 @@ Contains
                 If (dvr .gt. 0) Then
                     !dvr/dphi is positive at this zero point
                     x = -vrlast/dvr  ! zero crossing (relative to im1 = 0)
+                    xsave(xind) = im1+x
                     Do j = 1, nobs
                         ! Linearly interpolate to find the values at the zero crossing of vr
                         ! Interpolated vr is zero by definition -- good sanity check to save
@@ -448,9 +462,78 @@ Contains
         Do i = 1, nobs 
             observations(i) = SUM(vsave(:,i))/msymm
         Enddo
-        Write(6,*)xind, msymm
+
         DeAllocate(vsave)
     End Subroutine Point_Observations
+
+    Subroutine Calculate_Drift(time_in)
+        Implicit None
+        Real*8, Intent(In) :: time_in
+        Integer :: i, j,k, num_corr, kmax,ishift, ind
+        Real*8 :: cmax, delta_time
+        Real*8, Allocatable :: shifted_slice(:), correlation(:)
+        !Correlate current strip with reference strip
+        num_corr = n_phi/msymm+1
+        Allocate(correlation(1:num_corr))
+        Allocate(shifted_slice(1:n_phi))
+        Do j = 1, 1 !nobs
+            ! Shift the slice
+
+            Do k = 1, num_corr
+                ! If expected drift is positive, we want to scan backwards (ishift negative)
+                ishift = (k-1)*drift_sign
+                If (ishift .lt. 0) Then
+
+                    Do i = 1-ishift, n_phi
+                        shifted_slice(i) = strips(i+ishift,j)
+                    Enddo
+                    Do i = 1, -ishift
+                        shifted_slice(i) = strips(n_phi+ishift+i,j)
+                    Enddo
+                Else
+                    Do i = 1, n_phi-ishift
+                        shifted_slice(i) = strips(i+ishift,j)
+                    Enddo
+                    ind = 1
+                    Do i = n_phi-ishift+1, n_phi
+                        shifted_slice(i) = strips(ind,j)
+                        ind = ind+1
+                    Enddo
+                Endif
+
+                correlation(k) = 0.0d0
+                !Cross correlate against the reference
+                Do i = 1, n_phi
+                    correlation(k) = correlation(k)+shifted_slice(i)*reference_strips(i,j)
+                Enddo
+            Enddo
+            !Write(6,*)correlation
+            !Next find where the correlation is maximum
+            cmax = correlation(1)
+            kmax = 1
+            Do k = 2, num_corr
+                If (correlation(k) .gt. cmax) Then
+                    cmax = correlation(k)
+                    kmax = k
+                Endif
+            Enddo
+            delta_time = time_in - drift_reference_time
+            If (kmax .lt. kprev) Then
+                Write(6,*)'Swapping reference'
+                drift = (kmax+num_corr-1)*(two_pi/n_phi)/delta_time
+                reference_strips(:,:) = strips(:,:)
+                drift_reference_time = time_in
+                kprev = kmax
+                ! We reset the reference
+
+            Else
+                Write(6,*)'kmax: ', kmax
+                drift = (kmax-1)*(two_pi/n_phi)/delta_time
+
+            Endif
+        Enddo
+        DeAllocate(shifted_slice,correlation)
+    End Subroutine Calculate_Drift
 
 	Subroutine Write_Array(arr,filename)
 		Implicit None

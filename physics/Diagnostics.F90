@@ -67,7 +67,7 @@ Contains
     !   vr      -- radial velocity
     !   vtheta  -- theta velocity
     !   vphi    -- phi velocity
-    !   tout    -- temperature or entropy
+    !   tout    -- temperature or entropy (note that this is NOT tvar -- that is T/radius)
     !   pvar    -- pressure
     !   zvar    -- l(l+1)*Z/r^2  where Z is the streamfunction
 
