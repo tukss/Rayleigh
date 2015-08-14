@@ -23,18 +23,19 @@ Module Benchmarking
     Integer, Private :: report_interval = 500
     Integer, Private :: drift_check_interval = 5 , integration_interval = 50
     Real*8 :: mag_factor
-    Real*8, Allocatable :: time_series(:,:), time_saves(:)
+    Real*8, Allocatable :: time_series(:,:), time_saves(:), iter_saves(:), obs_series(:,:)
     Integer :: drift_sign
     Integer :: r_one, r_two, theta_one, theta_two
     Integer :: strip_owners(1:4), btags(1:4), tvals(1:4), rvals(1:4)
     Integer :: num_strips = 4  !The number of strips we intend to average over
     Logical :: have_strip(1:4) , have_reference_strips = .false.
     Real*8, Allocatable :: strips(:,:) ! equatorial-mid-shell strips used for tracking pattern drift rate
-    Real*8, Allocatable :: reference_strips(:,:)
-    Real*8, Allocatable :: observations(:)
+    Real*8, Allocatable :: xnow(:), xlast(:), xref(:), drifts(:,:), report_sdev(:)
+    Real*8, Allocatable :: observations(:), report_vals(:), suggested_vals(:)
     Real*8 :: drift
-    Real*8 :: drift_reference_time
-    Integer :: kprev
+    Real*8 :: drift_reference_time, previous_time
+
+    Character*80, Allocatable :: report_names(:)
 Contains
 
     Subroutine Initialize_Benchmarking
@@ -46,6 +47,7 @@ Contains
         Integer :: your_theta_min, your_theta_max
         Logical :: have_r_one, have_r_two, have_theta_one, have_theta_two
 
+
         global_count = 0
         numt_ind = 1
         If (magnetism) Then
@@ -55,23 +57,40 @@ Contains
             num_int = 3
             nobs = 3
         Endif
-     
-        If (benchmark_mode .eq. 1) Then
+
+
+        If (benchmark_mode .eq. 2) Then
 
             drift_sign = -1 ! Retrograde Drift
-            max_numt = 1000
-            integration_interval = 10 !0
-            report_interval = 100 !000
+            integration_interval = 100 !0
+            report_interval = 10000 !000
+            max_numt = report_interval/integration_interval
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4
+            Allocate(report_names(1:6))
+            Allocate(report_vals(1:6))
+            Allocate(report_sdev(1:6))
+            Allocate(suggested_vals(1:6))
+            report_names(1) = '  Kinetic Energy  : '
+            report_names(2) = '  Magnetic Energy : '
+            report_names(3) = '  Temperature     : '
+            report_names(4) = '  Vphi            : '
+            report_names(5) = '  Btheta          : '
+            report_names(6) = '  Drift Frequency : '
+            
+            !Suggested values from Jones et al. 2000
+            suggested_vals(1) = 30.733d0
+            suggested_vals(2) = 626.41d0
+            suggested_vals(3) = 0.37338d0
+            suggested_vals(4) = -7.6250d0
+            suggested_vals(5) = -4.9289d0
+            suggested_vals(6) = -3.1017d0
             ! Ideally, we override namelist values with benchmark values here
 
         Endif
 
 
 
-        Allocate(time_series(1:max_numt,1:num_int))  ! Possible that only rank 0 needs these -- check
-        Allocate(time_saves(1:max_numt))   
 
 
         !NOTE:  for dimensional anelastic runs, use mag_factor = over_eight_pi
@@ -126,8 +145,14 @@ Contains
 
         If (my_rank .eq. 0) Then 
             Allocate(strips(1:n_phi,1:nobs))
-            Allocate(reference_strips(1:n_phi,1:nobs))
             Allocate(observations(1:nobs))
+            Allocate(obs_series(1:max_numt,1:nobs))
+            Allocate(time_series(1:max_numt,1:num_int))  ! Possible that only rank 0 needs these -- check
+            Allocate(time_saves(1:max_numt)) 
+            Allocate(iter_saves(1:max_numt))  
+            Allocate(drifts(1:max_numt,1:2))
+            Allocate(xnow(1:msymm),xlast(1:msymm),xref(1:msymm))
+
             Do p = 0, (npcol*nprow)-1
 		        your_row_rank = mod(p,nprow)
 		        your_col_rank = p/nprow
@@ -179,11 +204,16 @@ Contains
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,:)
         Real*8, Intent(In) :: current_time
         Real*8 :: tmp, tmp2, tmp3, time_passed, over_n_phi, shell_volume
+        Real*8 :: rel_diff, mean_value, sdev_value
 
-        Integer :: i,p,t,r
-        Real*8, Allocatable :: ell0_values(:,:), volume_integrals(:)	
-        Real*8, Allocatable :: qty(:,:,:,:)
-        Character*120 :: strip_file = 'strips'
+        Integer :: i,p,t,r, funit, iter_start, iter_end
+        Real*8, Allocatable :: ell0_values(:,:), volume_integrals(:), volume_sdev(:)	
+        Real*8, Allocatable :: qty(:,:,:,:), obs_sdev(:)
+        Character*120 :: report_file
+
+        Character*14 :: val_str, sdev_str, rel_str, sug_str, dt_str
+        Character*7 :: fmtstr = '(F14.6)'
+        Character*8 :: iter_string
 
 
         If (mod(iteration,integration_interval) .eq. 0) Then
@@ -285,7 +315,8 @@ Contains
             Endif ! (magnetism)
 
             Allocate(ell0_values(my_r%min:my_r%max,1:num_int))
-            Allocate(volume_integrals(1:num_int))
+            Allocate(volume_integrals(1:num_int), volume_sdev(1:num_int))
+            Allocate(obs_sdev(1:nobs))
             Call ComputeEll0(qty,ell0_values)   ! Requires communication across row
             DeAllocate(qty)
 
@@ -293,57 +324,117 @@ Contains
             DeAllocate(ell0_values)
 
 
-            !Now, add these into the time_series and update the counter
-            If (numt_ind .gt. max_numt) numt_ind = 1
-            time_series(numt_ind,1:num_int) = volume_integrals(1:num_int)
-            time_saves(numt_ind) = current_time
-            numt_ind = numt_ind+1
-            global_count = global_count+1
+  
 
             !////////////////////////////////////////////////////////
             Call Assemble_Strips(buffer)
             If (my_rank .eq. 0) Then
-                Call Point_Observations()
+                !Now, add these into the time_series and update the counter
+                If (numt_ind .gt. max_numt) numt_ind = 1
+
+                Call Point_Observations(current_time)
+                Do i = 1, nobs
+                    obs_series(numt_ind,i) = observations(i)
+                Enddo
+
+                time_series(numt_ind,1:num_int) = volume_integrals(1:num_int)
+                drifts(numt_ind,1) = drift
+                time_saves(numt_ind) = current_time
+                iter_saves(numt_ind) = iteration
+
+
+
+
                 If (have_reference_strips) Then
-                    Call Calculate_Drift(current_time)
+                   ! Call Calculate_Drift(current_time)
                 Else
-                    reference_strips(:,:) = strips(:,:)
+                    xref(:) = xnow(:)
+                    xlast(:) = xnow(:)
                     drift_reference_time = current_Time
+                    previous_time = current_time
                     have_reference_strips = .true.
-                    kprev = 1
+                Endif
+                numt_ind = numt_ind+1   
+                global_count = MIN(global_count+1, max_numt)            
+
+                If (Mod(iteration,report_interval) .eq. 0) Then
+                    ! Generate a benchmark report
+                    ! Re-task the volume_integrals array
+
+                    Do i = 1, num_int
+                        Call get_moments(time_series(1:global_count,i),mean_value,sdev_value)
+                        volume_integrals(i) = mean_value ! SUM(time_series(1:global_count,i))/global_count  
+                        volume_sdev(i) = sdev_value
+                    Enddo
+                    Do i = 1, nobs
+                        Call get_moments(obs_series(1:global_count,i),mean_value,sdev_value)
+                        observations(i) = mean_value
+                        obs_sdev(i) = sdev_value
+                    Enddo
+
+                    Write(dt_str,fmtstr)( MAXVAL(time_saves(1:global_count))- &
+                        & MINVAL(time_saves(1:global_count)) )
+                    iter_start = MINVAL(iter_saves(1:global_count))
+                    iter_end   = MAXVAL(iter_saves(1:global_count))
+
+
+                    shell_volume = four_pi*one_third*(radius(1)**3-radius(N_R)**3)
+                    !volume_integrals = volume_integrals*shell_volume ! We want integral, not average
+                    ! Note that we'll need to do some readjustments here for 
+                    ! non-dimensional and dimensional runs.
+                    Write(iter_string,'(i8.8)')iteration
+                    funit = 88
+                    report_file = Trim(my_path)//'Benchmark_Reports/'//TRIM(iter_string)
+                    Open(unit = funit, file = report_file,action="write", status="REPLACE", FORM = 'FORMATTED')
+
+                    If (benchmark_mode .eq. 2) Then
+                        report_vals(1) = volume_integrals(1)
+                        report_vals(2) = volume_integrals(4)*mag_factor
+                        report_vals(3) = observations(3)
+                        report_vals(4) = observations(2)
+                        report_vals(5) = observations(4)
+
+                        report_sdev(1) = volume_sdev(1)
+                        report_sdev(2) = volume_sdev(4)*mag_factor
+                        report_sdev(3) = obs_sdev(3)
+                        report_sdev(4) = obs_sdev(2)
+                        report_sdev(5) = obs_sdev(4)
+
+                        Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
+                        report_vals(6) = mean_value
+                        report_sdev(6) = sdev_value
+            Write(funit,*)'////////////////////////////////////////////////////////////////////////////////'
+            Write(funit,*)'              RAYLEIGH ACCURACY BENCHMARK SUMMARY               '
+            Write(funit,*)' '
+            Write(funit,*)'  Benchmark:  Christensen et al. 2001  (MHD, Case 1) '
+            Write(funit,*)' '
+            Write(funit,*)'  Radial Resolution      N_R = ', N_R
+            Write(funit,*)'  Angular Resolution N_theta = ', n_theta
+            Write(funit,*)' '
+            Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            Write(funit,*)' '
+            Write(funit,*)'  Beginning Iteration : ', iter_start
+            Write(funit,*)'  Ending Iteration    : ', iter_end
+            Write(funit,*)'  Number of Samples   : ', global_count
+            Write(funit,*)'---------------------------------------------------------------------------------'
+            Write(funit,*)'  Observable      |    Measured    | Suggested   | % Difference |  Std Deviation'
+            Write(funit,*)'---------------------------------------------------------------------------------'
+
+                        Do i = 1, 6
+                            rel_diff = (report_vals(i)-suggested_vals(i))/suggested_vals(i)*100
+                            Write(val_str,fmtstr)report_vals(i)
+                            Write(sug_str,fmtstr)suggested_vals(i)
+                            Write(rel_str,fmtstr)rel_diff
+                            Write(sdev_str,fmtstr)report_sdev(i)
+                            Write(funit,*)TRIM(report_names(i)), val_str,sug_str,rel_str,sdev_str
+                        Enddo
+
+                        Close(funit)
+                    Endif
+
                 Endif
             Endif
-
-            If (Mod(iteration,report_interval) .eq. 0) Then
-                ! Generate a benchmark report
-                ! Re-task the volume_integrals array
-                If (global_count .ge. max_numt) Then
-                    Do i = 1, num_int
-                        volume_integrals(i) = SUM(time_series(:,i))/max_numt 
-                    Enddo
-                Else
-                    Do i = 1, num_int
-                        volume_integrals(i) = SUM(time_series(1:global_count,i))/global_count  
-                    Enddo
-                Endif
-                shell_volume = four_pi*one_third*(radius(1)**3-radius(N_R)**3)
-                !volume_integrals = volume_integrals*shell_volume ! We want integral, not average
-                ! Note that we'll need to do some readjustments here for 
-                ! non-dimensional and dimensional runs.
-
-                If (my_rank .eq. 0) Then
-                    Write(6,*)'Kinetic Energy: ', volume_integrals(1)
-                    Write(6,*)'Magnetic Energy: ', volume_integrals(4)*mag_factor
-                    !Call Write_Array(strips,strip_file)
-                    !Write(6,*)maxval(strips(:,1)), maxval(strips(:,2)), maxval(strips(:,3)), maxval(strips(:,4))
-                    Write(6,*)observations
-                    Write(6,*)' '
-                    Write(6,*)drift, kprev
-                Endif
-
-            Endif
-
-            DeAllocate(volume_integrals)
+            DeAllocate(volume_integrals,volume_sdev, obs_sdev)
         Endif
     End Subroutine Benchmark_Checkup
 
@@ -424,13 +515,21 @@ Contains
 
     End Subroutine Assemble_Strips
 
-    Subroutine Point_Observations()
+    Subroutine Point_Observations(time_in)
         Implicit None
         !Conduct point-wise observations of T, u_phi, and b_theta
         ! Observations taken where vr = 0 and dvr/dphi > 0
+        ! Also calculates the drift velocity.
+        ! There is a lot of (somewhat) confusing logic here related to 
+        ! dealing with the drift of vr=0 points needed to
+        ! calculate the drift velocity properly
+        Real*8, Intent(In) :: time_in
         Integer :: i, j, xind, im1
         Real*8 :: vrlast, vrnext, dvr, test,x, y2, y1, slope
+        Real*8 :: domegadt2, domegadt
+        Real*8 :: delta_time, delta_time_pair, xadd, thisx
         Real*8, Allocatable :: vsave(:,:)
+        Logical :: adjustx 
         Allocate(vsave(1:msymm,1:nobs))
         xind = 1
         im1 = n_phi
@@ -444,7 +543,9 @@ Contains
                 If (dvr .gt. 0) Then
                     !dvr/dphi is positive at this zero point
                     x = -vrlast/dvr  ! zero crossing (relative to im1 = 0)
-                    xsave(xind) = im1+x
+                    xnow(xind) = im1+x
+                    If (xnow(xind) .gt. n_phi) xnow(xind) = xnow(xind)-n_phi ! x is always between 0 and n_phi
+                    If (xnow(xind) .lt. 0) xnow(xind) = xnow(xind)+n_phi 
                     Do j = 1, nobs
                         ! Linearly interpolate to find the values at the zero crossing of vr
                         ! Interpolated vr is zero by definition -- good sanity check to save
@@ -459,81 +560,59 @@ Contains
             im1 = i
         Enddo
 
+        If (xind .ne. (msymm+1)) Write(6,*)'ISSUE!'
+
         Do i = 1, nobs 
             observations(i) = SUM(vsave(:,i))/msymm
         Enddo
 
+        ! Check for wrapping around of the x coordinates
+        adjustx = .false.
+        Do i = 1, xind-1
+            If (drift_sign .ge. 0) Then
+                If (xnow(i) .le. xlast(i)) Then
+                    adjustx = .true.
+                Endif
+            Else
+                If (xnow(i) .ge. xlast(i)) Then
+                    adjustx = .true.
+                Endif
+            Endif
+        Enddo
+
+        delta_time = time_in - drift_reference_time
+        delta_time_pair = time_in - previous_time
+        domegadt = 0.0d0
+        domegadt2 = 0.0d0
+        xadd = n_phi/dble(msymm)
+
+        
+        Do i = 1, xind-1
+            thisx = xnow(i)
+            If (adjustx) Then
+                thisx = thisx + xadd*drift_sign
+            Endif
+            domegadt = domegadt+(thisx-xref(i))
+            domegadt2 = domegadt2 + (thisx-xlast(i))
+            xlast(i) = xnow(i)
+            previous_time = time_in
+        Enddo
+        If (adjustx) Then
+            xref(:) = xnow(:)
+            drift_reference_time = time_in
+            !Write(6,*)'Adjusting X'
+        Endif
+
+        domegadt = domegadt/(msymm*delta_time*n_phi)*two_pi
+        domegadt2 = domegadt2/(msymm*delta_time_pair*n_phi)*two_pi
+        drifts(numt_ind,1) = domegadt
+        drifts(numt_ind,2) = domegadt2
+        drift = domegadt
+        !Write(6,*)'xnow: ', xnow
+        !Write(6,*)'drifts: ', domegadt, domegadt2
         DeAllocate(vsave)
     End Subroutine Point_Observations
 
-    Subroutine Calculate_Drift(time_in)
-        Implicit None
-        Real*8, Intent(In) :: time_in
-        Integer :: i, j,k, num_corr, kmax,ishift, ind
-        Real*8 :: cmax, delta_time
-        Real*8, Allocatable :: shifted_slice(:), correlation(:)
-        !Correlate current strip with reference strip
-        num_corr = n_phi/msymm+1
-        Allocate(correlation(1:num_corr))
-        Allocate(shifted_slice(1:n_phi))
-        Do j = 1, 1 !nobs
-            ! Shift the slice
-
-            Do k = 1, num_corr
-                ! If expected drift is positive, we want to scan backwards (ishift negative)
-                ishift = (k-1)*drift_sign
-                If (ishift .lt. 0) Then
-
-                    Do i = 1-ishift, n_phi
-                        shifted_slice(i) = strips(i+ishift,j)
-                    Enddo
-                    Do i = 1, -ishift
-                        shifted_slice(i) = strips(n_phi+ishift+i,j)
-                    Enddo
-                Else
-                    Do i = 1, n_phi-ishift
-                        shifted_slice(i) = strips(i+ishift,j)
-                    Enddo
-                    ind = 1
-                    Do i = n_phi-ishift+1, n_phi
-                        shifted_slice(i) = strips(ind,j)
-                        ind = ind+1
-                    Enddo
-                Endif
-
-                correlation(k) = 0.0d0
-                !Cross correlate against the reference
-                Do i = 1, n_phi
-                    correlation(k) = correlation(k)+shifted_slice(i)*reference_strips(i,j)
-                Enddo
-            Enddo
-            !Write(6,*)correlation
-            !Next find where the correlation is maximum
-            cmax = correlation(1)
-            kmax = 1
-            Do k = 2, num_corr
-                If (correlation(k) .gt. cmax) Then
-                    cmax = correlation(k)
-                    kmax = k
-                Endif
-            Enddo
-            delta_time = time_in - drift_reference_time
-            If (kmax .lt. kprev) Then
-                Write(6,*)'Swapping reference'
-                drift = (kmax+num_corr-1)*(two_pi/n_phi)/delta_time
-                reference_strips(:,:) = strips(:,:)
-                drift_reference_time = time_in
-                kprev = kmax
-                ! We reset the reference
-
-            Else
-                Write(6,*)'kmax: ', kmax
-                drift = (kmax-1)*(two_pi/n_phi)/delta_time
-
-            Endif
-        Enddo
-        DeAllocate(shifted_slice,correlation)
-    End Subroutine Calculate_Drift
 
 	Subroutine Write_Array(arr,filename)
 		Implicit None
@@ -552,4 +631,25 @@ Contains
 		Close(15)
 
 	End Subroutine Write_Array
+    Subroutine Get_Moments(arr,arr_mean,arr_sdev)
+        Implicit None
+        Real*8, Intent(In) :: arr(1:)
+        Real*8, Intent(InOut) :: arr_mean, arr_sdev
+        Integer :: i, n
+        ! Computes the mean and standard deviation of arr
+        arr_mean = 0.0d0
+        n = size(arr)
+
+        Do i = 1, n
+            arr_mean = arr_mean+arr(i)
+        Enddo
+        arr_mean = arr_mean/n
+
+        arr_sdev = 0.0d0    
+        Do i = 1, n
+            arr_sdev = arr_sdev+(arr(i)-arr_mean)**2
+        Enddo
+        arr_sdev = arr_sdev/n
+        arr_sdev = sqrt(arr_sdev)
+    End Subroutine Get_Moments
 End Module Benchmarking
