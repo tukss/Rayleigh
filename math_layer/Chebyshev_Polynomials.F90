@@ -158,6 +158,8 @@ Contains
 			xx = (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
 			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
 		Enddo
+        integration_weights(1) = 0.0d0  !Zero by definition - take care here with numerics though.
+        integration_weights(N_max) = 0.0d0
 
 
 	End Subroutine Initialize_Chebyshev

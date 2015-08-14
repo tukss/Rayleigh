@@ -649,17 +649,25 @@ Contains
         tweights(:) = gl_weights(:)/2.0d0
 
         Allocate(rweights(1:n_r))
-        Do i = 2, n_r-1
-            delr = (radius(i-1)-radius(i+1))/2.0d0
-            rweights(i) = delr*radius(i)**2
-        Enddo
-        delr = ( radius(1)-radius(2) )/ 2.0d0
-        rweights(1) = delr*radius(1)**2
 
-        delr = (radius(n_r-1)-radius(n_r))/2.0d0
-        rweights(n_r) = delr*radius(n_r)**2
+        If (use_cheby_weights) Then
+            If (my_rank .eq. 0) Write(6,*)'Integrating using Chebyshev Quadrature'
+            rweights = radial_integral_weights
+        Else
+            Do i = 2, n_r-1
+                delr = (radius(i-1)-radius(i+1))/2.0d0
+                rweights(i) = delr*radius(i)**2
+            Enddo
+            delr = ( radius(1)-radius(2) )/ 2.0d0
+            rweights(1) = delr*radius(1)**2
 
-        rweights = rweights/sum(rweights)
+            delr = (radius(n_r-1)-radius(n_r))/2.0d0
+            rweights(n_r) = delr*radius(n_r)**2
+
+            rweights = rweights/sum(rweights)
+
+        Endif
+
         Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
 
