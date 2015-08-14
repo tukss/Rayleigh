@@ -61,7 +61,7 @@ Contains
 
         !////////////////////////////////////////
         ! Read in checkpoint files as appropriate
-        If ( (init_type .eq. -1) .or. (magnetic_init_type .eq. -1) ) Then
+        If ( (init_type .eq. -1) .or. ( magnetism .and. (magnetic_init_type .eq. -1) ) ) Then
             Call restart_from_checkpoint(restart_iter)
         Endif
 

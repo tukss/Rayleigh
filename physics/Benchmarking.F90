@@ -20,11 +20,11 @@ Module Benchmarking
 
     Integer, Private :: nobs, msymm
     Integer, Private :: max_numt, numt_ind, global_count, num_int
-    Integer, Private :: report_interval = 500
-    Integer, Private :: drift_check_interval = 5 , integration_interval = 50
+    Integer, Private :: report_interval 
+    Integer, Private :: integration_interval 
     Real*8 :: mag_factor
     Real*8, Allocatable :: time_series(:,:), time_saves(:), iter_saves(:), obs_series(:,:)
-    Integer :: drift_sign
+    Integer :: drift_sign, num_rep
     Integer :: r_one, r_two, theta_one, theta_two
     Integer :: strip_owners(1:4), btags(1:4), tvals(1:4), rvals(1:4)
     Integer :: num_strips = 4  !The number of strips we intend to average over
@@ -36,6 +36,7 @@ Module Benchmarking
     Real*8 :: drift_reference_time, previous_time
 
     Character*80, Allocatable :: report_names(:)
+    Character*120 :: benchmark_name
 Contains
 
     Subroutine Initialize_Benchmarking
@@ -58,15 +59,45 @@ Contains
             nobs = 3
         Endif
 
+        If (benchmark_mode .eq. 1) Then
+            benchmark_name = 'Christensen et al. 2001  (Non-MHD, Case 0)'
 
-        If (benchmark_mode .eq. 2) Then
-
-            drift_sign = -1 ! Retrograde Drift
-            integration_interval = 100 !0
-            report_interval = 10000 !000
+            drift_sign = 1 ! Prograde Drift
+            integration_interval = 100 !100 
+            report_interval = 10000 ! 10000 
             max_numt = report_interval/integration_interval
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4
+            num_rep = 4
+            Allocate(report_names(1:4))
+            Allocate(report_vals(1:4))
+            Allocate(report_sdev(1:4))
+            Allocate(suggested_vals(1:4))
+            report_names(1) = '  Kinetic Energy  : '
+            report_names(2) = '  Temperature     : '
+            report_names(3) = '  Vphi            : '
+            report_names(4) = '  Drift Frequency : '
+            
+            !Suggested values from Jones et al. 2000
+            suggested_vals(1) = 58.348d0
+            suggested_vals(2) = 0.42812d0
+            suggested_vals(3) = -10.1571d0
+            suggested_vals(4) = 0.1824d0
+
+            ! Ideally, we override namelist values with benchmark values here
+
+        Endif
+
+        If (benchmark_mode .eq. 2) Then
+            benchmark_name = 'Christensen et al. 2001  (MHD, Case 1)'
+
+            drift_sign = -1 ! Retrograde Drift
+            integration_interval = 100 !100 
+            report_interval = 10000 ! 10000 
+            max_numt = report_interval/integration_interval
+            mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
+            msymm = 4
+            num_rep = 6
             Allocate(report_names(1:6))
             Allocate(report_vals(1:6))
             Allocate(report_sdev(1:6))
@@ -363,8 +394,8 @@ Contains
 
                 If (Mod(iteration,report_interval) .eq. 0) Then
                     ! Generate a benchmark report
-                    ! Re-task the volume_integrals array
 
+                    ! Re-task the volume_integrals array
                     Do i = 1, num_int
                         Call get_moments(time_series(1:global_count,i),mean_value,sdev_value)
                         volume_integrals(i) = mean_value ! SUM(time_series(1:global_count,i))/global_count  
@@ -383,13 +414,46 @@ Contains
 
 
                     shell_volume = four_pi*one_third*(radius(1)**3-radius(N_R)**3)
-                    !volume_integrals = volume_integrals*shell_volume ! We want integral, not average
-                    ! Note that we'll need to do some readjustments here for 
-                    ! non-dimensional and dimensional runs.
+
+
                     Write(iter_string,'(i8.8)')iteration
                     funit = 88
                     report_file = Trim(my_path)//'Benchmark_Reports/'//TRIM(iter_string)
                     Open(unit = funit, file = report_file,action="write", status="REPLACE", FORM = 'FORMATTED')
+
+            Write(funit,*)'///////////////////////////////////////////////////////////////////////////'
+            Write(funit,*)'              RAYLEIGH ACCURACY BENCHMARK SUMMARY               '
+            Write(funit,*)' '
+            Write(funit,*)'  Benchmark:  '//TRIM(benchmark_name)
+            Write(funit,*)' '
+            Write(funit,*)'  Radial Resolution      N_R = ', N_R
+            Write(funit,*)'  Angular Resolution N_theta = ', n_theta
+            Write(funit,*)' '
+            Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            Write(funit,*)' '
+            Write(funit,*)'  Beginning Iteration : ', iter_start
+            Write(funit,*)'  Ending Iteration    : ', iter_end
+            Write(funit,*)'  Number of Samples   : ', global_count
+            Write(funit,*)'----------------------------------------------------------------------------'
+            Write(funit,*)'  Observable      |    Measured    | Suggested   | % Difference |  Std. Dev.'
+            Write(funit,*)'----------------------------------------------------------------------------'
+
+                    If (benchmark_mode .eq. 1) Then
+                        report_vals(1) = volume_integrals(1)
+                        report_vals(2) = observations(3)
+                        report_vals(3) = observations(2)
+
+
+                        report_sdev(1) = volume_sdev(1)
+                        report_sdev(2) = obs_sdev(3)
+                        report_sdev(3) = obs_sdev(2)
+
+                        Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
+                        report_vals(4) = mean_value
+                        report_sdev(4) = sdev_value
+
+                    Endif
+
 
                     If (benchmark_mode .eq. 2) Then
                         report_vals(1) = volume_integrals(1)
@@ -407,34 +471,22 @@ Contains
                         Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
                         report_vals(6) = mean_value
                         report_sdev(6) = sdev_value
-            Write(funit,*)'///////////////////////////////////////////////////////////////////////////'
-            Write(funit,*)'              RAYLEIGH ACCURACY BENCHMARK SUMMARY               '
-            Write(funit,*)' '
-            Write(funit,*)'  Benchmark:  Christensen et al. 2001  (MHD, Case 1) '
-            Write(funit,*)' '
-            Write(funit,*)'  Radial Resolution      N_R = ', N_R
-            Write(funit,*)'  Angular Resolution N_theta = ', n_theta
-            Write(funit,*)' '
-            Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
-            Write(funit,*)' '
-            Write(funit,*)'  Beginning Iteration : ', iter_start
-            Write(funit,*)'  Ending Iteration    : ', iter_end
-            Write(funit,*)'  Number of Samples   : ', global_count
-            Write(funit,*)'----------------------------------------------------------------------------'
-            Write(funit,*)'  Observable      |    Measured    | Suggested   | % Difference |  Std. Dev.'
-            Write(funit,*)'----------------------------------------------------------------------------'
 
-                        Do i = 1, 6
-                            rel_diff = (report_vals(i)-suggested_vals(i))/suggested_vals(i)*100
-                            Write(val_str,fmtstr)report_vals(i)
-                            Write(sug_str,fmtstr)suggested_vals(i)
-                            Write(rel_str,fmtstr)rel_diff
-                            Write(sdev_str,fmtstr)report_sdev(i)
-                            Write(funit,*)TRIM(report_names(i)), val_str,sug_str,rel_str,sdev_str
-                        Enddo
 
-                        Close(funit)
+
                     Endif
+
+                    Do i = 1, num_rep
+                        rel_diff = (report_vals(i)-suggested_vals(i))/suggested_vals(i)*100
+                        Write(val_str,fmtstr)report_vals(i)
+                        Write(sug_str,fmtstr)suggested_vals(i)
+                        Write(rel_str,fmtstr)rel_diff
+                        Write(sdev_str,fmtstr)report_sdev(i)
+                        Write(funit,*)TRIM(report_names(i)), val_str,sug_str,rel_str,sdev_str
+                    Enddo
+
+                    Close(funit)
+
 
                 Endif
             Endif
