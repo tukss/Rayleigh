@@ -332,30 +332,34 @@ Contains
                 !Now, add these into the time_series and update the counter
                 If (numt_ind .gt. max_numt) numt_ind = 1
 
+
                 Call Point_Observations(current_time)
-                Do i = 1, nobs
-                    obs_series(numt_ind,i) = observations(i)
-                Enddo
-
-                time_series(numt_ind,1:num_int) = volume_integrals(1:num_int)
-                drifts(numt_ind,1) = drift
-                time_saves(numt_ind) = current_time
-                iter_saves(numt_ind) = iteration
-
-
-
-
-                If (have_reference_strips) Then
-                   ! Call Calculate_Drift(current_time)
-                Else
+                If (.not. have_reference_strips) Then
                     xref(:) = xnow(:)
                     xlast(:) = xnow(:)
                     drift_reference_time = current_Time
                     previous_time = current_time
                     have_reference_strips = .true.
                 Endif
+
+                Do i = 1, nobs
+                    obs_series(numt_ind,i) = observations(i)
+                Enddo
+
+                time_series(numt_ind,1:num_int) = volume_integrals(1:num_int)
+                time_saves(numt_ind) = current_time
+                iter_saves(numt_ind) = iteration
+
+
+
+
+
                 numt_ind = numt_ind+1   
                 global_count = MIN(global_count+1, max_numt)            
+
+                !The first drift measurement is always garbage 
+                !  - duplicate 2nd measurement for averaging purposes
+                If (global_count .eq. 2) drifts(1,1:2) = drifts(2,1:2)
 
                 If (Mod(iteration,report_interval) .eq. 0) Then
                     ! Generate a benchmark report
@@ -403,7 +407,7 @@ Contains
                         Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
                         report_vals(6) = mean_value
                         report_sdev(6) = sdev_value
-            Write(funit,*)'////////////////////////////////////////////////////////////////////////////////'
+            Write(funit,*)'///////////////////////////////////////////////////////////////////////////'
             Write(funit,*)'              RAYLEIGH ACCURACY BENCHMARK SUMMARY               '
             Write(funit,*)' '
             Write(funit,*)'  Benchmark:  Christensen et al. 2001  (MHD, Case 1) '
@@ -416,9 +420,9 @@ Contains
             Write(funit,*)'  Beginning Iteration : ', iter_start
             Write(funit,*)'  Ending Iteration    : ', iter_end
             Write(funit,*)'  Number of Samples   : ', global_count
-            Write(funit,*)'---------------------------------------------------------------------------------'
-            Write(funit,*)'  Observable      |    Measured    | Suggested   | % Difference |  Std Deviation'
-            Write(funit,*)'---------------------------------------------------------------------------------'
+            Write(funit,*)'----------------------------------------------------------------------------'
+            Write(funit,*)'  Observable      |    Measured    | Suggested   | % Difference |  Std. Dev.'
+            Write(funit,*)'----------------------------------------------------------------------------'
 
                         Do i = 1, 6
                             rel_diff = (report_vals(i)-suggested_vals(i))/suggested_vals(i)*100
@@ -607,9 +611,7 @@ Contains
         domegadt2 = domegadt2/(msymm*delta_time_pair*n_phi)*two_pi
         drifts(numt_ind,1) = domegadt
         drifts(numt_ind,2) = domegadt2
-        drift = domegadt
-        !Write(6,*)'xnow: ', xnow
-        !Write(6,*)'drifts: ', domegadt, domegadt2
+
         DeAllocate(vsave)
     End Subroutine Point_Observations
 
