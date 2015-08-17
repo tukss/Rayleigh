@@ -30,6 +30,7 @@ cp ../IO/*.F90 .
 cp ../test_suite/*.F90 .
 cp ../physics/*.F90 .
 cp ../Utility/*.F90 .
+cp ../Utility/*.c .
 cp ../Makefiles/Makefile_$MACHINE Makefile
 cp ../Makefiles/object_list .
 if($MACHINE == "Mira") then

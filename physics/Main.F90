@@ -1,4 +1,5 @@
 Program Main
+    Use MakeDir
     Use Controls
 	Use Fields
 	Use Initial_Conditions
@@ -43,6 +44,8 @@ Contains
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
 
+        Call Initialize_Directory_Structure()
+
         Call Initialize_Benchmarking()
 
         Call Initialize_FFts()
@@ -68,6 +71,21 @@ Contains
 		Call StopWatch(init_time)%increment() ! started in Init_Problemsize just after MPI is started up
 	End Subroutine Main_Initialization
 
+    Subroutine Initialize_Directory_Structure()
+        Implicit None
+        Integer :: ecode
+        If (my_rank .eq. 0) Then
+            Call Make_Directory(Trim(my_path)//'G_Avgs',ecode)
+            Call Make_Directory(Trim(my_path)//'Shell_Avgs',ecode)
+            Call Make_Directory(Trim(my_path)//'AZ_Avgs',ecode)
+            Call Make_Directory(Trim(my_path)//'Shell_Slices',ecode)
+            Call Make_Directory(Trim(my_path)//'Checkpoints',ecode)
+            Call Make_Directory(Trim(my_path)//'Timings',ecode)
+            Call Make_Directory(Trim(my_path)//'Spherical_3D',ecode)
+            Call Make_Directory(Trim(my_path)//'Shell_Spectra',ecode)
+            Call Make_Directory(Trim(my_path)//'Benchmark_Reports',ecode)
+        Endif
+    End Subroutine Initialize_Directory_Structure
 
 	Subroutine Finalization()
         If (.not. test_mode) Then

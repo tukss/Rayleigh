@@ -110,7 +110,7 @@ Contains
             report_names(6) = '  Drift Frequency : '
             
             !Suggested values from Jones et al. 2000
-            suggested_vals(1) = 30.733d0
+            suggested_vals(1) = 30.773d0
             suggested_vals(2) = 626.41d0
             suggested_vals(3) = 0.37338d0
             suggested_vals(4) = -7.6250d0
