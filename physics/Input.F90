@@ -80,7 +80,7 @@ Contains
                 if (global_rank .eq. 0) Write(6,*)'    Multi-run mode enabled.'
                 Allocate(rundirs(1:nruns))
 
-                Open(unit=20,file='tmp',form='formatted', status='old',access='stream',iostat = errcheck)
+                Open(unit=20,file='run_list',form='formatted', status='old',access='stream',iostat = errcheck)
 
                 If (errcheck .eq. 0) Then
                     rcount = 0

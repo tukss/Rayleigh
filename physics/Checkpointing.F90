@@ -227,7 +227,7 @@ Contains
 					DeAllocate(myarr)
 			Enddo
                 If (ItIsTimeForAQuickSave) Then
-                    write(autostring,'(i2.2)') quick_save_num
+                    write(autostring,'(i2.2)') (quick_save_num+1) !quick save number starts at 1
                     checkpoint_prefix = 'Checkpoints/quicksave_'//trim(autostring)
                 Else
                     write(iterstring,'(i8.8)') iteration
@@ -269,12 +269,30 @@ Contains
                 Write(15)new_dt
                 Write(15)(radius(i),i=1,N_R)
                 Write(15)elapsed_time
+                Write(15)iteration
                 Close(15)
 
                 open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='replace')
                 If (ItIsTimeForAQuickSave) Then
+                    !Write(iterstring,'(i8.8)')iteration
+                    !Write(autostring,'(i2.2)')quick_save_num+1
+                    !Write(15,*)iterstring, ' ', autostring
                     Write(15,'(i9.8)')-iteration
-                    Write(15,'(i2.2)')quick_save_num
+                    Write(15,'(i2.2)')(quick_save_num+1)
+                Else
+                    Write(15,'(i8.8)')iteration
+                Endif
+                Close(15)
+
+                open(unit=15,file=Trim(my_path)//'Checkpoints/checkpoint_log',form='formatted', status='unknown', &
+                    position='Append')
+                If (ItIsTimeForAQuickSave) Then
+                    !Write(15,'(i9.8)')-iteration
+                    !Write(15,'(i2.2)')(quick_save_num+1)
+                    Write(iterstring,'(i8.8)')iteration
+                    Write(autostring,'(i2.2)')quick_save_num+1
+                    Write(15,*)iterstring, ' ', autostring
+
                 Else
                     Write(15,'(i8.8)')iteration
                 Endif
@@ -317,7 +335,7 @@ Contains
         If (my_rank .eq. 0) Then
             old_pars(4) = checkpoint_iter
             old_pars(5) = -1
-            If (checkpoint_iter .eq. -1) Then
+            If (checkpoint_iter .eq. 0) Then
                 ! Get rid of these print statements momentarily
                 open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='old')
                 read(15,'(i9.8)')last_iter
@@ -335,6 +353,13 @@ Contains
                 Endif
 
                 Close(15)
+            ElseIf (checkpoint_iter .lt. 0) Then
+                !User has specified a particular quicksave file
+                    last_auto = -checkpoint_iter
+                    old_pars(5) = -checkpoint_iter
+                    Write(autostring,'(i2.2)')-checkpoint_iter
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+                    Write(6,*)'cpref: ', checkpoint_prefix
             Else
                 Write(iterstring,'(i8.8)') iteration 
                 checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
@@ -352,6 +377,13 @@ Contains
             Allocate(old_radius(1:N_r_old))
             Read(15)(old_radius(i),i=1,N_R_old)
             Read(15)Checkpoint_time
+            If (checkpoint_iter .lt. 0) Then
+                ! We're loading a quicksave file
+                ! Need to retrieve iteration from the grid_etc file because
+                ! iteration specified in main_input was a low, negative number
+                Read(15)Checkpoint_iter
+                old_pars(4) = Checkpoint_iter
+            Endif
             Close(15)				
             Write(6,*)'Checkpoint time is: ', checkpoint_time
             old_pars(1) = n_r_old
