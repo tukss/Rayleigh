@@ -92,8 +92,8 @@ Contains
             benchmark_name = 'Christensen et al. 2001  (MHD, Case 1)'
 
             drift_sign = -1 ! Retrograde Drift
-            integration_interval = 100 !100 
-            report_interval = 10000 ! 10000 
+            integration_interval = 10 !0 !100 
+            report_interval = 100 !00 ! 10000 
             max_numt = report_interval/integration_interval
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4

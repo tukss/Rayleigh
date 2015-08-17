@@ -5,13 +5,14 @@ Module Chebyshev_Polynomials
 	Real*8, Allocatable, Private :: x(:)  ! The colocation points
 	Real*8, Allocatable :: cheby(:,:)		! cheby(r,k) is chebyshev polynomial of degree k-1 at radius r
 	Real*8, Allocatable :: cheby_even(:,:), cheby_odd(:,:) ! even and odd chebyshev arrays
-
+    Real*8, Allocatable, Private :: ctheta(:) ! Colocation points (angle) on the semi-circle
 	Real*8, Allocatable :: dcheby(:,:,:)	! The Chebyshev Derivative Arrays
 	Real*8, private ::	Pi  = 3.1415926535897932384626433832795028841972d+0
-	Real*8, private :: pi_over_N
+	Real*8, private :: pi_over_N, ctheta0, dctheta
 	Logical :: DeAlias = .true.
 	Logical :: Parity = .true.
 	Logical :: initialized = .false.
+    Logical, Private :: use_extrema = .false. ! Set to true to use extrema points instead of zeros for T_Nmax
 	Real*8, Private :: scaling ! x runs from -0.5 to 0.5 by default
 	Interface Cheby_To_Spectral
 		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D !2
@@ -155,11 +156,12 @@ Contains
 		tmp = 1.5d0*Pi * (grid(1)-grid(N_max)) / &
 			& ( (grid(1)**3 - grid(N_max)**3) * N_max )
 		Do r=1,N_max
-			xx = (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
+			xx = x(r) ! (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
+            !xx = (2.0d0*x(r)-x(N_max)-x(1) )
 			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
 		Enddo
-        integration_weights(1) = 0.0d0  !Zero by definition - take care here with numerics though.
-        integration_weights(N_max) = 0.0d0
+        !integration_weights(1) = 0.0d0  !Zero by definition - take care here with numerics though.
+        !integration_weights(N_max) = 0.0d0
 
 
 	End Subroutine Initialize_Chebyshev
@@ -181,25 +183,44 @@ Contains
 		Implicit None
 		Integer :: i
 		Real*8 :: arg
-		Allocate(x(1:N_max))
-		pi_over_N = pi/(N_max*1.0d0)
-		arg = (0.5d0)*pi_over_N
-		Do i = 1, N_Max
-			x(i) = cos(arg)
-			arg = arg+pi_over_N
-		Enddo
+        ! Calculate the colocation points X { -1 , 1
+        ! Also calculate the theta grid ctheta { 0 , pi 
+	    Allocate(x(1:N_max))
+        Allocate(ctheta(1:N_max))
+        If (use_extrema) Then  !Use the extrema of T_{N_max}  
+            dctheta = pi/(N_max-1)
+            ctheta0 = 0.0d0
+            arg = ctheta0
+            Do i = 1, N_max
+                ctheta(i) = arg
+                x(i) = cos(arg)
+                arg = arg+dctheta
+            Enddo
+
+
+        Else !Use the zeroes of T_{N_max}
+
+            dctheta = pi/N_max
+            ctheta0 = dctheta*0.5d0
+		    arg = ctheta0
+		    Do i = 1, N_Max
+                ctheta(i) = arg
+			    x(i) = cos(arg)
+			    arg = arg+dctheta
+		    Enddo
+
+        Endif
 	End Subroutine Gen_Colocation_Points
 
 	Subroutine Gen_Tn()
 		Implicit None
 		Integer :: i, k, r
-		Real*8 :: acx, arg
+		Real*8 :: arg
 		Allocate(cheby(1:N_max,1:N_max))
 		Do r = 1, N_max
-			acx = pi_over_n*(r-1+0.5d0)
 			Do i = 1, N_max
 				k = i -1
-				arg = k*acx
+				arg = k*ctheta(r)
 				cheby(r,i) = cos(arg)
 			Enddo
 		Enddo
