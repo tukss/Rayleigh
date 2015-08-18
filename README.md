@@ -1,4 +1,4 @@
-![rotator2.jpg](https://bitbucket.org/repo/Rp975y/images/1016806417-rotator2.jpg)
+![simple_background.jpg](https://bitbucket.org/repo/Rp975y/images/1683798179-simple_background.jpg)
 # README #
 
 This README would normally document whatever steps are necessary to get your application up and running.
