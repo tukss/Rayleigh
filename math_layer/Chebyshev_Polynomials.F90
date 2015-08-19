@@ -153,8 +153,12 @@ Contains
         integration_weights(1:n_max) = 0.0d0
 
 
-		tmp = 1.5d0*Pi * (grid(1)-grid(N_max)) / &
-			& ( (grid(1)**3 - grid(N_max)**3) * N_max )
+		!tmp = 1.5d0*Pi * (grid(1)-grid(N_max)) / &
+		!	& ( (grid(1)**3 - grid(N_max)**3) * N_max )
+
+        !Because we're using the zeroes, x(1)-x(n_max) is not quite 2
+		tmp = (3*Pi * (grid(1)-grid(N_max)) )/ &
+			& (x(1)-x(N_max) (grid(1)**3 - grid(N_max)**3) * N_max )
 		Do r=1,N_max
 			xx = x(r) ! (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
             !xx = (2.0d0*x(r)-x(N_max)-x(1) )
