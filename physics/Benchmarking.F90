@@ -20,8 +20,8 @@ Module Benchmarking
 
     Integer, Private :: nobs, msymm
     Integer, Private :: max_numt, numt_ind, global_count, num_int
-    Integer, Private :: report_interval 
-    Integer, Private :: integration_interval 
+    Integer, Private :: report_interval = 9000000
+    Integer, Private :: integration_interval =9000000
     Real*8 :: mag_factor
     Real*8, Allocatable :: time_series(:,:), time_saves(:), iter_saves(:), obs_series(:,:)
     Integer :: drift_sign, num_rep
