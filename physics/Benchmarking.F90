@@ -32,6 +32,7 @@ Module Benchmarking
     Real*8, Allocatable :: strips(:,:) ! equatorial-mid-shell strips used for tracking pattern drift rate
     Real*8, Allocatable :: xnow(:), xlast(:), xref(:), drifts(:,:), report_sdev(:)
     Real*8, Allocatable :: observations(:), report_vals(:), suggested_vals(:)
+    Real*8 :: volume_norm = 1.0d0
     Real*8 :: drift
     Real*8 :: drift_reference_time, previous_time
 
@@ -69,6 +70,7 @@ Contains
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4
             num_rep = 4
+            volume_norm = 1
             Allocate(report_names(1:4))
             Allocate(report_vals(1:4))
             Allocate(report_sdev(1:4))
@@ -98,6 +100,7 @@ Contains
             mag_factor = 1.0d0/(2*ekman_number*magnetic_prandtl_number)
             msymm = 4
             num_rep = 6
+            volume_norm = 1
             Allocate(report_names(1:6))
             Allocate(report_vals(1:6))
             Allocate(report_sdev(1:6))
@@ -120,7 +123,38 @@ Contains
 
         Endif
 
+        If (benchmark_mode .eq. 3) Then
+            benchmark_name = 'Jones et al. 2001  (Hydrodynamic Case)'
 
+            drift_sign = 1 ! Prograde Drift
+            integration_interval = 100 !100 
+            report_interval = 10000 ! 10000 
+            max_numt = report_interval/integration_interval
+            msymm = 19
+            num_rep = 6
+            volume_norm = (four_pi/3.0d0)*(radius(1)**3-radius(n_r)**3)
+
+            Allocate(report_names(1:6))
+            Allocate(report_vals(1:6))
+            Allocate(report_sdev(1:6))
+            Allocate(suggested_vals(1:6))
+            report_names(1) = '  Kinetic Energy  : '
+            report_names(2) = '  Zonal KE        : '
+            report_names(3) = '  Meridional KE   : '
+            report_names(4) = '  Entropy         : '
+            report_names(5) = '  Vphi            : '
+            report_names(6) = '  Drift Frequency : '
+            
+            !Suggested values from Jones et al. 2000
+            suggested_vals(1) = 5.57028d35
+            suggested_vals(2) = 6.38099d34
+            suggested_vals(3) = 1.49825d32
+            suggested_vals(4) = 7.9452d5
+            suggested_vals(5) = 690.27
+            suggested_vals(6) = 3.10512d-6
+            ! Ideally, we override namelist values with benchmark values here
+
+        Endif
 
 
 
@@ -473,6 +507,25 @@ Contains
                         report_sdev(6) = sdev_value
 
 
+
+                    Endif
+
+                    If (benchmark_mode .eq. 2) Then
+                        report_vals(1) = volume_integrals(1)*volume_norm
+                        report_vals(2) = volume_integrals(2)*volume_norm
+                        report_vals(3) = volume_integrals(3)*volume_norm
+                        report_vals(4) = observations(3)
+                        report_vals(5) = observations(2)
+
+                        report_sdev(1) = volume_sdev(1)*volume_norm
+                        report_sdev(2) = volume_sdev(2)*volume_norm
+                        report_sdev(3) = volume_sdev(3)*volume_norm
+                        report_sdev(4) = obs_sdev(3)
+                        report_sdev(5) = obs_sdev(2)
+
+                        Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
+                        report_vals(6) = mean_value
+                        report_sdev(6) = sdev_value
 
                     Endif
 

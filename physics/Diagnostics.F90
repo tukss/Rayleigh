@@ -650,14 +650,10 @@ Contains
 
         Allocate(rweights(1:n_r))
 
-        If (use_cheby_weights) Then
+        If (chebyshev) Then
             If (my_rank .eq. 0) Write(6,*)'Integrating using Chebyshev Quadrature'
             rweights = radial_integral_weights
-            If (half_weights) Then
-                !boundaries weighted by 1/2
-                rweights(1) = rweights(1)*0.5d0
-                rweights(n_r) = rweights(n_r)*0.5d0
-            Endif
+
         Else
             Do i = 2, n_r-1
                 delr = (radius(i-1)-radius(i+1))/2.0d0

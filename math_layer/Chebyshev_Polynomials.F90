@@ -153,10 +153,9 @@ Contains
         integration_weights(1:n_max) = 0.0d0
 
 
-		!tmp = 1.5d0*Pi * (grid(1)-grid(N_max)) / &
-		!	& ( (grid(1)**3 - grid(N_max)**3) * N_max )
 
-        !Because we're using the zeroes, x(1)-x(n_max) is not quite 2
+
+        !Because we're using the zeros, x(1)-x(n_max) is not quite 2
 		tmp = (3*Pi * (grid(1)-grid(N_max)) )/ &
 			& ( (x(1)-x(N_max))* (grid(1)**3 - grid(N_max)**3) * N_max )
 		Do r=1,N_max
@@ -164,8 +163,9 @@ Contains
             !xx = (2.0d0*x(r)-x(N_max)-x(1) )
 			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
 		Enddo
-        !integration_weights(1) = 0.0d0  !Zero by definition - take care here with numerics though.
-        !integration_weights(N_max) = 0.0d0
+        integration_weights(1) = 0.5d0      !Boundaries x 1/2 (since on zero points)
+        integration_weights(N_max) = 0.5d0
+
 
 
 	End Subroutine Initialize_Chebyshev
