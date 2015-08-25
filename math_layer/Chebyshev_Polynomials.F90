@@ -163,8 +163,8 @@ Contains
             !xx = (2.0d0*x(r)-x(N_max)-x(1) )
 			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
 		Enddo
-        integration_weights(1) = 0.5d0      !Boundaries x 1/2 (since on zero points)
-        integration_weights(N_max) = 0.5d0
+        integration_weights(1) = integration_weights(1)*0.5d0      !Boundaries x 1/2 (since on zero points)
+        integration_weights(N_max) = integration_weights(N_max)*0.5d0
 
 
 
