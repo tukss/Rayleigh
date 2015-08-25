@@ -526,7 +526,7 @@ Contains
                         Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
                         report_vals(6) = mean_value
                         report_sdev(6) = sdev_value
-
+                        fmtstr = '(E14.6)'
                     Endif
 
                     Do i = 1, num_rep
