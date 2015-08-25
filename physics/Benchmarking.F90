@@ -510,7 +510,7 @@ Contains
 
                     Endif
 
-                    If (benchmark_mode .eq. 2) Then
+                    If (benchmark_mode .eq. 3) Then
                         report_vals(1) = volume_integrals(1)*volume_norm
                         report_vals(2) = volume_integrals(2)*volume_norm
                         report_vals(3) = volume_integrals(3)*volume_norm
