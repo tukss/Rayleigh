@@ -84,7 +84,7 @@ Subroutine Init_Equation_Coefficients
         If (.not. dimensional) Then
             alf_const = 1.0d0
         Else
-            alf_const = four_pi
+            alf_const = 1.0d0/four_pi
         Endif
 	Endif
 
