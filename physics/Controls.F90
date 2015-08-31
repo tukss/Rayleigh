@@ -41,9 +41,12 @@ Module Controls
     ! --- This flag determines if the code is run in benchmark mode
     !     0 (default) is no benchmarking.  1-5 are various accuracy benchmarks (see documentation)
     Integer :: benchmark_mode = 0 
+    Integer :: benchmark_integration_interval = -1 ! manual override of integration_interval
+    Integer :: benchmark_report_interval = -1      ! and report interval in Benchmarking.F90 (for debugging)
 
     Namelist /Physical_Controls_Namelist/ magnetism, nonlinear, rotation, lorentz_forces, &
-                & viscous_heating, ohmic_heating, advect_reference_state, benchmark_mode
+                & viscous_heating, ohmic_heating, advect_reference_state, benchmark_mode, &
+                & benchmark_integration_interval, benchmark_report_interval
 
     !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls

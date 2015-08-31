@@ -156,7 +156,56 @@ Contains
 
         Endif
 
+        If (benchmark_mode .eq. 4) Then
+            benchmark_name = 'Jones et al. 2001  (Steady Dynamo Case)'
 
+            drift_sign = 1 ! Prograde Drift
+            integration_interval = 100 
+            report_interval = 10000  
+            max_numt = report_interval/integration_interval
+            msymm = 7
+            num_rep = 10
+            volume_norm = (four_pi/3.0d0)*(radius(1)**3-radius(n_r)**3)
+            mag_factor = over_eight_pi
+            Allocate(report_names(1:num_rep))
+            Allocate(report_vals(1:num_rep))
+            Allocate(report_sdev(1:num_rep))
+            Allocate(suggested_vals(1:num_rep))
+            report_names(1) = '  Kinetic Energy  : '
+            report_names(2) = '  Zonal KE        : '
+            report_names(3) = '  Meridional KE   : '
+            report_names(4) = '  Magnetic Energy : '
+            report_names(5) = '  Zonal ME        : '
+            report_names(6) = '  Meridional ME   : '
+            report_names(7) = '  Entropy         : '
+            report_names(8) = '  Vphi            : '
+            report_names(9) = '  Btheta          : '
+            report_names(10) = '  Drift Frequency : '
+
+            
+            !Suggested values from Jones et al. 2000
+            suggested_vals(1) = 8.03623d36
+            suggested_vals(2) = 1.15318d36
+            suggested_vals(3) = 1.01587d33
+            suggested_vals(4) = 6.13333d36
+            suggested_vals(5) = 4.62046d36
+            suggested_vals(6) = 3.24927d35
+            suggested_vals(7) = 6.0893d5
+            suggested_vals(8) = -2942.2d0
+            suggested_vals(9) = 272.92d0
+            suggested_vals(10) = 4.30760d-6
+            ! Ideally, we override namelist values with benchmark values here
+
+        Endif
+
+
+        If (benchmark_integration_interval .gt. 0) Then
+            If (benchmark_report_interval .gt. 0) Then
+                integration_interval = benchmark_integration_interval
+                report_interval = benchmark_report_interval 
+                max_numt = report_interval/integration_interval
+            Endif
+        Endif
 
         !NOTE:  for dimensional anelastic runs, use mag_factor = over_eight_pi
 
@@ -277,7 +326,7 @@ Contains
         Character*120 :: report_file
 
         Character*14 :: val_str, sdev_str, rel_str, sug_str, dt_str
-        Character*7 :: fmtstr = '(F14.6)'
+        Character*8 :: fmtstr = '(F14.6)'
         Character*8 :: iter_string
 
 
@@ -526,8 +575,42 @@ Contains
                         Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
                         report_vals(6) = mean_value
                         report_sdev(6) = sdev_value
-                        fmtstr = '(E14.6)'
+                        fmtstr = '(ES14.6)'
                     Endif
+
+
+                    If (benchmark_mode .eq. 4) Then
+                        Do i = 1, 6
+                            report_vals(i) = volume_integrals(i)*volume_norm
+                            report_sdev(i) = volume_sdev(i)*volume_norm
+                        Enddo
+                        Do i = 4,6
+                            report_vals(i) = report_vals(i)*mag_factor
+                            report_sdev(i) = report_sdev(i)*mag_factor
+                        Enddo
+
+
+                        report_vals(7) = observations(3)
+                        report_vals(8) = observations(2)
+                        report_vals(9) = observations(4)
+
+                        !Btheta can be either positive or negative.
+                        !If it's negative, switch to positive so that 
+                        !relative error makes sense.
+                        If (report_vals(9) .lt. 0.0d0) Then
+                            report_vals(9) = -report_vals(9)
+                        Endif
+
+                        report_sdev(7) = obs_sdev(3)
+                        report_sdev(8) = obs_sdev(2)
+                        report_sdev(9) = obs_sdev(4)
+
+                        Call get_moments(drifts(1:global_count,2),mean_value,sdev_value)
+                        report_vals(10) = mean_value
+                        report_sdev(10) = sdev_value
+                        fmtstr = '(ES14.6)'
+                    Endif
+
 
                     Do i = 1, num_rep
                         rel_diff = (report_vals(i)-suggested_vals(i))/suggested_vals(i)*100
