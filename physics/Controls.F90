@@ -57,9 +57,9 @@ Module Controls
 
     Integer :: check_frequency = -1             ! Number of iterations between checkpoint dumps
     Integer :: checkpoint_interval = 1000000    ! Same as check_frequency (check_frequency will be deprecated soon)
-    Integer :: quick_save_interval =  -1        ! Number of iterations between quicksave dumps
-    Integer :: num_quick_saves = 3              ! Number of quick-save checkpoints to write before rolling back to #0
-    Real*8  :: quick_save_minutes = -1.0d0      ! Time in minutes between quick saves
+    Integer :: quicksave_interval =  -1        ! Number of iterations between quicksave dumps
+    Integer :: num_quicksaves = 3              ! Number of quick-save checkpoints to write before rolling back to #1
+    Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves
 
     Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
 	Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
@@ -68,7 +68,7 @@ Module Controls
     Integer :: diagnostic_reboot_interval = -1
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
                 & cflmax, cflmin, max_time_step,chk_type, diagnostic_reboot_interval, min_time_step, &
-                & num_quick_saves, quick_save_interval, checkpoint_interval, quick_save_minutes, &
+                & num_quicksaves, quicksave_interval, checkpoint_interval, quicksave_minutes, &
                 & max_time_minutes
 
 
