@@ -68,7 +68,7 @@ Subroutine Volume_Average(arr,arr_mean)
     Do i = 1, N_R
         arr_mean = arr_mean+arr(i)*radial_integral_weights(i)
     Enddo
-End
+End Subroutine Volume_Average
 
 Subroutine Density_Weighted_Average(arr,arr_mean)
     Implicit None
@@ -83,7 +83,7 @@ Subroutine Density_Weighted_Average(arr,arr_mean)
         arr_mean = arr_mean+arr(i)*radial_integral_weights(i)*ref%density(i)
     Enddo
     arr_mean = arr_mean/rho_mean
-End
+End Subroutine Density_Weighted_Average
 
 
 Subroutine Standard_ND
