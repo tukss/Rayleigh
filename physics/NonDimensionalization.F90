@@ -41,12 +41,50 @@ Subroutine NonDimensionalize
 				Case(1)
 					Call Standard_ND()
 				Case(2)
-				! something else
+				    Call Volumetric_ND()
+                Case(3)
+                    Call Density_Weighted_ND()
 			End Select
 		Endif
 
 
 End Subroutine NonDimensionalize
+
+Subroutine Volumetric_ND()
+    Implicit None
+End Subroutine Volumetric_ND
+
+Subroutine Density_Weighted_ND()
+    Implicit None
+End Subroutine Density_Weighted_ND
+
+Subroutine Volume_Average(arr,arr_mean)
+    Implicit None
+    Real*8, Intent(In) :: arr(1:)
+    Real*8, Intent(InOut) :: arr_mean
+    Integer :: i
+    ! Computes radial average with r^2 weighting
+    arr_mean = 0.0d0    
+    Do i = 1, N_R
+        arr_mean = arr_mean+arr(i)*radial_integral_weights(i)
+    Enddo
+End
+
+Subroutine Density_Weighted_Average(arr,arr_mean)
+    Implicit None
+    Real*8, Intent(In) :: arr(1:)
+    Real*8, Intent(InOut) :: arr_mean
+    Real*8 :: rho_mean
+    Integer :: i
+    ! Computes radial average with rho r^2 weighting
+    Call Volume_Average(ref%density,rho_mean)
+    arr_mean = 0.0d0    
+    Do i = 1, N_R
+        arr_mean = arr_mean+arr(i)*radial_integral_weights(i)*ref%density(i)
+    Enddo
+    arr_mean = arr_mean/rho_mean
+End
+
 
 Subroutine Standard_ND
 	Implicit None
