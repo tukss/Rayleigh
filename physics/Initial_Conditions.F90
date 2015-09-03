@@ -781,7 +781,7 @@ Contains
         Return
     End Subroutine Splint
 
-    Subroutine Restore_InitialConditions_Defaults()
+    Subroutine Restore_InitialCondition_Defaults()
         Implicit None
 
         alt_check = .false.
@@ -794,5 +794,5 @@ Contains
         mag_amp  = 1.0d0
         conductive_profile = .false.
 
-    End Subroutine Restore_InitialConditions_Defaults
+    End Subroutine Restore_InitialCondition_Defaults
 End Module Initial_Conditions
