@@ -75,7 +75,8 @@ Contains
                 Write(6,*)"Setting Run Parameters to Christensen et al. 2001 Case 0 Values."
             Endif
 
-            precise_bounds .eq. 1
+            shell_depth = 1.0d0
+            aspect_ratio = 0.35d0
 
             !Temporal Controls
             rotation = .true.

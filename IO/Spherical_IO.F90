@@ -1558,6 +1558,7 @@ Contains
         !if (pid .eq. 0) Then
             !NOTE:  Later, we may want to do this only on the master node later, but this isn't a huge memory issue
             Allocate(self%oqvals(1:self%nq))
+            self%oqvals(:) = nqmax+100
         !Endif
     End Subroutine Initialize_Diagnostic_Info
     Subroutine AdvanceInd(self)
