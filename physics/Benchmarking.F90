@@ -315,7 +315,7 @@ Contains
         Endif
 
         If (my_rank .eq. 0) Then
-            Write(6,*)"Run Parameters have been set to:  '
+            Write(6,*)"Run Parameters have been set to:  "
             Write(6,*) benchmark_name
         Endif
         If (benchmark_integration_interval .gt. 0) Then
