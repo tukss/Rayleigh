@@ -16,6 +16,9 @@ Module Benchmarking
     Use ReferenceState
     Use TransportCoefficients
     Use Math_Constants
+    Use BoundaryConditions
+    Use Initial_Conditions
+    Use TransportCoefficients
     Implicit None
 
     Integer, Private :: nobs, msymm
