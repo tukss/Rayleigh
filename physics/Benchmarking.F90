@@ -71,9 +71,6 @@ Contains
         Endif
 
         If (benchmark_mode .eq. 1) Then
-            If (my_rank .eq. 0) Then
-                Write(6,*)"Setting Run Parameters to Christensen et al. 2001 Case 0 Values."
-            Endif
 
             shell_depth = 1.0d0
             aspect_ratio = 0.35d0
@@ -107,15 +104,56 @@ Contains
             Ekman_Number = 1.0d-3
             Rayleigh_Number = 1.0d5
             Prandtl_Number = 1.0d0
+            reference_type = 1
+            heating_type = 0
+            gravity_power = 1.0d0
+            dimensional = .false.
+        Endif
+
+        If (benchmark_mode .eq. 2) Then
+
+            shell_depth = 1.0d0
+            aspect_ratio = 0.35d0
+
+            !Temporal Controls
+            rotation = .true.
+            viscous_heating = .false.
+            max_time_step = 1.0d-4
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .true.
+            strict_L_Conservation = .false.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 1.0d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 1
+            magnetic_init_type = 1
+            If (init_remember .eq. -1) Then ! Allow for restarts (assume hydro and mhd are both restarted)
+                 init_type = -1
+                 magnetic_init_type = -1
+                 restart_iter = restart_remember
+            Endif            
+
+            !Reference_Namelist
+            Ekman_Number = 1.0d-3
+            Rayleigh_Number = 1.0d5
+            Prandtl_Number = 1.0d0
             Magnetic_Prandtl_Number = 5.0d0
             reference_type = 1
             heating_type = 0
             gravity_power = 1.0d0
             dimensional = .false.
-
-
-
         Endif
+
+
     End Subroutine Benchmark_Input_Reset
 
     Subroutine Initialize_Benchmarking
@@ -276,7 +314,10 @@ Contains
 
         Endif
 
-
+        If (my_rank .eq. 0) Then
+            Write(6,*)"Run Parameters have been set to:  '
+            Write(6,*) benchmark_name
+        Endif
         If (benchmark_integration_interval .gt. 0) Then
             If (benchmark_report_interval .gt. 0) Then
                 integration_interval = benchmark_integration_interval
