@@ -3,9 +3,8 @@
  n_theta = 96
  nprow = 16
  npcol = 32
- rmin = 1.0
- rmax = 2.0  ! Overridden with next flag
- precise_bounds = 1
+ aspect_ratio = 0.35d0
+ shell_depth = 1.0d0
 /
 &numerical_controls_namelist
  chebyshev = .true.

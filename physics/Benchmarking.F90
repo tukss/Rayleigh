@@ -74,6 +74,9 @@ Contains
             If (my_rank .eq. 0) Then
                 Write(6,*)"Setting Run Parameters to Christensen et al. 2001 Case 0 Values."
             Endif
+
+            precise_bounds .eq. 1
+
             !Temporal Controls
             rotation = .true.
             viscous_heating = .false.
