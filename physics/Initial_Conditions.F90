@@ -23,10 +23,8 @@ Module Initial_Conditions
     Integer :: restart_iter = -1
     Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
     Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0, mag_amp = 1.0d0
-    Logical :: custom_t
     Logical :: conductive_profile = .false.
-    Character*120 :: custom_t_file
-    Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, custom_t, custom_t_file, restart_iter, &
+    Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, restart_iter, &
             magnetic_init_type,alt_check, mag_amp, conductive_profile
 Contains
     
@@ -782,4 +780,19 @@ Contains
 
         Return
     End Subroutine Splint
+
+    Subroutine Restore_InitialConditions_Defaults()
+        Implicit None
+
+        alt_check = .false.
+        init_type = 1
+        magnetic_init_type = 1
+        init_tag = 8989
+        restart_iter = -1
+        temp_amp = 1.0d0
+        temp_w   = 0.3d0
+        mag_amp  = 1.0d0
+        conductive_profile = .false.
+
+    End Subroutine Restore_InitialConditions_Defaults
 End Module Initial_Conditions
