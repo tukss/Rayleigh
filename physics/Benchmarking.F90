@@ -115,9 +115,13 @@ Contains
             shell_depth = 1.0d0
             aspect_ratio = 0.35d0
 
-            !Temporal Controls
+            !Physical Controls
             rotation = .true.
+            magnetism = .true.
             viscous_heating = .false.
+            ohmic_heating = .false.
+
+            !Temporal Controls
             max_time_step = 1.0d-4
             alpha_implicit = 0.50001d0
             cflmin = 0.4d0
@@ -631,7 +635,11 @@ Contains
             Write(funit,*)'  Radial Resolution      N_R = ', N_R
             Write(funit,*)'  Angular Resolution N_theta = ', n_theta
             Write(funit,*)' '
-            Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            If (benchmark_mode .lt. 3) Then
+                Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            Else
+                Write(funit,*)'  Averaging Interval (seconds) : ', dt_str
+            Endif
             Write(funit,*)' '
             Write(funit,*)'  Beginning Iteration : ', iter_start
             Write(funit,*)'  Ending Iteration    : ', iter_end
