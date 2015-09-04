@@ -74,7 +74,6 @@ restart_iter = 0
 &Reference_Namelist
 reference_type = 2
 heating_type = 0
-luminosity = 3.846d33
 poly_n = 2.0d0
 poly_Nrho = 5.0d0
 poly_mass = 1.9D30
@@ -84,8 +83,6 @@ dimensional = .true.
 angular_velocity = 1.76d-4
 /
 &NonDimensionalization_Namelist
-nd_index = 64
-entropy_bottom = 851225.7d0
 /
 &Transport_Namelist
 nu_top    = 3.64364d12

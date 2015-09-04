@@ -225,6 +225,69 @@ Contains
         Endif
 
 
+        If (benchmark_mode .eq. 4) Then
+            ! Jones et al. MHD (steady)
+            ! Domain Size
+            rmin = 2.45d9
+            rmax = 7.0d9
+            
+
+            !Physical Controls
+            rotation = .true.
+            magnetism = .true.
+
+            !Temporal Controls
+            max_time_step = 200.0d0
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .false.
+            strict_L_Conservation = .true.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 774268.3d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 7
+            magnetic_init_type = 7
+            mag_amp = 1.0d0
+            temp_amp = 1.0d1
+            temp_w = 0.01d4
+
+            If ( (init_remember .eq. -1) .or. (minit_remember .eq. -1) ) Then 
+                 ! Allow for restarts (assume hydro and mhd are both restarted)
+                 init_type = -1
+                 magnetic_init_type = -1
+                 restart_iter = restart_remember
+            Endif       
+
+
+            !Reference_Namelist
+            reference_type = 2
+            heating_type = 0
+            luminosity = 3.846d33
+            poly_n = 2.0d0
+            poly_Nrho = 3.0d0
+            poly_mass = 1.9D30
+            poly_rho_i = 1.1d0
+            pressure_specific_heat = 1.0509d8
+            dimensional = .true.
+            angular_velocity = 1.76d-4
+
+            !Transport Namelist
+            nu_top    = 7.28728d12
+            kappa_top = 7.28728d12
+            eta_top = 1.457456d11
+
+        Endif
+
+
+
 
     End Subroutine Benchmark_Input_Reset
 
