@@ -182,23 +182,23 @@ Contains
 
 
             !Temporal Controls
-            max_time_step = 1.0d-4
+            max_time_step = 30.0d0
             alpha_implicit = 0.50001d0
             cflmin = 0.4d0
             cflmax = 0.6d0
 
             !Boundary Conditions
-            no_slip_boundaries = .true.
+            no_slip_boundaries = .false.
             strict_L_Conservation = .false.
             dtdr_bottom = 0.0d0
             T_Top    = 0.0d0
-            T_Bottom = 1.0d0
+            T_Bottom = 851225.7d0
             fix_tvar_top = .true.
             fix_tvar_bottom = .true.
             fix_dtdr_bottom = .false.
 
             !Initial Conditions
-            init_type = 1
+            init_type = 6
             If (init_remember .eq. -1) Then 
                  ! Allow for restarts
                  init_type = -1
@@ -206,14 +206,22 @@ Contains
             Endif            
 
             !Reference_Namelist
-            Ekman_Number = 1.0d-3
-            Rayleigh_Number = 1.0d5
-            Prandtl_Number = 1.0d0
-            Magnetic_Prandtl_Number = 5.0d0
-            reference_type = 1
+            reference_type = 2
             heating_type = 0
-            gravity_power = 1.0d0
-            dimensional = .false.
+            luminosity = 3.846d33
+            poly_n = 2.0d0
+            poly_Nrho = 5.0d0
+            poly_mass = 1.9D30
+            poly_rho_i = 1.1d0
+            pressure_specific_heat = 1.0509d8
+            dimensional = .true.
+            angular_velocity = 1.76d-4
+
+            !Transport Namelist
+            nu_top    = 3.64364d12
+            kappa_top = 3.64364d12
+
+
         Endif
 
 
