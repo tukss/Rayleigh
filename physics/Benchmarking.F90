@@ -98,7 +98,8 @@ Contains
 
             !Initial Conditions
             init_type = 1
-            If (init_remember .eq. -1) Then ! Allow for restarts
+            If (init_remember .eq. -1) Then 
+                 ! Allow for restarts
                  init_type = -1
                  restart_iter = restart_remember
             Endif            
@@ -147,7 +148,8 @@ Contains
             !Initial Conditions
             init_type = 1
             magnetic_init_type = 1
-            If (init_remember .eq. -1) Then ! Allow for restarts (assume hydro and mhd are both restarted)
+            If ( (init_remember .eq. -1) .or. (minit_remember .eq. -1) ) Then 
+                 ! Allow for restarts (assume hydro and mhd are both restarted)
                  init_type = -1
                  magnetic_init_type = -1
                  restart_iter = restart_remember
@@ -197,10 +199,9 @@ Contains
 
             !Initial Conditions
             init_type = 1
-            magnetic_init_type = 1
-            If (init_remember .eq. -1) Then ! Allow for restarts (assume hydro and mhd are both restarted)
+            If (init_remember .eq. -1) Then 
+                 ! Allow for restarts
                  init_type = -1
-                 magnetic_init_type = -1
                  restart_iter = restart_remember
             Endif            
 
