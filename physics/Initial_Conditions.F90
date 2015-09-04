@@ -20,7 +20,7 @@ Module Initial_Conditions
     Integer :: init_type = 1
     Integer :: magnetic_init_type = 1
     Integer :: init_tag = 8989
-    Integer :: restart_iter = -1
+    Integer :: restart_iter = 0
     Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
     Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0, mag_amp = 1.0d0
     Logical :: conductive_profile = .false.
@@ -788,7 +788,7 @@ Contains
         init_type = 1
         magnetic_init_type = 1
         init_tag = 8989
-        restart_iter = -1
+        restart_iter = 0
         temp_amp = 1.0d0
         temp_w   = 0.3d0
         mag_amp  = 1.0d0
