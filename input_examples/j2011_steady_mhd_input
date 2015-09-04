@@ -52,14 +52,11 @@ full3d_frequency = 9000000
 /
 
 &Boundary_Conditions_Namelist
-no_slip_boundaries = .false.
 strict_L_Conservation = .true.
-dtdr_bottom = 0.0d0
 T_Top    = 0.0d0
 T_Bottom = 774268.3d0
 fix_tvar_top = .true.
 fix_tvar_bottom = .true.
-fix_dtdr_bottom = .false.
 /
 &Initial_Conditions_Namelist
 init_type = 7
