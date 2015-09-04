@@ -18,7 +18,7 @@
  max_time_step = 30.0d0
  max_iterations = 5000000
  alpha_implicit = 0.51d0
- check_frequency = 100000
+ checkpoint_interval = 100000
  cflmin = 0.4d0
  cflmax = 0.6d0
 /
