@@ -16,6 +16,10 @@ Module Benchmarking
     Use ReferenceState
     Use TransportCoefficients
     Use Math_Constants
+    Use BoundaryConditions
+    Use Initial_Conditions
+    Use TransportCoefficients
+    use NonDimensionalization
     Implicit None
 
     Integer, Private :: nobs, msymm
@@ -39,6 +43,253 @@ Module Benchmarking
     Character*80, Allocatable :: report_names(:)
     Character*120 :: benchmark_name
 Contains
+
+    Subroutine Benchmark_Input_Reset()
+        Implicit None
+        Integer :: mode_remember, integration_remember, report_remember
+        Integer :: init_remember, restart_remember, minit_remember
+        ! This routine re-initializes input values to their benchmark values
+
+        If (benchmark_mode .gt. 0) Then
+
+            mode_remember = benchmark_mode  ! Keep track of a few things before restoring defaults
+            integration_remember = benchmark_integration_interval
+            report_remember = benchmark_report_interval
+            init_remember = init_type
+            restart_remember = restart_iter
+            minit_remember = magnetic_init_type
+
+            Call Restore_Transport_Defaults()
+            Call Restore_InitialCondition_Defaults()
+            Call Restore_BoundaryCondition_Defaults()
+            Call Restore_Reference_Defaults()
+            !Call Restore_Temporal_Defaults()
+            Call Restore_Physics_Defaults()
+
+            benchmark_mode = mode_remember
+            benchmark_integration_interval = integration_remember
+            benchmark_report_interval = report_remember
+        Endif
+
+        If (benchmark_mode .eq. 1) Then
+            !Christsensen et al. Hydro (case 0)
+
+            ! Domain Size
+            shell_depth = 1.0d0
+            aspect_ratio = 0.35d0
+
+            !Temporal Controls
+            rotation = .true.
+            viscous_heating = .false.
+            max_time_step = 1.0d-4
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .true.
+            strict_L_Conservation = .false.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 1.0d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 1
+            If (init_remember .eq. -1) Then 
+                 ! Allow for restarts
+                 init_type = -1
+                 restart_iter = restart_remember
+            Endif            
+
+            !Reference_Namelist
+            Ekman_Number = 1.0d-3
+            Rayleigh_Number = 1.0d5
+            Prandtl_Number = 1.0d0
+            reference_type = 1
+            heating_type = 0
+            gravity_power = 1.0d0
+            dimensional = .false.
+
+            !Nodimensionalization Namelist
+            use_dimensional_inputs = .false.
+        Endif
+
+        If (benchmark_mode .eq. 2) Then
+            ! Christensen et al. MHD (case 1)
+            ! Domain Size
+            shell_depth = 1.0d0
+            aspect_ratio = 0.35d0
+
+            !Physical Controls
+            rotation = .true.
+            magnetism = .true.
+            viscous_heating = .false.
+            ohmic_heating = .false.
+
+            !Temporal Controls
+            max_time_step = 1.0d-4
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .true.
+            strict_L_Conservation = .false.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 1.0d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 1
+            magnetic_init_type = 1
+            If ( (init_remember .eq. -1) .or. (minit_remember .eq. -1) ) Then 
+                 ! Allow for restarts (assume hydro and mhd are both restarted)
+                 init_type = -1
+                 magnetic_init_type = -1
+                 restart_iter = restart_remember
+            Endif            
+
+            !Reference_Namelist
+            Ekman_Number = 1.0d-3
+            Rayleigh_Number = 1.0d5
+            Prandtl_Number = 1.0d0
+            Magnetic_Prandtl_Number = 5.0d0
+            reference_type = 1
+            heating_type = 0
+            gravity_power = 1.0d0
+            dimensional = .false.
+
+            !Nodimensionalization Namelist
+            use_dimensional_inputs = .false.
+
+        Endif
+
+        If (benchmark_mode .eq. 3) Then
+            ! Jones et al. Hydro
+            ! Domain Size
+            rmin = 2.45d9
+            rmax = 7.0d9
+            
+
+            !Physical Controls
+            rotation = .true.
+
+
+            !Temporal Controls
+            max_time_step = 30.0d0
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .false.
+            strict_L_Conservation = .false.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 851225.7d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 6
+            If (init_remember .eq. -1) Then 
+                 ! Allow for restarts
+                 init_type = -1
+                 restart_iter = restart_remember
+            Endif            
+
+            !Reference_Namelist
+            reference_type = 2
+            heating_type = 0
+            luminosity = 3.846d33
+            poly_n = 2.0d0
+            poly_Nrho = 5.0d0
+            poly_mass = 1.9D30
+            poly_rho_i = 1.1d0
+            pressure_specific_heat = 1.0509d8
+            dimensional = .true.
+            angular_velocity = 1.76d-4
+
+            !Transport Namelist
+            nu_top    = 3.64364d12
+            kappa_top = 3.64364d12
+
+
+        Endif
+
+
+        If (benchmark_mode .eq. 4) Then
+            ! Jones et al. MHD (steady)
+            ! Domain Size
+            rmin = 2.45d9
+            rmax = 7.0d9
+            
+
+            !Physical Controls
+            rotation = .true.
+            magnetism = .true.
+
+            !Temporal Controls
+            max_time_step = 200.0d0
+            alpha_implicit = 0.50001d0
+            cflmin = 0.4d0
+            cflmax = 0.6d0
+
+            !Boundary Conditions
+            no_slip_boundaries = .false.
+            strict_L_Conservation = .true.
+            dtdr_bottom = 0.0d0
+            T_Top    = 0.0d0
+            T_Bottom = 774268.3d0
+            fix_tvar_top = .true.
+            fix_tvar_bottom = .true.
+            fix_dtdr_bottom = .false.
+
+            !Initial Conditions
+            init_type = 7
+            magnetic_init_type = 7
+            mag_amp = 1.0d0
+            temp_amp = 1.0d1
+            temp_w = 0.01d4
+
+            If ( (init_remember .eq. -1) .or. (minit_remember .eq. -1) ) Then 
+                 ! Allow for restarts (assume hydro and mhd are both restarted)
+                 init_type = -1
+                 magnetic_init_type = -1
+                 restart_iter = restart_remember
+            Endif       
+
+
+            !Reference_Namelist
+            reference_type = 2
+            heating_type = 0
+            luminosity = 3.846d33
+            poly_n = 2.0d0
+            poly_Nrho = 3.0d0
+            poly_mass = 1.9D30
+            poly_rho_i = 1.1d0
+            pressure_specific_heat = 1.0509d8
+            dimensional = .true.
+            angular_velocity = 1.76d-4
+
+            !Transport Namelist
+            nu_top    = 7.28728d12
+            kappa_top = 7.28728d12
+            eta_top = 1.457456d11
+
+        Endif
+
+
+
+
+    End Subroutine Benchmark_Input_Reset
 
     Subroutine Initialize_Benchmarking
         Implicit None
@@ -198,7 +449,10 @@ Contains
 
         Endif
 
-
+        If (my_rank .eq. 0) Then
+            Write(6,*)"Run Parameters have been set to:  "
+            Write(6,*) benchmark_name
+        Endif
         If (benchmark_integration_interval .gt. 0) Then
             If (benchmark_report_interval .gt. 0) Then
                 integration_interval = benchmark_integration_interval
@@ -512,7 +766,11 @@ Contains
             Write(funit,*)'  Radial Resolution      N_R = ', N_R
             Write(funit,*)'  Angular Resolution N_theta = ', n_theta
             Write(funit,*)' '
-            Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            If (benchmark_mode .lt. 3) Then
+                Write(funit,*)'  Averaging Interval (Viscous Diffusion Times) : ', dt_str
+            Else
+                Write(funit,*)'  Averaging Interval (seconds) : ', dt_str
+            Endif
             Write(funit,*)' '
             Write(funit,*)'  Beginning Iteration : ', iter_start
             Write(funit,*)'  Ending Iteration    : ', iter_end

@@ -3,12 +3,12 @@ Module BoundaryConditions
     Use ProblemSize
     Use ReferenceState
     Use TransportCoefficients
-	Implicit None
+    Implicit None
 
-	Logical :: Fix_Tvar_Top    = .True.
-	Logical :: Fix_Tvar_Bottom = .True.
-	Logical :: Fix_dTdr_Top    = .False.
-	Logical :: Fix_dTdr_Bottom = .False.
+    Logical :: Fix_Tvar_Top    = .True.
+    Logical :: Fix_Tvar_Bottom = .True.
+    Logical :: Fix_dTdr_Top    = .False.
+    Logical :: Fix_dTdr_Bottom = .False.
     Logical :: Fix_divrt_top = .False.
     Logical :: Fix_divt_top = .False.
     Logical :: Fix_divrfc_top = .False.
@@ -18,8 +18,8 @@ Module BoundaryConditions
     Logical :: Impose_Dipole_Field = .False.
     Logical :: fix_tdt_bottom = .false.
  
-	Real*8  :: T_Bottom     = 1.0d0
-	Real*8  :: T_Top        = 0.0d0
+    Real*8  :: T_Bottom     = 1.0d0
+    Real*8  :: T_Top        = 0.0d0
     Real*8  :: dTdr_Top     = 0.0d0
     Real*8  :: dTdr_Bottom  = 0.0d0
     Real*8  :: C10_bottom = 0.0d0
@@ -34,8 +34,8 @@ Module BoundaryConditions
     Logical :: Strict_L_Conservation = .false.         ! (In-Progress) Turn on to enforce angular momentum conservation abous x,y, and z-axes
     Logical :: no_slip_boundaries = .false. ! Set to true to use no-slip boundaries.  Stree-free boundaries are the default.
 
-	Namelist /Boundary_Conditions_Namelist/ Fix_Tvar_Top, Fix_Tvar_Bottom, T_Bottom, T_Top, dTdr_top, dTdr_bottom, &
-		fix_dtdr_bottom, fix_dtdr_top, fix_divrt_top, fix_divt_top, fix_divrfc_top, fix_divfc_top, &
+    Namelist /Boundary_Conditions_Namelist/ Fix_Tvar_Top, Fix_Tvar_Bottom, T_Bottom, T_Top, dTdr_top, dTdr_bottom, &
+        fix_dtdr_bottom, fix_dtdr_top, fix_divrt_top, fix_divt_top, fix_divrfc_top, fix_divfc_top, &
         no_slip_boundaries, strict_L_Conservation, fix_poloidalfield_top, fix_poloidalfield_bottom, &
         C10_bottom, C10_top, C11_bottom, C11_top, C1m1_bottom, C1m1_top, Br_bottom, &
         dipole_tilt_degrees, impose_dipole_field, fix_tdt_bottom
@@ -73,4 +73,36 @@ Contains
             Write(6,*)'Setting dtdr_top to: ', dtdr_top
         Endif
     End Subroutine Initialize_Boundary_Conditions
+
+    Subroutine Restore_BoundaryCondition_Defaults()
+        Implicit None
+        Fix_Tvar_Top    = .True.
+        Fix_Tvar_Bottom = .True.
+        Fix_dTdr_Top    = .False.
+        Fix_dTdr_Bottom = .False.
+        Fix_divrt_top = .False.
+        Fix_divt_top = .False.
+        Fix_divrfc_top = .False.
+        Fix_divfc_top = .False.
+        Fix_poloidalfield_top = .False.
+        Fix_poloidalfield_bottom = .False.
+        Impose_Dipole_Field = .False.
+        fix_tdt_bottom = .false.
+         
+        T_Bottom     = 1.0d0
+        T_Top        = 0.0d0
+        dTdr_Top     = 0.0d0
+        dTdr_Bottom  = 0.0d0
+        C10_bottom = 0.0d0
+        C10_top = 0.0d0
+        C11_bottom = 0.0d0
+        C11_top = 0.0d0
+        C1m1_bottom = 0.0d0
+        C1m1_top = 0.0d0
+        Br_bottom = 0.0d0
+        Dipole_Tilt_Degrees = 0.0d0
+
+        Strict_L_Conservation = .false.
+        no_slip_boundaries = .false. 
+    End Subroutine Restore_BoundaryCondition_Defaults
 End Module BoundaryConditions
