@@ -181,4 +181,49 @@ Contains
 		coeff = coeff_top*(ref%density/ref%density(1))**coeff_power
 		dln = coeff_power*ref%dlnrho
 	End Subroutine Vary_With_Density
+
+    Subroutine Restore_Transport_Defaults
+        Implicit None
+
+	    If (Allocated(nu))       DeAllocate(nu)
+        If (Allocated(kappa))    DeAllocate(kappa)
+        If (Allocated(eta))      DeAllocate(eta)
+        If (Allocated(dlnu))     DeAllocate(dlnu)
+        If (Allocated(dlnkappa)) DeAllocate(dlnkappa)
+        If (Allocated(dlneta))   DeAllocate(dlneta)
+
+	    If (allocated  (W_Diffusion_Coefs_0)) DeAllocate( W_Diffusion_Coefs_0)
+        If (allocated  (W_Diffusion_Coefs_1)) DeAllocate( W_Diffusion_Coefs_1)
+
+        If (allocated (dW_Diffusion_Coefs_0)) DeAllocate(dW_Diffusion_Coefs_0)
+        If (allocated (dw_Diffusion_Coefs_1)) DeAllocate(dW_Diffusion_Coefs_1)
+        If (allocated (dW_diffusion_coefs_2)) DeAllocate(dW_Diffusion_Coefs_2)
+
+        If (allocated(S_Diffusion_Coefs_1)) DeAllocate(S_Diffusion_Coefs_1)
+        
+        If (allocated(Z_Diffusion_Coefs_1)) DeAllocate(Z_Diffusion_Coefs_1)
+        If (allocated(Z_Diffusion_Coefs_0)) DeAllocate(Z_Diffusion_Coefs_0)
+        
+        If (allocated(A_Diffusion_Coefs_1)) DeAllocate(A_Diffusion_Coefs_1)
+
+
+        kappa_type =1
+        nu_type = 1
+        eta_type = 1
+
+        nu_top = 1.0d0
+        kappa_top = 1.0d0
+        eta_top = 1.0d0
+
+        nu_power = 0
+        eta_power = 0
+        kappa_power = 0
+
+        eta_amp = 1.0d0
+
+        custom_eta_file = 'nothing'
+        custom_nu_file = 'nothing'
+        custom_kappa_file = 'nothing'
+
+    End Subroutine Restore_Transport_Defaults
 End Module TransportCoefficients

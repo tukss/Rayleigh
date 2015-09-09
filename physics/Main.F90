@@ -14,7 +14,7 @@ Program Main
 	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Use Timers
     Use Fourier_Transform, Only : Initialize_FFTs
-    Use Benchmarking, Only : Initialize_Benchmarking
+    Use Benchmarking, Only : Initialize_Benchmarking, Benchmark_Input_Reset
 	Implicit None
 
     Call Main_MPI_Init(global_rank)    !Initialize MPI
@@ -23,7 +23,7 @@ Program Main
 
 
 	Call Main_Input()
-	
+	Call Benchmark_Input_Reset() ! Sets run parameters to benchmark parameters if benchmark_mode .ge. 0
 
 	If (test_mode) Then
 		Call Init_ProblemSize()

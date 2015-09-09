@@ -246,12 +246,17 @@ Contains
         Call Shell_Slices%Shell_Balance()
         Call Shell_Spectra%Shell_Balance()
         if (my_row_rank .eq. 0) Then
-            master_rank = shell_slices%shell_r_ids(1)
-            Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
+
+            If (Shell_Slices%nshell_r_ids .gt. 0) Then
+                master_rank = shell_slices%shell_r_ids(1)
+                Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
+            Endif
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
 
-            master_rank = shell_spectra%shell_r_ids(1)
-            Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
+            If (Shell_Slices%nshell_r_ids .gt. 0) Then
+                master_rank = shell_spectra%shell_r_ids(1)
+                Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
+            Endif
         Endif
         
         If (Shell_Spectra%nlevels .gt. 0) Then
@@ -1558,6 +1563,7 @@ Contains
         !if (pid .eq. 0) Then
             !NOTE:  Later, we may want to do this only on the master node later, but this isn't a huge memory issue
             Allocate(self%oqvals(1:self%nq))
+            self%oqvals(:) = nqmax+100
         !Endif
     End Subroutine Initialize_Diagnostic_Info
     Subroutine AdvanceInd(self)
