@@ -443,8 +443,9 @@ Contains
         ref%dsdr(:) = ref_arr(:,4)
         ref%entropy(:) = 0.0
         ref%gravity(:) = ref_arr(:,5)
+        ref%dlnT(:) = ref_arr(:,6)   
         ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
-        ref%dlnT(:) = ref_arr(:,6)                
+             
 
         ref%dlnrho(:) = ref_arr(:,7)
         
