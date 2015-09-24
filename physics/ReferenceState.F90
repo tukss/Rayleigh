@@ -420,6 +420,7 @@ Contains
         s_conductive = s_conductive-s_conductive(1)
         s_conductive = s_conductive/s_conductive(N_R)
         DeAllocate(integrand)
+        Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference
 
     Subroutine Get_Custom_Reference2()
@@ -479,6 +480,7 @@ Contains
         s_conductive = s_conductive-s_conductive(1)
         s_conductive = s_conductive/s_conductive(N_R)
         DeAllocate(integrand)
+        Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference2    
     
 
