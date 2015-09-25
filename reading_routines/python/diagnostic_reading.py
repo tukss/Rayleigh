@@ -560,3 +560,58 @@ def TimeAvg_AZAverages(file_list,ofile):
     tfinal.tofile(fd)
     ifinal.tofile(fd)
     fd.close()
+
+def TimeAvg_ShellAverages(file_list,ofile):
+    nfiles = len(file_list)
+    #   We read the first file, assume that nrec doesn't change
+    #   and use the nrecs + nq in the file to create our combined array
+    #print file_list
+    a = ShellAverage(file_list[0], path = '')
+    nfiles = len(file_list)
+
+
+    nr = a.nr
+    nq = a.nq
+    tmp = np.zeros((nr,nq),dtype='float64')
+    simtime   = np.zeros(1,dtype='float64')
+    iteration = np.zeros(1,dtype='int32')
+    icount = np.zeros(1,dtype='int32')
+    ifinal = np.zeros(1,dtype='int32')
+    tfinal = np.zeros(1,dtype='float64')
+    icount[0] = 0
+    i0 = a.iters[0]
+    t0 = a.time[0]
+    for i in range(0,nfiles):
+        the_file = file_list[i]
+        b = ShellAverage(the_file,path='')
+        nrec = b.niter
+        for j in range(nrec):
+            tmp[0:nr,0:nq] += b.vals[0:nr,0:nq,j].astype('float64')
+
+            tfinal[0] = b.time[j]
+            ifinal[0] = b.iters[j]
+            icount[0] = icount[0]+1
+    div = np.float(icount[0])
+    tmp = tmp/div
+
+    # We open the file that we want to store the compiled time traces into and write a header
+    fd = open(ofile,'wb') #w = write, b = binary
+    dims = np.zeros(5,dtype='int32')
+    dims[0] = 314
+    dims[1] = a.version
+    dims[2] = 1
+    dims[3] = a.nr
+    dims[4] = a.nq
+    dims.tofile(fd)
+    a.qv.tofile(fd)
+    a.radius.tofile(fd)
+
+
+    test = np.transpose(tmp)
+    test.tofile(fd)
+    t0.tofile(fd)
+    i0.tofile(fd)
+    # The final structure is identical to a normal az_average file save for the fact that final iteration adn final time are saved
+    tfinal.tofile(fd)
+    ifinal.tofile(fd)
+    fd.close()
