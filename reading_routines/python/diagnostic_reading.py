@@ -615,3 +615,21 @@ def TimeAvg_ShellAverages(file_list,ofile):
     tfinal.tofile(fd)
     ifinal.tofile(fd)
     fd.close()
+
+def integrate_dr(radius,f):
+    n_r = len(radius)
+    weight = np.zeros(n_r,dtype='float64')
+    fpr = np.zeros(n_r,dtype='float64')
+    weight[:] = 1.0
+    fpr[:] = 1.0
+    dr = 0.5*(radius[0]-radius[1])
+    intf = dr*f[0]*fpr[0]*weight[0]
+    dr = 0.5*(radius[n_r-2]-radius[n_r-1])*fpr[n_r-1]
+    intf = intf+dr*f[n_r-1]*weight[n_r-1]
+
+    for i in range(1,n_r-1):
+        dr0 = 0.5*(radius[i]-radius[i+1])
+        dr1 = 0.5*(radius[i-1]- radius[i])
+        intf = intf+(dr1+dr0)*f[i]*fpr[i]*weight[i]
+    return intf
+
