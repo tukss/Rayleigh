@@ -529,19 +529,14 @@ Contains
 				r = N_R
 				Call Load_BC(lp,r,weq,wvar,one,0)
 
-		
-                If (no_slip_boundaries) Then		
-				! No Slip Top and Bottom
-				! Z and dWdr vanish at the boundaries
+
+                If (no_slip_top) Then
                     r = 1
 
                     Call Load_BC(lp,r,zeq,zvar,one,0)
 				    Call Load_BC(lp,r,peq,wvar,one,1)
-				    r = N_R
-				    Call Load_BC(lp,r,peq,wvar,one,1)
-				    Call Load_BC(lp,r,zeq,zvar,one,0)
                 Else
-                    ! stress-free boundaries
+                    ! Else stress-free
                     r = 1
                     samp = -(2.0d0/radius(r)+ref%dlnrho(r))
                     Call Load_BC(lp,r,peq,wvar,one,2)
@@ -550,8 +545,15 @@ Contains
 
                     Call Load_BC(lp,r,zeq,zvar,one,1)
                     Call Load_BC(lp,r,zeq,zvar,samp,0)
+                Endif
 
+                If (no_slip_bottom) Then
+				    r = N_R
+				    Call Load_BC(lp,r,peq,wvar,one,1)
+				    Call Load_BC(lp,r,zeq,zvar,one,0)
 
+                Else
+                    !stress_free_bottom
                     r = N_R
                     samp = -(2.0d0/radius(r)+ref%dlnrho(r))
                     Call Load_BC(lp,r,peq,wvar,one,2)
@@ -559,6 +561,36 @@ Contains
                     Call Load_BC(lp,r,zeq,zvar,one,1)
                     Call Load_BC(lp,r,zeq,zvar,samp,0)
                 Endif
+		
+                !If (no_slip_boundaries) Then		
+				! No Slip Top and Bottom
+				! Z and dWdr vanish at the boundaries
+                !    r = 1
+
+                !    Call Load_BC(lp,r,zeq,zvar,one,0)
+				!    Call Load_BC(lp,r,peq,wvar,one,1)
+				!    r = N_R
+				!    Call Load_BC(lp,r,peq,wvar,one,1)
+				!    Call Load_BC(lp,r,zeq,zvar,one,0)
+                !Else
+                    ! stress-free boundaries
+                !    r = 1
+                !    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                !    Call Load_BC(lp,r,peq,wvar,one,2)
+                !    Call Load_BC(lp,r,peq,wvar,samp,1)
+
+
+                !    Call Load_BC(lp,r,zeq,zvar,one,1)
+                !    Call Load_BC(lp,r,zeq,zvar,samp,0)
+
+
+                !    r = N_R
+                !    samp = -(2.0d0/radius(r)+ref%dlnrho(r))
+                !    Call Load_BC(lp,r,peq,wvar,one,2)
+                !    Call Load_BC(lp,r,peq,wvar,samp,1)
+                !    Call Load_BC(lp,r,zeq,zvar,one,1)
+                !    Call Load_BC(lp,r,zeq,zvar,samp,0)
+                !Endif
                 If ((l .eq. 1) .and. (strict_L_Conservation) ) then
                    !    write(6,*)'Conserving Angular Momentum'
                     Call Clear_Row(zeq,lp,1)

@@ -33,12 +33,15 @@ Module BoundaryConditions
 
     Logical :: Strict_L_Conservation = .false.         ! (In-Progress) Turn on to enforce angular momentum conservation abous x,y, and z-axes
     Logical :: no_slip_boundaries = .false. ! Set to true to use no-slip boundaries.  Stree-free boundaries are the default.
+    Logical :: stress_free_top = .true., stress_free_bottom = .true.
+    Logical :: no_slip_top = .false., no_slip_bottom = .false.
+
 
     Namelist /Boundary_Conditions_Namelist/ Fix_Tvar_Top, Fix_Tvar_Bottom, T_Bottom, T_Top, dTdr_top, dTdr_bottom, &
         fix_dtdr_bottom, fix_dtdr_top, fix_divrt_top, fix_divt_top, fix_divrfc_top, fix_divfc_top, &
         no_slip_boundaries, strict_L_Conservation, fix_poloidalfield_top, fix_poloidalfield_bottom, &
         C10_bottom, C10_top, C11_bottom, C11_top, C1m1_bottom, C1m1_top, Br_bottom, &
-        dipole_tilt_degrees, impose_dipole_field, fix_tdt_bottom
+        dipole_tilt_degrees, impose_dipole_field, fix_tdt_bottom, no_slip_top, no_slip_bottom
 
 Contains
 
@@ -46,6 +49,20 @@ Contains
         Implicit None
         Real*8 :: tilt_angle_radians,a,b
         Real*8 :: fsun
+        If (no_slip_boundaries) Then
+            no_slip_top = .true.
+            no_slip_bottom = .true.
+        Endif
+        If (no_slip_top) Then
+            stress_free_top = .false.
+        Else
+            stress_free_top = .true.
+        Endif
+        If (no_slip_bottom) Then
+            stress_free_bottom = .false.
+        Else
+            stress_free_bottom = .true.
+        Endif
         If (impose_dipole_field) Then
             fix_poloidalfield_top = .true.
             fix_poloidalfield_bottom = .true.
