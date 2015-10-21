@@ -1,3 +1,4 @@
+!Rayleigh's main program
 Program Main
     Use MakeDir
     Use Controls
@@ -16,7 +17,7 @@ Program Main
     Use Fourier_Transform, Only : Initialize_FFTs
     Use Benchmarking, Only : Initialize_Benchmarking, Benchmark_Input_Reset
 	Implicit None
-
+    
     Call Main_MPI_Init(global_rank)    !Initialize MPI
 
     Call Check_Run_Mode()   !This needs to be done before ever reading main input
