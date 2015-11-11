@@ -516,6 +516,13 @@ Contains
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
+        If (finite_element) Then
+            Call tempfield%construct('p1a')
+            Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
+            Call tempfield%deconstruct('p1a')
+        Endif
+
         ! Set temperature.  Leave the other fields alone
         Call Set_RHS(teq,tempfield%p1b(:,:,:,1))
 

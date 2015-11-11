@@ -81,6 +81,7 @@ Contains
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
             Else If (finite_element) Then
+                !write(6,*)'Calling post solve FE'
                 Call Post_Solve_FE
 			Else
 				Call Post_Solve()	! Linear Solve configuration

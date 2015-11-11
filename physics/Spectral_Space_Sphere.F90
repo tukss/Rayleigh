@@ -377,7 +377,10 @@ Contains
 		!!!DDDD Write(6,*)'I am getting the new rhs: ', my_rank
 		Call Get_All_RHS(wsp%p1a)
         
+        !Write(6,*)'MAXVAL:  ', maxval(wsp%p1a)
+        !Write(6,*)'MINVAL:  ', minval(wsp%p1a)
 		! de-alias  each subdomain
+
         jstart = (2*fencheby)/3  ! might play with de-aliasing type...
         jend = fencheby
         Do j = 1, fensub
@@ -385,7 +388,6 @@ Contains
             jstart = jstart+fencheby
             jend = jend+fencheby
         Enddo
-		! This is terribly inefficient, but I just want to test the stability of Chebyshev vs. FD for not..
 		! We'll create a new buffer.  ctemp
 		! Store all the permanent derivatives there - in c space
 		ctemp%nf1a = 4
@@ -435,7 +437,13 @@ Contains
             ctemp%p1a(jstart:jend,:,:,:) = 0.0d0
         Enddo
 
+        !Do m = my_lm_min, my_lm_max
+        !    If (l_lm_values(m) .eq. 0) Then
+        !        Write(6,*)'tvar 0 (A):   ', wsp%p1a(:,:,m,tvar)
+        !    Endif
+        !Enddo
 		Call Cheby_From_SpectralFE(ctemp%p1a,ctemp%p1b)
+
 
 		Call Add_Derivative(peq,wvar,3,wsp%p1b,ctemp%p1b,1)
 		Call Add_Derivative(weq,pvar,1,wsp%p1b,ctemp%p1b,2)
@@ -462,6 +470,17 @@ Contains
 
 		wsp%p1a(:,:,:,:) = 0.0d0	! Shouldn't need to do this, but just to be sure
 		Call Cheby_From_SpectralFE(ctemp%p1a,wsp%p1a)
+
+
+        !Write(6,*)'MAXVAL2:  ', maxval(wsp%p1a)
+        !Write(6,*)'MINVAL2:  ', minval(wsp%p1a)
+        !Do m = my_lm_min, my_lm_max
+        !    If (l_lm_values(m) .eq. 0) Then
+        !        Write(6,*)'tvar 0 (Post):   ', wsp%p1a(:,:,m,tvar)
+        !    Endif
+        !Enddo
+
+
 		Call ctemp%deconstruct('p1a')
 
 		!/////////////////////////////////////////////////////////////////
