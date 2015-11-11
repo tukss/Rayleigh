@@ -239,7 +239,7 @@ Contains
 			Enddo
 
         Else If (finite_element) Then
-            Write(6,*)"Initializing grid..."
+            !Write(6,*)"Initializing grid..."
             Allocate(xtemp(1:fencheby))
             Allocate(weight_Temp(1:fencheby))
             dsub = (rmax-rmin)/DBLE(fensub)
