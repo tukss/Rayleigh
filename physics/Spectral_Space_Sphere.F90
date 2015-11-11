@@ -589,7 +589,7 @@ Contains
 		Integer m, i,j,jstart,jend
 		! we need to take one last radial derivative and combine terms
 
-		If (chebyshev) Then
+		If (chebyshev .or. finite_element) Then
 			! Again, terribly inefficient, but we are looking to check the MHD right now.
 			! Will optimize this later.
 			ctemp%nf1a = 2
