@@ -620,7 +620,7 @@ Contains
 
                         Call FEContinuity(ceq,lp,cvar,fencheby,0)   ! C is continuous
                         Call FEContinuity(ceq,lp,cvar,1,1)          ! C' is continuous
- 
+                        !Call FEContinuity(ceq,lp,cvar,2,2)          ! C'' is continuous
                     Endif
 
 					! Match to a potential field at top and bottom
@@ -816,6 +816,7 @@ Contains
                 Do j = fencheby+1, N_R-1, fencheby
                     equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
                     equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                    !equation_set(1,ceq)%RHS(      j+1,: , indx:indx+n_m) = 0.0d0
                 Enddo
                 endif
             Endif

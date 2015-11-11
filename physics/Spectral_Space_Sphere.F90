@@ -422,6 +422,7 @@ Contains
 			Call d_by_dr_cpFE(avar,dadr  ,wsp%p1a,1)
 			Call d_by_dr_cpFE(cvar,dcdr  ,wsp%p1a,1)
 			Call d_by_dr_cpFE(cvar,d2cdr2,wsp%p1a,2)
+            !wsp%p1a(:,:,:,d2cdr2) = 0.0d0 ! DEBUG
 		Endif
 
 		!//////////////////////////////////////////////////////////////////////////
@@ -617,7 +618,7 @@ Contains
                     jend = jend+fencheby
                 Enddo
     			Call Cheby_From_SpectralFE(ctemp%p1b,ctemp%p1a)
-
+                !Write(6,*)'Checking: ', maxval(ctemp%p1a), minval(ctemp%p1a)
             Else
     			Call Cheby_To_Spectral(ctemp%p1a,ctemp%p1b)
     			Call d_by_dr_cp(1,2,ctemp%p1b,1)

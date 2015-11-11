@@ -647,6 +647,7 @@ Contains
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
             If (finite_element) Then
+                !write(6,*)'I am in the right routine'
                 Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
             Else
                 Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)

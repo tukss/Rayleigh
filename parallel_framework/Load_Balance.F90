@@ -108,7 +108,7 @@ Contains
         ! Does not have to be m's.  Can be any index
         Implicit None
         Type(Load_Config), Intent(InOut) :: lb_in(0:)
-        Type(Communicator), Intent(Out) :: comm
+        Type(Communicator), Intent(In) :: comm
         Logical :: found 
         Integer, Intent(InOut) :: m_values(1:)
         Integer :: n_m, ind, dpair,k

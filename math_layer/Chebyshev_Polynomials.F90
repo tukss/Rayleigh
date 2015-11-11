@@ -959,16 +959,20 @@ Contains
 	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
 		Integer, Intent(In) :: rind,row, col, dorder, nglobal
 		Integer :: n, off1, off2, r, rstart,rmod, extra, rind1, rind2
+        Integer :: del1, del2
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
 
-
+        del1 = rind-1
+        del2 = n_max - rind
 
         ! We'll either be doing index 1 (within a subdomain) or index N_max
-        if (rind .eq. 1) Then
-            rstart = N_max+1
+        !if (rind .eq. 1) Then
+        If (del1 .lt. del2) Then
+            rstart = N_max+ rind !1
+            !write(6,*)'rstart is: ', rstart, rind
             extra = -N_max      ! We link current domain and previous domain (domain to the left)
         else
-            rstart = N_max
+            rstart = rind !N_max
             extra = 0   ! Link current domain and next domain (to the right)
         endif
         Do r = rstart, nglobal-1, N_max  ! explicitly leave out the boundaries
@@ -992,7 +996,6 @@ Contains
 		    Enddo
         Enddo
 	End Subroutine Cheby_Continuity
-
 
 	Subroutine From_SpectralFE_4D(c_in,f_out)
 		Implicit None

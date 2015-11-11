@@ -787,7 +787,7 @@ Module Linear_Solve
 	    		Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
             Else If (finite_element) Then
 	            Call Load_Single_Row_FECheby(row,rowblock,colblock,amp,dorder,mpointer,&
-                     & clear_Row = .true., boundary = .true.)
+                     &  boundary = .true.)
 		    Else
 			    Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
 		    Endif
