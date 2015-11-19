@@ -39,7 +39,7 @@ Module Diagnostics
     Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
     Integer, Parameter, Private :: J_r = 204, J_theta = 205, J_phi = 206
     Integer, Parameter, Private :: B_sq = 207, magnetic_energy=208, zonal_me = 209
-    Integer, Parameter, Private :: merid_me = 210
+    Integer, Parameter, Private :: merid_me = 210, b_r2 = 211, b_theta2 = 212, b_phi2 = 213
 
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
@@ -555,6 +555,21 @@ Contains
                     Call Add_Quantity(qty)
                 Endif	
 
+                If (compute_quantity(B_r2)) Then
+                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)**2
+                    Call Add_Quantity(qty)
+                Endif		
+
+                If (compute_quantity(B_theta2)) Then
+                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)**2
+                    Call Add_Quantity(qty)
+                Endif		
+
+                If (compute_quantity(b_phi2)) Then
+                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
+                    Call Add_Quantity(qty)
+                Endif	
+
                 If (compute_quantity(J_r)) Then
                     qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jr)
                     Call Add_Quantity(qty)
@@ -650,7 +665,7 @@ Contains
 
         Allocate(rweights(1:n_r))
 
-        If (chebyshev) Then
+        If (chebyshev .or. finite_element) Then
             If (my_rank .eq. 0) Write(6,*)'Integrating using Chebyshev Quadrature'
             rweights = radial_integral_weights
 

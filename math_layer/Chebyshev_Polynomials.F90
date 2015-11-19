@@ -926,7 +926,7 @@ Contains
 
 	End Subroutine Load_Single_Row_FECheby
 
-	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
+	Subroutine Cheby_Continuity0(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
 		Integer, Intent(In) :: rind,row, col, dorder, nglobal
 		Integer :: n, off1, off2, r, rstart,rmod, extra
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
@@ -954,8 +954,48 @@ Contains
                 mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) - dcheby(rmod,n,dorder)
 		    Enddo
         Enddo
-	End Subroutine Cheby_Continuity
+	End Subroutine Cheby_Continuity0
 
+	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
+		Integer, Intent(In) :: rind,row, col, dorder, nglobal
+		Integer :: n, off1, off2, r, rstart,rmod, extra, rind1, rind2
+        Integer :: del1, del2
+		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
+
+        del1 = rind-1
+        del2 = n_max - rind
+
+        ! We'll either be doing index 1 (within a subdomain) or index N_max
+        !if (rind .eq. 1) Then
+        If (del1 .lt. del2) Then
+            rstart = N_max+ rind !1
+            !write(6,*)'rstart is: ', rstart, rind
+            extra = -N_max      ! We link current domain and previous domain (domain to the left)
+        else
+            rstart = rind !N_max
+            extra = 0   ! Link current domain and next domain (to the right)
+        endif
+        Do r = rstart, nglobal-1, N_max  ! explicitly leave out the boundaries
+            
+    		! clear everything in this row
+    		mpointer(r+row,:) = 0.0d0
+            !rmod = MOD(r-1,N_max)+1
+            off1 = N_max*((r-1)/N_max)+extra
+            off2 = off1+N_max
+            if (off1 .lt. off2) then
+                rind1 = n_max
+                rind2 = 1
+            else
+                rind1 = 1
+                rind2 = n_max
+            endif
+            !Write(6,*)"r: ", r, rmod, off1, off2, rind, rstart
+		    Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
+			    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) + dcheby(rind1,n,dorder)
+                mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) - dcheby(rind2,n,dorder)
+		    Enddo
+        Enddo
+	End Subroutine Cheby_Continuity
 
 	Subroutine From_SpectralFE_4D(c_in,f_out)
 		Implicit None

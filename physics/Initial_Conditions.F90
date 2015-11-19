@@ -414,7 +414,7 @@ Contains
         DeAllocate(rfunc1,rfunc2)
 
         Call tempfield%reform() ! goes to p1b
-        If (chebyshev) Then
+        If (chebyshev .or. finite_element) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
             If (finite_element) Then
@@ -516,6 +516,13 @@ Contains
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
+        If (finite_element) Then
+            Call tempfield%construct('p1a')
+            Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
+            Call tempfield%deconstruct('p1a')
+        Endif
+
         ! Set temperature.  Leave the other fields alone
         Call Set_RHS(teq,tempfield%p1b(:,:,:,1))
 
@@ -636,10 +643,11 @@ Contains
         DeAllocate(rfunc1,rfunc2)
 
         Call tempfield%reform() ! goes to p1b
-        If (chebyshev) Then
+        If (chebyshev .or. finite_element) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
             If (finite_element) Then
+                !write(6,*)'I am in the right routine'
                 Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
             Else
                 Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)

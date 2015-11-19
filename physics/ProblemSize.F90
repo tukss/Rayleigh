@@ -221,7 +221,7 @@ Contains
 
         !////////////////////////////////////////
         ! Variables for FE approach
-        Real*8, Allocatable :: xtemp(:)
+        Real*8, Allocatable :: xtemp(:), weight_temp(:)
         Real*8 :: dsub, offset, xmax, xmin
         Integer :: istart, iend
 
@@ -239,18 +239,20 @@ Contains
 			Enddo
 
         Else If (finite_element) Then
-            Write(6,*)"Initializing grid..."
+            !Write(6,*)"Initializing grid..."
             Allocate(xtemp(1:fencheby))
+            Allocate(weight_Temp(1:fencheby))
             dsub = (rmax-rmin)/DBLE(fensub)
             xmin = 0.0d0
             xmax = dsub
             
-            Call Initialize_Chebyshev(xtemp,xmin,xmax,radial_integral_weights, nthr)
+            Call Initialize_Chebyshev(xtemp,xmin,xmax,weight_temp, nthr)
             offset = rmax-xtemp(1)
             istart = 1
             iend = istart+fencheby-1
             Do j = 1, fensub
                 radius(istart:iend) = xtemp(1:fencheby)+offset
+                radial_integral_weights(istart:iend) = weight_temp(1:fencheby)
                 offset = radius(iend)-xtemp(1)
                 istart = istart+fencheby
                 iend = iend+fencheby
@@ -338,12 +340,13 @@ Contains
 			End Select
 		Endif
 
+        If (.not. finite_element) Then
 		! Compute delta_r for CFL
 		do r = N_R-1, 1, -1
 			Delta_r(r) = Radius(r)-Radius(r+1)
 		enddo
 		Delta_r(N_R) = Delta_r(N_R-1) ! Duplicated extra value
-
+        Endif
 
 		Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
 		R_squared       = Radius**2

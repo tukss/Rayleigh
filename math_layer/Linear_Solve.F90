@@ -728,6 +728,45 @@ Module Linear_Solve
 		Endif
 	End Subroutine Save_Derivatives
 
+    Subroutine write_matrix(mode,eqind)
+		Integer, Intent(In) :: mode, eqind
+		Integer :: i, j, nlinks
+        Integer :: sig = 314
+		real*8, Pointer, Dimension(:,:) :: mpointer
+        Character*120 :: filename
+        filename = 'matrix_dump'
+		mpointer => equation_set(mode,eqind)%mpointer
+        nlinks = equation_set(mode,eqind)%nlinks
+        Open(unit=15,file=filename,form='unformatted', status='replace',access='stream')
+        Write(15)sig
+        Write(15)ndim1*nlinks
+        Write(15)ndim1*nlinks
+        Write(15)((mpointer(i,j), i = 1, ndim1*3), j = 1, ndim1*3)
+        Close(15)
+
+    End Subroutine write_matrix
+
+    Subroutine print_row(mode,row,eqind)
+		Integer, Intent(In) :: mode, row, eqind
+		Integer :: rowblock,i 
+		real*8, Pointer, Dimension(:,:) :: mpointer
+		mpointer => equation_set(mode,eqind)%mpointer
+		rowblock = equation_set(mode,eqind)%rowblock        
+        Do i = 1, ndim1*3
+            Write(6,*)i, mpointer(rowblock+row,i)
+        Enddo
+    End Subroutine print_row
+
+    Subroutine print_column(mode,col,eqind)
+		Integer, Intent(In) :: mode, col, eqind
+		Integer :: rowblock,i 
+		real*8, Pointer, Dimension(:,:) :: mpointer
+		mpointer => equation_set(mode,eqind)%mpointer      
+        Do i = 1, ndim1*3
+            Write(6,*)i, mpointer(i,col)
+        Enddo
+    End Subroutine print_column
+
 
 	Subroutine Load_BC(mode,row,eqind,varind,amp,dorder,integral)
 		Implicit None
@@ -747,7 +786,8 @@ Module Linear_Solve
     		If (chebyshev) Then
 	    		Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
             Else If (finite_element) Then
-	    Call Load_Single_Row_FECheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
+	            Call Load_Single_Row_FECheby(row,rowblock,colblock,amp,dorder,mpointer,&
+                     &  boundary = .true.)
 		    Else
 			    Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
 		    Endif

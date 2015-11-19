@@ -355,6 +355,11 @@ Contains
 					Call Band_Arrange(ceq,lp)
                 Endif
             Endif
+        !if (l .eq. 0) Then 
+        !    write(6,*)'//////////////////////////////////////'
+        !    write(6,*)'final!'
+        !    Call write_matrix(lp,weq)
+        !Endif
 		Enddo
 		DeAllocate(amp)
 		DeAllocate(H_Laplacian)
@@ -379,12 +384,11 @@ Contains
 				Call Clear_Row(teq,lp,1)
 				Call Clear_Row(teq,lp,N_R)
                 If (finite_element) Then
-                    Call FEContinuity(peq,lp,pvar,fencheby,0) ! Pressure is continuous
-                    Call FEContinuity(peq,lp,pvar,1,1)   ! dPdr is continuous (for ell = 0)
+                    Call FEContinuity(peq,lp,pvar,1,0) ! Pressure is continuous
+                    !Call FEContinuity(peq,lp,pvar,fencheby,1)   ! dPdr is continuous (for ell = 0)
 
                     Call FEContinuity(teq,lp,tvar,fencheby,0) ! T/S is continuous
                     Call FEContinuity(teq,lp,tvar,1,1)   ! T' / S' is continuous (for ell = 0)
-
                 Endif
 
 				!*******************************************************
@@ -394,6 +398,8 @@ Contains
 				r = 1
                 If (fix_tvar_top) Then
     				Call Load_BC(lp,r,teq,tvar,one,0)	!upper boundary
+                    !Call print_row(lp,12,peq)
+                    !Call print_column(lp,65,peq)
                 Endif
                 If (fix_dtdr_top) Then
                     Call Load_BC(lp,r,teq,tvar,one,1)	
@@ -614,7 +620,7 @@ Contains
 
                         Call FEContinuity(ceq,lp,cvar,fencheby,0)   ! C is continuous
                         Call FEContinuity(ceq,lp,cvar,1,1)          ! C' is continuous
- 
+                        !Call FEContinuity(ceq,lp,cvar,2,2)          ! C'' is continuous
                     Endif
 
 					! Match to a potential field at top and bottom
@@ -657,7 +663,6 @@ Contains
 
 			Endif ! l = 0 or not
 		!Enddo
-
 
 	End Subroutine Set_Boundary_Conditions
 
@@ -783,9 +788,12 @@ Contains
             
             Do j = fencheby, N_R-1, fencheby
                 equation_set(1,weq)%RHS(      j, : , indx:indx+n_m) = 0.0d0
-                equation_set(1,weq)%RHS(N_R  +j, : , indx:indx+n_m) = 0.0d0
+
                 equation_set(1,weq)%RHS(2*N_R+j, : , indx:indx+n_m) = 0.0d0
-                if (l .ne. 0) equation_set(1,zeq)%RHS(      j, : , indx:indx+n_m) = 0.0d0
+                if (l .ne. 0) then 
+                    equation_set(1,zeq)%RHS(      j, : , indx:indx+n_m) = 0.0d0
+                    equation_set(1,weq)%RHS(N_R  +j, : , indx:indx+n_m) = 0.0d0 ! dpdr continuity - only for ell =/ 0
+                endif
             Enddo
             If (Magnetism) Then
                 if (l .ne. 0) then
@@ -801,12 +809,14 @@ Contains
                 equation_set(1,weq)%RHS(N_R+j  ,: , indx:indx+n_m) = 0.0d0
                 equation_set(1,weq)%RHS(2*N_R+j,: , indx:indx+n_m) = 0.0d0
                 if (l .ne. 0) equation_set(1,zeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+
             Enddo
             If (Magnetism) Then
                 if (l .ne. 0) then
                 Do j = fencheby+1, N_R-1, fencheby
                     equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
                     equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                    !equation_set(1,ceq)%RHS(      j+1,: , indx:indx+n_m) = 0.0d0
                 Enddo
                 endif
             Endif

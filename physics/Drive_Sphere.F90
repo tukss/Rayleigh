@@ -59,14 +59,14 @@ Contains
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
 		last_iteration = first_iteration + max_iterations-1
 		Call Initialize_TimeStepping(first_iteration)
-		If (chebyshev .or. magnetism) Then
+		If ((chebyshev .or. magnetism) .or. finite_element) Then
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
-		If (finite_element) Then
+		!If (finite_element) Then
 			! work structure for post_solveFE (same as above)
-			Call ctemp%init(field_count = wsfcount, config = 'p1b')
-		Endif
+		!	Call ctemp%init(field_count = wsfcount, config = 'p1b')
+		!Endif
 
 
 		Call Hybrid_Init()
@@ -81,6 +81,7 @@ Contains
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
             Else If (finite_element) Then
+                !write(6,*)'Calling post solve FE'
                 Call Post_Solve_FE
 			Else
 				Call Post_Solve()	! Linear Solve configuration
