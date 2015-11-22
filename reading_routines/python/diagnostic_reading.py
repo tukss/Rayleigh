@@ -160,7 +160,14 @@ class ShellAverage:
     self.nr                            : number of radial points
     self.qv[0:nq-1]                    : quantity codes for the diagnostics output
     self.radius[0:nr-1]                : radial grid
-    self.vals[0:nr-1,0:nq-1,0:niter-1] : The spherically averaged diagnostics 
+
+    For version 1:
+    self.vals[0:nr-1,0:nq-1,0:niter-1] : The spherically averaged diagnostics
+                                             
+
+    For version 2:
+    self.vals[0:nr-1,0:3,0:nq-1,0:niter-1] : The spherically averaged diagnostics
+                                             0-3 refers to moments (index 0 is mean, index 3 is kurtosis)    
     self.iters[0:niter-1]              : The time step numbers stored in this output file
     self.time[0:niter-1]               : The simulation time corresponding to each time step
     self.version                       : The version code for this particular output (internal use)
@@ -188,14 +195,20 @@ class ShellAverage:
         self.nr = nr
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
-
-        self.vals  = np.zeros((nr,nq,nrec),dtype='float64')
+        if (self.version == 1):
+            self.vals  = np.zeros((nr,nq,nrec),dtype='float64')
+        if (self.version == 2):
+            self.vals  = np.zeros((nr,4,nq,nrec),dtype='float64')
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
 
         for i in range(nrec):
-            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
-            self.vals[:,:,i] = tmp
+            if (self.version == 1):
+                tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
+                self.vals[:,:,i] = tmp
+            if (self.version == 2):
+                tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*4,swap=bs),(nr,4,nq), order = 'F')
+                self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
         maxq = 250
