@@ -30,7 +30,8 @@ Module Diagnostics
     Integer, Parameter, Private :: amom_fluct_r = 25, amom_fluct_theta = 26, &
          amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
 
-
+    !Viscous Fluxes
+    Integer, Parameter, Private :: visc_flux_r = 31
          
 
     ! We have some "known" outputs as well that allow us to verify that
@@ -143,6 +144,72 @@ Contains
             !   computed averages are used for moments in the shell_average output
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
+
+            If (compute_quantity(visc_flux_r)) Then
+                !- v dot D |_r
+                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+                !Radial contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = buffer(p,r,t,vr)*ref%dlnrho(r)/3.0d0+buffer(p,r,t,dvrdr)
+                            qty(p,r,t) = qty(p,r,t)*buffer(p,r,t,vr)*2.0d0
+                        Enddo
+                    Enddo
+                Enddo
+
+                !Theta contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvtdr)-buffer(p,r,t,vtheta)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdt)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vtheta)
+                        Enddo
+                    Enddo
+                Enddo                
+
+
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
+                        Enddo
+                    Enddo
+                Enddo
+
+                !phi contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvpdr)-buffer(p,r,t,vphi)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdp)/radius(r)/sintheta(t)
+                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vphi)
+                        Enddo
+                    Enddo
+                Enddo                
+
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
+                        Enddo
+                    Enddo
+                Enddo
+
+                !Multiply by rho and nu
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)*nu(r)*ref%density(r)                            
+                        Enddo
+                    Enddo
+                Enddo
+                Call Add_Quantity(qty)
+                DeAllocate(tmp1)
+            Endif
 
             If (compute_quantity(v_r)) Then
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
