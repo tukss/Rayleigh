@@ -164,6 +164,49 @@ Contains
     End Subroutine DALLSUM1D
 
     !/////////////////////////////////////////////////////////////////////
+    ! SUBROUTINE:  DSUM3D
+    !
+    ! DESCRIPTION:  Performs MPI REDUCE (SUM) of 3-D array 
+    !                 sendbuf across grp.  Results are stored in rank ddest.
+    !
+    ! INPUTS:
+    !            sendbuf - 3-D double-precision array to SUM across grp
+    !                grp - MPI communicator across which the REDUCE is conducted 
+    !                       (optional; default = MPI_COMM_WORLD)
+    !              ddest - MPI rank within grp that stores the results of the REDUCE operation
+    ! OUTPUTS:
+    !
+    !           recvbuf - 3-D double-precision array that stores the result 
+    !                       of the REDUCE on rank ddest
+    !///////////////////////////////////////////////////////////////////// 
+    Subroutine DSUM3D(sendbuf, recvbuf, grp, ddest)
+        Real*8, Intent(In)  :: sendbuf(:,:,:)
+        Real*8, Intent(Out) :: recvbuf(:,:,:)
+        Type(communicator), Optional  :: grp
+        Integer, Intent(In), Optional :: ddest
+        Integer :: icount,  comm, MPI_err, dest
+
+        If (present(ddest)) then
+            dest = ddest
+        Else
+            dest = 0
+        Endif
+
+        icount = size(sendbuf)
+
+        If (Present(grp)) Then
+            comm = grp%comm
+        Else
+            comm = MPI_COMM_WORLD
+        End If
+
+
+        Call MPI_REDUCE(sendbuf, recvbuf, icount, MPI_DOUBLE_PRECISION, MPI_SUM, dest, comm, MPI_err)
+
+    End Subroutine DSUM3D
+
+
+    !/////////////////////////////////////////////////////////////////////
     ! SUBROUTINE:  DSUM2D
     !
     ! DESCRIPTION:  Performs MPI REDUCE (SUM) of 2-D array 

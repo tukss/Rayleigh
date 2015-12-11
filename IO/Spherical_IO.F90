@@ -26,7 +26,7 @@ Module Spherical_IO
   
     Integer, Parameter :: shellslice_version = 1
     Integer, Parameter :: azavg_version = 1
-    Integer, Parameter :: shellavg_version = 1
+    Integer, Parameter :: shellavg_version = 2
     Integer, Parameter :: globalavg_version = 1
     Integer, Parameter :: shellspectra_version = 1
     Integer, Parameter :: full3d_version = 1    !currently unused
@@ -131,7 +131,7 @@ Module Spherical_IO
     Integer :: integer_zero = 0
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
-    Real*8, Private, Allocatable :: shellav_outputs(:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
+    Real*8, Private, Allocatable :: shellav_outputs(:,:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
     type(SphericalBuffer) :: spectra_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
@@ -154,6 +154,15 @@ Module Spherical_IO
     Integer, Private :: nproc1, nproc2, myid, nproc, my_row_rank, my_column_rank, my_nr
     Real*8, Allocatable, Private :: radius(:),sintheta(:),costheta(:) 
     Real*8 :: over_nphi_double
+
+    !////////////////////////////////////////////////////////////
+    ! And here are some variables used for storing averages so that moments may be taken
+    ! These two arrays contain the ell0 and m0 representation of all quantities
+    !   computed in shell- and (eventually) azimuthal- averaging.
+    ! These two averages are used to compute moments
+    Real*8, Private, Allocatable :: IOell0_values(:,:), IOm0_values(:,:,:)
+    Integer, Private :: num_avg_store ! number of averages to store in the two arrays above
+    Integer, Private :: IOavg_flag = -1
 Contains
 
     Subroutine Begin_Outputting(iter)
@@ -169,6 +178,12 @@ Contains
 
         Allocate(f_of_r_theta(my_rmin:my_rmax,my_theta_min:my_theta_max))
         Allocate(f_of_r(my_rmin:my_rmax))
+
+        num_avg_store = shell_averages%nq
+        Allocate(IOm0_values(my_rmin:my_rmax,my_theta_min:my_theta_max,1:num_avg_store))
+        Allocate(IOell0_values(my_rmin:my_rmax,1:num_avg_store))
+        IOm0_values(:,:,:) = 0.0d0
+        IOell0_values(:,:) = 0.0d0
     End Subroutine Begin_Outputting
 
 
@@ -883,15 +898,24 @@ Contains
         Logical             :: yesno 
         current_qval = qval
         yesno = .false.
-        If (compute_q(qval) .eq. 1) Then
-            ! We check all diagnostic types and their respective frequencies
-            ! While doing so, we modify the averaging level
-            Call Full_3D%getq_now(yesno)
-            Call Shell_Slices%getq_now(yesno)
-            Call Shell_Spectra%getq_now(yesno)
-            Call AZ_Averages%getq_now(yesno)
-            Call Shell_Averages%getq_now(yesno)
-            Call Global_Averages%getq_now(yesno)
+
+        If (IOAvg_Flag .eq. 1) Then
+            ! We check only the shell_averages so we can compute averages for moments
+            If (Shell_Averages%compute(qval) .eq. 1) Then
+                Call Shell_Averages%getq_now(yesno)
+            Endif
+        Else
+            ! Otherwise, check everything - normal output
+            If (compute_q(qval) .eq. 1) Then
+                ! We check all diagnostic types and their respective frequencies
+                ! While doing so, we modify the averaging level
+                Call Full_3D%getq_now(yesno)
+                Call Shell_Slices%getq_now(yesno)
+                Call Shell_Spectra%getq_now(yesno)
+                Call AZ_Averages%getq_now(yesno)
+                Call Shell_Averages%getq_now(yesno)
+                Call Global_Averages%getq_now(yesno)
+            Endif
         Endif
     End function Compute_quantity
 
@@ -909,17 +933,32 @@ Contains
          If (Mod(iter,Full_3D%Frequency) .eq. 0) yesno = .true.
     End function Time_To_Output
 
+    Subroutine Finalize_Averages()
+        ! Use the azimuthal averages to compute the ell=0 mean
+        Call IOComputeEll0(IOm0_values,IOell0_values)
+        Call Shell_Averages%reset() !need to reset the index counter
+    End Subroutine Finalize_Averages
+    Subroutine Set_Avg_Flag(flag_val)
+        Integer, Intent(In) :: flag_val
+        IOavg_flag = flag_val
+    End Subroutine Set_Avg_Flag
 	Subroutine Add_Quantity(qty)
 		Implicit None
 		Real*8, Intent(In) :: qty(:,:,:)
 
+        If (IOavg_flag .eq. 1) Then
+            !Compute and store the azimuthal average of qty
+            If (shell_averages%grab_this_q) Then
+                Call IOComputeM0(qty)
+            Endif
+        Else
 
-		If (Shell_Slices%grab_this_q) Call get_shell_slice(qty)
-		If (Shell_Spectra%grab_this_q) Call get_shell_spectra(qty)
-        Call Get_Averages(qty)
+		    If (Shell_Slices%grab_this_q) Call get_shell_slice(qty)
+		    If (Shell_Spectra%grab_this_q) Call get_shell_spectra(qty)
+            Call Get_Averages(qty)
 
-		If (full_3d%grab_this_q) Call write_full_3d(qty)
-
+		    If (full_3d%grab_this_q) Call write_full_3d(qty)
+        Endif
 		
 
 
@@ -938,43 +977,17 @@ Contains
 
         DeAllocate(f_of_r_theta)
         DeAllocate(f_of_r)
+        DeAllocate(IOm0_values)
+        DeAllocate(IOell0_values)
 	End Subroutine Complete_Output
-
-	Subroutine Get_Azimuthal_Average(qty)
-		Implicit None
-		Integer :: r, t, nq_azav, azav_ind
-		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
-        nq_azav = AZ_Averages%nq
-		If (AZ_Averages%begin_output) Then
-			Allocate(azav_outputs(my_rmin:my_rmax,my_theta_min:my_theta_max,1:AZ_Averages%nq))
-		Endif
-		azav_ind = AZ_Averages%ind
-		f_of_r_theta(:,:) = 0.0D0
-		
-		Do t = my_theta_min, my_theta_max
-			Do r = my_rmin, my_rmax
-				f_of_r_theta(r,t) = sum(qty(:,r,t))
-			Enddo
-		Enddo
-
-		!Write(6,*)'my max: ', maxval(f_of_r_theta)
-		f_of_r_theta = f_of_r_theta/dble(nphi)     ! average in phi
-
-		If (AZ_Averages%grab_this_q) Then
-			azav_outputs(:,:,azav_ind) = f_of_r_theta
-            If (myid .eq. 0) AZ_Averages%oqvals(azav_ind) = current_qval
-			Call AZ_Averages%AdvanceInd()
-		Endif
-		
-	END Subroutine Get_Azimuthal_Average
 
 	Subroutine Get_Averages(qty)
         ! Takes azimuthal, shellular, and partial global averages of 3D array qty
 		Implicit None
 		Integer :: azav_ind,shellav_ind, globav_ind
-        Integer :: i, r,t 
-        Real*8 :: this_average
-		Real*8, Intent(In) :: qty(:,my_rmin:,my_theta_min:)
+        Integer :: i, r,t,p,m
+        Real*8 :: this_average, wght
+		Real*8, Intent(In) :: qty(1:,my_rmin:,my_theta_min:)
 
         !//////////////////////////////
         !First the azimuthal average
@@ -988,7 +1001,7 @@ Contains
 			    Enddo
 		    Enddo
 
-		    f_of_r_theta = f_of_r_theta/dble(nphi)     ! average in phi
+		    f_of_r_theta = f_of_r_theta*over_nphi_double     ! average in phi
 
 		    If (AZ_Averages%grab_this_q) Then
                 If (.not. Allocated(azav_outputs)) Then
@@ -1012,11 +1025,33 @@ Contains
 
 
 		    If (Shell_Averages%grab_this_q) Then
+
                 If (.not. Allocated(shellav_outputs)) Then
-			        Allocate(shellav_outputs(my_rmin:my_rmax,1:Shell_Averages%nq))
+			        Allocate(shellav_outputs(my_rmin:my_rmax,1:4,1:Shell_Averages%nq))  ! four moments
+                    shellav_outputs(:,:,:) = 0.0d0
                 Endif
+
                 shellav_ind = Shell_Averages%ind
-			    shellav_outputs(:,shellav_ind) = f_of_r(:)
+
+                !First, add the partially integrated spherically symmetric mean ( f_of_r )
+                Do r = my_rmin, my_rmax
+                    shellav_outputs(r,1,shellav_ind) = f_of_r(r)
+                Enddo
+
+                ! Now, the moments - rms, skewness, kurtosis
+                Do m = 2, 4
+                    Do t = my_theta_min, my_theta_max
+                        wght = theta_integration_weights(t)*over_nphi_double
+                        Do r = my_rmin, my_rmax
+                            Do p = 1, nphi
+                            shellav_outputs(r,m,shellav_ind) = shellav_outputs(r,m,shellav_ind) + &
+                                & wght*(qty(p,r,t)-IOell0_values(r,shellav_ind))**m
+                            Enddo
+                            
+                        Enddo
+                    Enddo
+                Enddo
+
                 If (myid .eq. 0) Shell_Averages%oqvals(shellav_ind) = current_qval
                 Call Shell_Averages%AdvanceInd()
 		    Endif
@@ -1046,54 +1081,8 @@ Contains
 	END Subroutine Get_Averages
 
 
-	Subroutine Get_Shell_Average()
-		Implicit None
-        Integer :: t, nq_shell, shellav_ind
-
-        nq_shell = Shell_Averages%nq
-		If (Shell_Averages%begin_output) Then		
-			Allocate(shellav_outputs(my_rmin:my_rmax,1:Shell_Averages%nq))			
-		Endif
-        shellav_ind = Shell_Averages%ind
-		f_of_r(:) = 0.0D0
-
-        Do t = my_theta_min, my_theta_max
-            f_of_r(:) = f_of_r(:) + f_of_r_theta(:,t)*theta_integration_weights(t)
-        Enddo
 
 
-		If (Shell_Averages%grab_this_q) Then
-			shellav_outputs(:,shellav_ind) = f_of_r(:)
-            If (myid .eq. 0) Shell_Averages%oqvals(shellav_ind) = current_qval
-            Call Shell_Averages%AdvanceInd()
-		Endif
-
-	END Subroutine Get_Shell_Average		
-
-	Subroutine Get_Global_Average()
-		Implicit None
-        Integer :: i, nq_globav, globav_ind, qval
-        Real*8 :: this_average
-
-        nq_globav = Global_Averages%nq
-		If (Global_Averages%begin_output) Then			
-			Allocate(globav_outputs(1:Global_Averages%nq))			
-
-		Endif
-        globav_ind = Global_Averages%ind
-
-        this_average =0.0d0
-        do i = my_rmin, my_rmax
-            this_average = this_average+f_of_r(i)*r_integration_weights(i)
-        enddo
-
-		If (Global_Averages%grab_this_q) Then
-			globav_outputs(globav_ind) = this_average
-            If (myid .eq. 0) Global_Averages%oqvals(globav_ind) = qval
-            Call Global_Averages%AdvanceInd()
-		Endif
-
-	END Subroutine Get_Global_Average
 
 	Subroutine Write_Azimuthal_Average(this_iter,simtime)
         USE MPI_BASE
@@ -1333,10 +1322,10 @@ Contains
 		Implicit None
         Integer, Intent(In) :: this_iter
 		Real*8, Intent(In) :: simtime
-		Integer :: i,j, k, n, nn, nq_shellav, shell_avg_tag
-        Real*8, Allocatable :: full_shellavg(:,:), buff(:,:), buff2(:,:)		
+		Integer :: i,j, k, n, nn, nq_shellav, shell_avg_tag, m 
+        Real*8, Allocatable :: full_shellavg(:,:,:), buff(:,:,:), buff2(:,:,:)		
         Integer :: your_r_min, your_r_max, your_nr, your_id
-        Integer :: funit, error, inds(2), ncount, sirq,nirq
+        Integer :: funit, error, inds(3), ncount, sirq,nirq
         Integer, Allocatable :: rirqs(:)
 
         shell_avg_tag = Shell_Averages%mpi_tag
@@ -1344,9 +1333,9 @@ Contains
         funit = Shell_Averages%file_unit
 
         !Sum across the row to complete integration in theta
-        Allocate(buff(my_rmin:my_rmax,nq_shellav))
-        buff(:,:) = 0.0d0
-        Call dsum2d(shellav_outputs,buff,pfi%rcomm)
+        Allocate(buff(my_rmin:my_rmax,1:4,nq_shellav))
+        buff(:,:,:) = 0.0d0
+        Call dsum3d(shellav_outputs,buff,pfi%rcomm)
 
         If (my_row_rank .eq. 0) Then
             !now set up a series of isends/ireceives along the column
@@ -1354,33 +1343,38 @@ Contains
                 !Post ireceives before anything else is done
                 nirq = nproc1-1
                 Allocate(rirqs(1:nirq))
-                Allocate(full_shellavg(1:nq_shellav,1:nr))
+                Allocate(full_shellavg(1:nq_shellav,1:4,1:nr))
                 Do n = 1, nproc1-1
                     your_r_min = pfi%all_1p(n)%min
                     your_nr = pfi%all_1p(n)%delta
-                    ncount = your_nr*nq_shellav
+                    ncount = your_nr*nq_shellav*4
                     inds(1) = 1
-                    inds(2) = your_r_min
+                    inds(2) = 1
+                    inds(3) = your_r_min
                     Call IReceive(full_shellavg, rirqs(n),n_elements = ncount, &
                             &  source= n,tag = shell_avg_tag, grp = pfi%ccomm,indstart = inds)
                 Enddo
                 ! Load my buff into the full_shellavg array
                 Do j = my_rmin,my_rmax
-                    Do i = 1, nq_shellav
-                        full_shellavg(i,j) = buff(j,i)
+                    Do m = 1, 4
+                        Do i = 1, nq_shellav
+                            full_shellavg(i,m,j) = buff(j,m,i)
+                        Enddo
                     Enddo
                 Enddo
                 DeAllocate(buff)
                 Call IWaitAll(nirq, rirqs)
                 DeAllocate(rirqs)
             Else
-                Allocate(buff2(nq_shellav, my_rmin:my_rmax)) ! Transpose for easier send logic
+                Allocate(buff2(nq_shellav, 1:4,my_rmin:my_rmax)) ! Transpose for easier send logic
                 Do j = my_rmin,my_rmax
-                    Do i = 1, nq_shellav
-                        buff2(i,j) = buff(j,i)
+                    Do m = 1, 4
+                        Do i = 1, nq_shellav
+                            buff2(i,m,j) = buff(j,m,i)
+                        Enddo
                     Enddo
                 Enddo
-                ncount = my_nr*nq_shellav
+                ncount = my_nr*nq_shellav*4
                 Call ISend(buff2, sirq,ncount, dest = 0, tag = shell_avg_tag, grp = pfi%ccomm)
 
                 Call IWait(sirq)
@@ -1398,7 +1392,7 @@ Contains
                     Write(funit)(radius(i),i=1,nr)
                     Call Shell_Averages%update_position()
                 Endif
-                    Write(funit)((full_shellavg(k,i),i=1,nr),k=1,nq_shellav)
+                    Write(funit)(((full_shellavg(k,m,i),i=1,nr),m=1,4),k=1,nq_shellav)
                 Write(funit) simtime
 
                 Write(funit)this_iter
@@ -1908,6 +1902,50 @@ Contains
 
     End Subroutine ComputeEll0
 
+    Subroutine IOComputeEll0(inbuff,outbuff)
+        !Works exactly like computeEll0, but inbuff has already been averaged in phi
+        Real*8, Intent(In) :: inbuff(my_rmin:,my_theta_min:,1:)
+        Real*8, Intent(InOut) :: outbuff(my_rmin:,1:)
+        Real*8, Allocatable :: tmp_buffer(:,:)
+        Integer :: bdims(1:3)
+        Integer :: q,nq,r,t,p
+        !Averages over theta and phi to get the spherically symmetric mean of all
+        ! fields in inbuff at each radii
+        ! inbuff is expected to be dimensioned as (my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,1:nfields)
+        ! ** Note that this routine should be used sparingly because it requires 
+        ! **   a collective operation (allreduce) across process rows
+        ! ** One way to do this is to aggregate several fields into the inbuff when calling this routine
+
+
+        bdims = shape(inbuff)
+        nq = bdims(3)
+
+        Allocate(tmp_buffer(my_rmin:my_rmax,1:nq))
+        tmp_buffer(:,:) = 0.0d0
+        outbuff(:,:) = 0.0d0
+
+        ! Perform partial averaging in theta
+        Do q = 1, nq
+            Do t = my_theta_min, my_theta_max
+                Do r = my_rmin, my_rmax
+                    tmp_buffer(r,q) = tmp_buffer(r,q)+inbuff(r,t,q) &
+                        & *theta_integration_weights(t)
+                Enddo
+            Enddo
+        Enddo
+
+        ! Turn phi-integration into an average
+        tmp_buffer(:,:) = tmp_buffer(:,:)*over_nphi_double
+
+        ! Complete the averaging process in theta
+        Call DALLSUM2D(tmp_buffer, outbuff, pfi%rcomm)
+
+        DeAllocate(tmp_buffer)
+
+    End Subroutine IOComputeEll0
+
+
     Subroutine Compute_Radial_Average(inbuff,outbuff)
         Real*8, Intent(In) :: inbuff(my_rmin:,1:)
         Real*8, Intent(InOut) :: outbuff(1:)
@@ -1944,6 +1982,35 @@ Contains
         DeAllocate(tmp_buffer)
 
     End Subroutine Compute_Radial_Average
+
+    Subroutine IOComputeM0(qty)
+        Real*8, Intent(In) :: qty(1:,my_rmin:,my_theta_min:)
+
+
+        Integer :: q,nq,r,t,p, ind
+        !Averages over phi to get the azimuthally symmetric mean of all
+        ! fields in inbuff at each radii and theta value.
+        ! inbuff is expected to be dimensioned as (1:nphi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields)
+        ! outbuff is dimensioned as outbuff(my_r%min:my_rmax,my_theta_min:my_theta_max,1:nfields)
+
+
+
+        ind = Shell_Averages%ind
+
+        ! Perform phi-integration
+
+        Do t = my_theta_min, my_theta_max
+            Do r = my_rmin, my_rmax
+                Do p = 1, nphi
+                    IOm0_values(r,t,ind) = IOm0_values(r,t,ind)+qty(p,r,t)
+                Enddo
+                IOm0_values(r,t,ind) = IOm0_values(r,t,ind)*over_nphi_double ! Turn integration into an average
+            Enddo
+        Enddo
+
+        Call Shell_Averages%AdvanceInd()
+
+    End Subroutine IOComputeM0
 
     Subroutine ComputeM0(inbuff,outbuff)
         Real*8, Intent(In) :: inbuff(1:,my_rmin:,my_theta_min:,1:)

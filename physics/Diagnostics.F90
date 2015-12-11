@@ -29,11 +29,17 @@ Module Diagnostics
     !Angular Momentum Transport Diagnostics
     Integer, Parameter, Private :: amom_fluct_r = 25, amom_fluct_theta = 26, &
          amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
+
+    !Viscous Fluxes
+    Integer, Parameter, Private :: visc_flux_r = 31
          
 
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
     Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
+    ! We also have some comparison outputs for checking the moments
+    Integer, Parameter, Private :: vr2 = 101, vt2 = 102, vp2 = 103
+    Integer, Parameter, Private :: vr3 = 104, vt3 = 105, vp3 = 106
 
     !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
     Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
@@ -107,7 +113,7 @@ Contains
         Real*8, Intent(In) :: current_time
         Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3, dt_by_dp, dt_by_ds, tpert
 
-        Integer :: p,t,r, nfields, bdims(1:4)
+        Integer :: p,t,r, nfields, bdims(1:4), pass_num
         Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
 
         If (time_to_output(iteration)) Then
@@ -128,6 +134,83 @@ Contains
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
 
+            Do pass_num = 1, 2
+            !////////////////////////
+            ! All requested Shell_Average quantities are computed twice
+            ! During the first pass, ell = 0 and m = 0 averages are computed
+            !   (for the shell_average quantities)
+            ! During the second pass, all quantities are computed, 
+            !   file output is conducted, and the previously
+            !   computed averages are used for moments in the shell_average output
+            ! Compute_quantity returns false on the first pass for everything but shell_averages
+            Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
+
+            If (compute_quantity(visc_flux_r)) Then
+                !- v dot D |_r
+                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+                !Radial contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = buffer(p,r,t,vr)*ref%dlnrho(r)/3.0d0+buffer(p,r,t,dvrdr)
+                            qty(p,r,t) = qty(p,r,t)*buffer(p,r,t,vr)*2.0d0
+                        Enddo
+                    Enddo
+                Enddo
+
+                !Theta contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvtdr)-buffer(p,r,t,vtheta)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdt)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vtheta)
+                        Enddo
+                    Enddo
+                Enddo                
+
+
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
+                        Enddo
+                    Enddo
+                Enddo
+
+                !phi contribution (mod rho*nu)
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvpdr)-buffer(p,r,t,vphi)/radius(r)
+                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdp)/radius(r)/sintheta(t)
+                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vphi)
+                        Enddo
+                    Enddo
+                Enddo                
+
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
+                        Enddo
+                    Enddo
+                Enddo
+
+                !Multiply by rho and nu
+                Do t = my_theta%min, my_theta%max
+                    Do r = my_r%min, my_r%max
+                        Do p = 1, n_phi				
+                            qty(p,r,t) = qty(p,r,t)*nu(r)*ref%density(r)                            
+                        Enddo
+                    Enddo
+                Enddo
+                Call Add_Quantity(qty)
+                DeAllocate(tmp1)
+            Endif
+
             If (compute_quantity(v_r)) Then
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
                 Call Add_Quantity(qty)
@@ -142,6 +225,37 @@ Contains
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)
                 Call Add_Quantity(qty)
             Endif	
+
+            If (compute_quantity(vr2)) Then
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
+                Call Add_Quantity(qty)
+            Endif		
+
+            If (compute_quantity(vt2)) Then	
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**2
+                Call Add_Quantity(qty)
+            Endif		
+
+            If (compute_quantity(vp2)) Then
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
+                Call Add_Quantity(qty)
+            Endif	
+
+            If (compute_quantity(vr3)) Then
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**3
+                Call Add_Quantity(qty)
+            Endif		
+
+            If (compute_quantity(vt3)) Then	
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**3
+                Call Add_Quantity(qty)
+            Endif		
+
+            If (compute_quantity(vp3)) Then
+                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**3
+                Call Add_Quantity(qty)
+            Endif	
+
 
             If (compute_quantity(rhov_r)) Then
                 Do t = my_theta%min, my_theta%max
@@ -635,7 +749,10 @@ Contains
                     Call Add_Quantity(qty)
                 Endif	
 
-			Endif
+			Endif !Magnetism
+            If (pass_num .eq. 1) Call Finalize_Averages()
+            Enddo !Pass_num
+
 			DeAllocate(qty)
 			Call Complete_Output(iteration, current_time)
 
