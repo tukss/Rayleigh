@@ -37,12 +37,20 @@ PRO READ_SHELLAVG, file, res
 
 
 	; Read the individual records
-	vals = DBLARR(nr,nq,nrec)
+	IF (version eq 1) THEN BEGIN
+		vals = DBLARR(nr,nq,nrec)
+		nmom = 1
+	ENDIF
+	IF (version eq 2) THEN BEGIN
+		vals = DBLARR(nr,4,nq,nrec)
+		nmom = 4
+	ENDIF
 	tmp  = DBLARR(nr)
 	time = DBLARR(nrec)
 	iter = LONARR(nrec)
 	it = 0L
 	tm = 0.0d0
+	If (version eq 1) THEN BEGIN
 	FOR i = 0, nrec-1 DO BEGIN
 		FOR k = 0, nq -1 DO BEGIN
 			READU,13,tmp
@@ -53,6 +61,22 @@ PRO READ_SHELLAVG, file, res
 		time[i] = tm
 		iter[i] = it
 	ENDFOR
+	ENDIF ELSE BEGIN
+	FOR i = 0, nrec-1 DO BEGIN
+		FOR k = 0, nq -1 DO BEGIN
+			For m = 0, nmom-1 DO BEGIN
+			READU,13,tmp
+			vals[*,m,k,i] = tmp
+			ENDFOR
+		ENDFOR
+		READU,13,tm
+		READU,13,it
+		time[i] = tm
+		iter[i] = it
+	ENDFOR
+
+	ENDELSE
+
 	CLOSE, 13
 
 	; Build a lookup table for the quantity codes
