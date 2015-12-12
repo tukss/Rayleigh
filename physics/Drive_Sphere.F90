@@ -124,7 +124,9 @@ Contains
             Endif
 
             If(iteration .eq. last_iteration) Then
-                checkpoint_interval = iteration ! force a checkpoint on final iteration
+                If (save_last_timestep) Then
+                    checkpoint_interval = iteration ! force a checkpoint on final iteration
+                Endif
             Endif
 
             Call IsItTimeForACheckpoint(iteration)
