@@ -118,13 +118,8 @@ Contains
         Real*8 :: One, ee
         Real*8 :: InnerRadius, OuterRadius
         Integer :: r
-        !////////////////////////////////
-        ! Variables for quick debugging finite-element approach
-        Integer :: j, jstart, jend
-        Real*8, Allocatable :: test_buffer4d(:,:,:,:), test_buffer4dc(:,:,:,:)
-        Real*8, Allocatable :: test_buffer4dcd(:,:,:,:)
-        Real*8, Allocatable :: out_arr(:,:)
-        Character*120 :: out_file
+
+
         If (my_rank .eq. 0) Call stdout%print('Initializing polytropic reference state.')
         ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
         ! The following parameters are read from the input file.
@@ -205,33 +200,6 @@ Contains
         Deallocate(zeta)
 
         Call Initialize_Reference_Heating()
-
-        !//////////////////////////////////////////
-        !Debugging of finite elements.  Testing the derivatives here
-        ! All I'm doing here is (convolutedly) taking a derivative of density and outputting it
-        Allocate(test_buffer4d(1:n_r,1,1,1))
-        Allocate(test_buffer4dc(1:n_r,1,1,1))
-        Allocate(test_buffer4dcd(1:n_r,1,1,1:2))
-        Allocate(out_arr(1:n_r,1:2))
-        test_buffer4d(:,1,1,1) = ref%density(:)
-    	Call Cheby_To_SpectralFE(test_buffer4d,test_buffer4dc)
-        test_buffer4d(:,:,:,:) = 0.0d0 ! zero out for the receive later
-        test_buffer4dcd(:,:,:,:) = 0.0d0
-		! de-alias  each subdomain
-        jstart = (2*fencheby)/3  ! might play with de-aliasing type...
-        jend = fencheby
-        Do j = 1, fensub
-            test_buffer4dc(jstart:jend,1,1,1) = 0.0d0
-        Enddo        
-
-        test_buffer4dcd(:,1,1,1) = test_buffer4dc(:,1,1,1)
-        Call d_by_dr_cpFE(1,2,test_buffer4dcd,1)
-        test_buffer4dc(:,1,1,1) = test_buffer4dcd(:,1,1,2)
-        Call Cheby_From_SpectralFE(test_buffer4dc,test_buffer4d)
-        out_arr(:,1) = radius
-        out_arr(:,2) = test_buffer4d(:,1,1,1)
-        out_file = 'fe_test_function'
-        Call Write_Profile(out_arr,out_file)
 
     End Subroutine Polytropic_Reference
 
@@ -376,7 +344,7 @@ Contains
         !Call Integrate_in_radius(temp2,integral)
         !write(6,*)'integral:  ', integral*4.0*pi
 
-        cooling_file = 'reference_heating'
+        cooling_file = Trim(my_path)//'reference_heating'
         Allocate(cool_arr(1:n_r,1:6))
         cool_arr(:,1) = radius
         cool_arr(:,2) = ref%heating
