@@ -53,9 +53,6 @@ Module ReferenceState
 
     Real*8 :: Angular_Velocity = 1.0d0
 
-
-
-    
     !/////////////////////////////////////////////////////////////////////////////////////
     ! Nondimensional Parameters
     Real*8 :: Rayleigh_Number         = 1.0d0
@@ -232,6 +229,10 @@ Contains
         !///////////////////////////////////////////////////////////
         ! Next, compute a cooling function if desired and ADD it to 
         ! whatever's in reference heating.
+        If (cooling_type .eq. 1) Then
+            ! Here we generate a tanh cooling envelope for use with our drag constant
+        Endif
+
 
         If (cooling_type .eq. 2) Then
             Call Tanh_Reference_Cooling()            
