@@ -237,7 +237,7 @@ class AzAverage:
     """
 
 
-    def __init__(self,filename='none',path='AZ_Avgs/'):
+    def __init__(self,filename='none',path='AZ_Avgs/', verbose = False):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
@@ -245,6 +245,8 @@ class AzAverage:
             the_file = path+'00000001'
         else:
             the_file = path+filename
+        if (verbose):
+            print "Opening file: ", filename
         fd = open(the_file,'rb')
         # We read an integer to assess which endian the file was written in...
         bs = check_endian(fd,314,'int32')
