@@ -7,7 +7,7 @@ Program Main
 	Use Parallel_Framework
 	Use ProblemSize
 	Use Input
-	Use Diagnostics
+	Use Diagnostics_Interface, Only : Initialize_Diagnostics
 	Use TestSuite
 	Use Checkpointing
     Use Equation_Coefficients

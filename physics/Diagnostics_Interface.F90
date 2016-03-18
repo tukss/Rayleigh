@@ -1,4 +1,4 @@
-Module Diagnostics
+Module Diagnostics_Interface
     Use ProblemSize
     Use Controls
     Use Spherical_IO
@@ -7,50 +7,15 @@ Module Diagnostics
     Use ReferenceState
     Use TransportCoefficients
     Use Math_Constants
+    Use Diagnostics_Base
+    Use Diagnostics_Lorentz_Forces
     Implicit None
-    !/////////////////////////////////////////////////////////
-    !  Quantity Codes (some care must be taken to
-    Integer, Parameter, Private :: V_r = 1,   V_theta = 2, V_phi = 3
-    Integer, Parameter, Private :: Temperature = 4,    Pressure = 5
 
-    Integer, Parameter, Private :: v_sq = 6, kinetic_energy = 7
-    Integer, Parameter, Private :: gradt_r = 8, cond_flux_r = 9
-    Integer, Parameter, Private :: zonal_ke = 10, merid_ke = 11
-    Integer, Parameter, Private :: vol_heating = 12
-
-    Integer, Parameter, Private :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
-    Integer, Parameter, Private :: thermalE_flux_radial = 16, radial_ke = 17
-    Integer, Parameter, Private :: ke_flux_radial = 18, enth_flux_radial = 19
-    Integer, Parameter, Private :: buoyancy_work = 20
-
-    Integer, Parameter, Private :: vort_r = 21, vort_theta = 22, vort_phi = 23
-    Integer, Parameter, Private :: enstrophy = 24
-
-    !Angular Momentum Transport Diagnostics
-    Integer, Parameter, Private :: amom_fluct_r = 25, amom_fluct_theta = 26, &
-         amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
-
-    !Viscous Fluxes
-    Integer, Parameter, Private :: visc_flux_r = 31
-         
-
-    ! We have some "known" outputs as well that allow us to verify that
-    ! the spherical_io interface is functional
-    Integer, Parameter, Private :: diagnostic1 = 99, diagnostic2 = 100
-    ! We also have some comparison outputs for checking the moments
-    Integer, Parameter, Private :: vr2 = 101, vt2 = 102, vp2 = 103
-    Integer, Parameter, Private :: vr3 = 104, vt3 = 105, vp3 = 106
-
-    !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
-    Integer, Parameter, Private :: B_r = 201, B_theta = 202, B_phi = 203
-    Integer, Parameter, Private :: J_r = 204, J_theta = 205, J_phi = 206
-    Integer, Parameter, Private :: B_sq = 207, magnetic_energy=208, zonal_me = 209
-    Integer, Parameter, Private :: merid_me = 210, b_r2 = 211, b_theta2 = 212, b_phi2 = 213
 
     !///////////////////////////////////
-    Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
-    Real*8, Allocatable :: tmp1(:,:,:)
-    Real*8, Allocatable :: rweights(:), tweights(:)
+    !Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
+    !Real*8, Allocatable :: tmp1(:,:,:)
+    !Real*8, Allocatable :: rweights(:), tweights(:)
 
     !//////////////////////////////////
 
@@ -75,7 +40,7 @@ Contains
     !   vphi    -- phi velocity
     !   tout    -- temperature or entropy (note that this is NOT tvar -- that is T/radius)
     !   pvar    -- pressure
-    !   zvar    -- l(l+1)*Z/r^2  where Z is the streamfunction
+    !   zvar    -- l(l+1)*Z/r^2  where Z is the toroidal streamfunction
 
     ! Radial Derivatives:
     !   dvrdr   -- d(v_r)/dr
@@ -109,12 +74,12 @@ Contains
     Subroutine PS_Output(buffer,iteration, current_time)
         Implicit None
         Integer, Intent(In) :: iteration
-        Real*8, Intent(InOut) :: buffer(:,my_r%min:,my_theta%min:,:)
+        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8, Intent(In) :: current_time
         Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3, dt_by_dp, dt_by_ds, tpert
 
         Integer :: p,t,r, nfields, bdims(1:4), pass_num
-        Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
+        !Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
 
         If (time_to_output(iteration)) Then
             Call Begin_Outputting(iteration)
@@ -654,6 +619,8 @@ Contains
             !//////////////////// Magnetic Quantities
             If (magnetism) Then
 
+                Call Compute_Lorentz_Forces(buffer)
+
                 If (compute_quantity(B_r)) Then
                     qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)
                     Call Add_Quantity(qty)
@@ -869,4 +836,4 @@ Contains
         Endif
     End Subroutine Reboot_Diagnostics
 
-End Module Diagnostics
+End Module Diagnostics_Interface

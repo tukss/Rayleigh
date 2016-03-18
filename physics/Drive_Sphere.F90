@@ -3,7 +3,7 @@ Module Drive_Sphere
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
-    Use Diagnostics, Only : Reboot_Diagnostics
+    Use Diagnostics_Interface, Only : Reboot_Diagnostics
 	Use Checkpointing
 	Use Controls
 	Use Timers
