@@ -82,13 +82,13 @@ Module Diagnostics_Base
 
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
-    Real*8, Allocatable :: tmp1(:,:,:)
+    Real*8, Allocatable :: tmp1(:,:,:)  ! A work array
     Real*8, Allocatable :: rweights(:), tweights(:)
 
     !//////////////////////////////////
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
 
-
+    Type(SphericalBuffer) :: add_fields
 
 Contains
 
