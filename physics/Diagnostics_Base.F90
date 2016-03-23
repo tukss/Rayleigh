@@ -88,7 +88,7 @@ Module Diagnostics_Base
     !//////////////////////////////////
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
 
-    Type(SphericalBuffer) :: add_fields
+    Type(SphericalBuffer), public :: add_fields
 
 Contains
 

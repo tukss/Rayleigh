@@ -3,6 +3,7 @@
 #define IDX2 m:l_max,r,imi
 #define SBUFFA wsp%s2a(mp)%data
 #define SBUFFB wsp%s2b(mp)%data
+#define ASBUFFA add_fields%s2a(mp)%data
 Module Hybrid_Space_Sphere
 
     ! NOTE: WE NEED a 1/density variable
@@ -18,6 +19,7 @@ Module Hybrid_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
     Use Equation_Coefficients
+    Use Diagnostics_Interface, Only : add_fields
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
 
@@ -397,6 +399,7 @@ Contains
 	Subroutine Bfield_Derivatives()
 		Implicit None
 		Integer :: r, l, m, mp, imi
+        Integer :: dbrdr, dbtdr, dbpdr
         !These terms are only needed if we want to output 
         !inductions terms in the diagnostics
 
@@ -415,7 +418,7 @@ Contains
         END_DO
 
         DO_IDX2		
-            ABUFFA(IDX2,dbtdr) = SBUFFA(IDX2,dbtdr)- &
+            ASBUFFA(IDX2,dbtdr) = SBUFFA(IDX2,dbtdr)- &
                 & SBUFFA(IDX2,btheta)*one_over_r(r)
         END_DO	
 
@@ -429,7 +432,7 @@ Contains
         END_DO
 
         DO_IDX2		
-            SBUFFA(IDX2,dvpdr) = ftemp1(mp)%data(IDX2)*Over_RhoR(r)
+            ASBUFFA(IDX2,dvpdr) = ftemp1(mp)%data(IDX2)*Over_RhoR(r)
         END_DO
 
         !.... Small correction for density variation  :  - u_phi*dlnrhodr
@@ -457,7 +460,7 @@ Contains
 		
 		! Convert Z to ell(ell+1) Z/r^2  (i.e. omega_r)		
         DO_IDX2
-            SBUFFA(IDX2,zvar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,zvar)*Over_RhoRSQ(r)
+            ASBUFFA(IDX2,zvar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,zvar)*Over_RhoRSQ(r)
         END_DO
 	End Subroutine BField_Derivatives
 
