@@ -8,6 +8,7 @@ Module Diagnostics_Base
     Use Spherical_IO
     Use Fields
     Use Math_Constants
+    Use ReferenceState
 
     Implicit None
 
@@ -35,6 +36,33 @@ Module Diagnostics_Base
 
     !Viscous Fluxes
     Integer, Parameter :: visc_flux_r = 31
+
+    !////////////////////////  Advection Terms ////////////////////
+    ! Reynolds decomposition about the azimuthal mean may also be output
+    ! "m" and "< >" denote the azimuthal mean.
+    ! "p" and " ' " denote perturbations about the azimuthal mean 
+    ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
+
+    Integer, Parameter :: vgv = 40  ! Output offset for advection terms  
+    Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
+    Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
+    Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
+
+    Integer, Parameter :: vp_grad_vm_r     = vgv+4 ! radial component of v' dot grad <v>
+    Integer, Parameter :: vp_grad_vm_theta = vgv+5 !  theta component of v' dot grad <v>
+    Integer, Parameter :: vp_grad_vm_phi   = vgv+6 !    phi component of v' dot grad <v>
+
+    Integer, Parameter :: vm_grad_vp_r     = vgv+7 ! radial component of <v> dot grad v'
+    Integer, Parameter :: vm_grad_vp_theta = vgv+8 !  theta component of <v> dot grad v'
+    Integer, Parameter :: vm_grad_vp_phi   = vgv+9 !    phi component of <v> dot grad v'
+
+    Integer, Parameter :: vp_grad_vp_r     = vgv+10 ! radial component of v' dot grad v'
+    Integer, Parameter :: vp_grad_vp_theta = vgv+11 !  theta component of v' dot grad v'
+    Integer, Parameter :: vp_grad_vp_phi   = vgv+12 !    phi component of v' dot grad v'
+
+    Integer, Parameter :: vm_grad_vm_r     = vgv+13 ! radial component of <v> dot grad <v>
+    Integer, Parameter :: vm_grad_vm_theta = vgv+14 !  theta component of <v> dot grad <v>
+    Integer, Parameter :: vm_grad_vm_phi   = vgv+15 !    phi component of <v> dot grad <v>
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
@@ -89,7 +117,7 @@ Module Diagnostics_Base
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
 
     Type(SphericalBuffer), public :: add_fields
-
+    !Integer :: dbrdt, dbrdr, dbtdr, dbpdr
 Contains
 
     Subroutine Generate_Diagnostic_Labels()

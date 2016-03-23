@@ -399,7 +399,7 @@ Contains
 	Subroutine Bfield_Derivatives()
 		Implicit None
 		Integer :: r, l, m, mp, imi
-        Integer :: dbrdr, dbtdr, dbpdr
+        Integer :: dbrdr, dbtdr, dbpdr, dbrdt
         !These terms are only needed if we want to output 
         !inductions terms in the diagnostics
 
@@ -414,7 +414,7 @@ Contains
         END_DO
 
         DO_IDX2			
-            ASBUFFA(IDX2,dvtdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbtdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
@@ -432,17 +432,16 @@ Contains
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dvpdr) = ftemp1(mp)%data(IDX2)*Over_RhoR(r)
+            ASBUFFA(IDX2,dbpdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
-        !.... Small correction for density variation  :  - u_phi*dlnrhodr
-        ! .... moved -u_phi/r here as well
         DO_IDX2		
             ASBUFFA(IDX2,dbpdr) = ASBUFFA(IDX2,dbpdr)- &
                 &  SBUFFA(IDX2,bphi)*one_over_r(r)
         END_DO	
+
 		!/////////////////////////////////////////  
-		!dbrdr	
+		!dB r dr	
 
         DO_IDX2
             ASBUFFA(IDX2,dbrdr) = l_l_plus1(m:l_max)* & 
@@ -455,12 +454,12 @@ Contains
                 & SBUFFA(IDX2,br)*Two_Over_R(r)
         END_DO
 
-		Call d_by_dtheta(wsp%s2a,vr,dvrdt)  !<-----------WAS HERE need to check this NICK F 2016
+		Call d_by_dtheta(wsp%s2a,br,dbrdt)  
 
 		
-		! Convert Z to ell(ell+1) Z/r^2  (i.e. omega_r)		
+		! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
         DO_IDX2
-            ASBUFFA(IDX2,zvar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,zvar)*Over_RhoRSQ(r)
+            ASBUFFA(IDX2,avar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
         END_DO
 	End Subroutine BField_Derivatives
 

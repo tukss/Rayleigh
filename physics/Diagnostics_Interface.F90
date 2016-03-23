@@ -9,6 +9,7 @@ Module Diagnostics_Interface
     Use Math_Constants
     Use Diagnostics_Base
     Use Diagnostics_Lorentz_Forces
+    Use Diagnostics_Advection
     Implicit None
 
 
@@ -95,6 +96,8 @@ Contains
             Call ComputeEll0(buffer,ell0_values)
             Call ComputeM0(buffer,m0_values)
 
+
+            Call Compute_Inertial_Terms(buffer)
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
