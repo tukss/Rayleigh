@@ -9,7 +9,7 @@ Module Diagnostics_Interface
     Use Math_Constants
     Use Diagnostics_Base
     Use Diagnostics_Lorentz_Forces
-    Use Diagnostics_Advection
+    Use Diagnostics_Inertial_Forces
     Implicit None
 
 
