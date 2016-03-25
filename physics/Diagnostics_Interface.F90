@@ -97,7 +97,7 @@ Contains
             Call ComputeM0(buffer,m0_values)
 
 
-            Call Compute_Inertial_Terms(buffer)
+
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
@@ -112,7 +112,7 @@ Contains
             !   computed averages are used for moments in the shell_average output
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
-
+            Call Compute_Inertial_Terms(buffer)
             If (compute_quantity(visc_flux_r)) Then
                 !- v dot D |_r
                 Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))

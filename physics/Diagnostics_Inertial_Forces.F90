@@ -14,7 +14,7 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
-        Real*8, Allocatable :: tbuffer(:,:,:,:), cbuffer(:,:,:,:)
+        Real*8, Allocatable :: vpbuffer(:,:,:,:), cbuffer(:,:,:,:)
 
         Integer :: binds(1:12)
 
@@ -97,58 +97,58 @@ Contains
 
         Allocate(cbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:3))
         If (compute_fluctuations) Then
-            Allocate(tbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
-            !tbuffer holds perturbations about the azimuthal mean
+            Allocate(vpbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
+            !vpbuffer holds perturbations about the azimuthal mean
 
             ! V_r terms
             DO_PSI
-                tbuffer(PSI,vr_p) = buffer(PSI,vr) - m0_values(PSI2,vr) 
+                vpbuffer(PSI,vr_p) = buffer(PSI,vr) - m0_values(PSI2,vr) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvrdr_p) = buffer(PSI,dvrdr) - m0_values(PSI2,dvrdr) 
+                vpbuffer(PSI,dvrdr_p) = buffer(PSI,dvrdr) - m0_values(PSI2,dvrdr) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvrdt_p) = buffer(PSI,dvrdt) - m0_values(PSI2,dvrdt) 
+                vpbuffer(PSI,dvrdt_p) = buffer(PSI,dvrdt) - m0_values(PSI2,dvrdt) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvrdp_p) = buffer(PSI,dvrdp) 
+                vpbuffer(PSI,dvrdp_p) = buffer(PSI,dvrdp) 
             END_DO
 
             ! V_theta terms
             DO_PSI
-                tbuffer(PSI,vtheta_p) = buffer(PSI,vtheta) - m0_values(PSI2,vtheta) 
+                vpbuffer(PSI,vtheta_p) = buffer(PSI,vtheta) - m0_values(PSI2,vtheta) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvtdr_p) = buffer(PSI,dvtdr) - m0_values(PSI2,dvtdr) 
+                vpbuffer(PSI,dvtdr_p) = buffer(PSI,dvtdr) - m0_values(PSI2,dvtdr) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvtdt_p) = buffer(PSI,dvtdt) - m0_values(PSI2,dvtdt) 
+                vpbuffer(PSI,dvtdt_p) = buffer(PSI,dvtdt) - m0_values(PSI2,dvtdt) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvtdp_p) = buffer(PSI,dvtdp)  
+                vpbuffer(PSI,dvtdp_p) = buffer(PSI,dvtdp)  
             END_DO
 
             ! V_phi terms
             DO_PSI
-                tbuffer(PSI,vphi_p) = buffer(PSI,vphi) - m0_values(PSI2,vphi) 
+                vpbuffer(PSI,vphi_p) = buffer(PSI,vphi) - m0_values(PSI2,vphi) 
             END_DO        
 
             DO_PSI
-                tbuffer(PSI,dvpdr_p) = buffer(PSI,dvpdr) - m0_values(PSI2,dvpdr) 
+                vpbuffer(PSI,dvpdr_p) = buffer(PSI,dvpdr) - m0_values(PSI2,dvpdr) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvpdt_p) = buffer(PSI,dvpdt) - m0_values(PSI2,dvpdt) 
+                vpbuffer(PSI,dvpdt_p) = buffer(PSI,dvpdt) - m0_values(PSI2,dvpdt) 
             END_DO
 
             DO_PSI
-                tbuffer(PSI,dvpdp_p) = buffer(PSI,dvpdp) 
+                vpbuffer(PSI,dvpdp_p) = buffer(PSI,dvpdp) 
             END_DO
 
         Endif
@@ -190,8 +190,9 @@ Contains
             Endif
         Endif
 
+        !/////////////// v' dot grad v' //////////////////
         If (compute_fluct_fluct) Then
-            Call ADotGradB(tbuffer,tbuffer,cbuffer)
+            Call ADotGradB(vpbuffer,vpbuffer,cbuffer)
             If (compute_quantity(vp_grad_vp_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -212,6 +213,7 @@ Contains
             Endif
         Endif
 
+        !/////////////// <v> dot grad <v> //////////////////
         If (compute_mean_mean) Then
             Call ADotGradB(m0_values,m0_values,cbuffer,aindices=binds,bindices=binds)
             If (compute_quantity(vm_grad_vm_r)) Then
@@ -234,8 +236,9 @@ Contains
             Endif
         Endif
 
+        !/////////////// v' dot grad <v> //////////////////
         If (compute_fluct_mean) Then
-            Call ADotGradB(tbuffer,m0_values,cbuffer,bindices=binds)
+            Call ADotGradB(vpbuffer,m0_values,cbuffer,bindices=binds)
             If (compute_quantity(vp_grad_vm_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -256,8 +259,9 @@ Contains
             Endif
         Endif
 
+        !/////////////// <v> dot grad v' //////////////////
         If (compute_mean_fluct) Then
-            Call ADotGradB(m0_values,tbuffer,cbuffer,aindices=binds)
+            Call ADotGradB(m0_values,vpbuffer,cbuffer,aindices=binds)
             If (compute_quantity(vm_grad_vp_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -280,7 +284,7 @@ Contains
 
         DeAllocate(cbuffer)
         If (compute_fluctuations) Then
-            DeAllocate(tbuffer)
+            DeAllocate(vpbuffer)
         Endif
     End Subroutine Compute_Inertial_Terms
 End Module Diagnostics_Inertial_Forces
