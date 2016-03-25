@@ -80,7 +80,7 @@ Contains
         Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3, dt_by_dp, dt_by_ds, tpert
 
         Integer :: p,t,r, nfields, bdims(1:4), pass_num
-        !Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)		
+
 
         If (time_to_output(iteration)) Then
             Call Begin_Outputting(iteration)
