@@ -1,8 +1,31 @@
 Module Diagnostics_Induction
+    Implicit None
+    Logical :: allocate_indr = .false.
+    Logical :: allocate_indt = .false.
+    Logical :: allocate_indp = .false.
+    Logical :: compute_shear = .false.
+    Logical :: compute_advec = .false.
+    Logical :: compute_vmbm_shear = .false.
+    Logical :: compute_vmbm_advec = .false.
+
 
 Contains
 
     Subroutine Compute_Induction_Terms(buffer)
+        Implicit None
+        Real*8, Allocatable :: ind_r(:,:,:), ind_theta(:,:,:), ind_phi(:,:,:)
+
+        Call Reset_Induction_Flags()
+
+        If (allocate_indr) Then
+            Allocate(    ind_r(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
+        Endif
+        If (allocate_indt) Then
+            Allocate(ind_theta(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
+        Endif
+        If (allocate_indp) Then
+            Allocate(  ind_phi(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max))
+        Endif
 
         !////////////////////////////////////////////////////////////////////////
         !
@@ -10,7 +33,7 @@ Contains
         !
         !////////////////////////////////////////////////////////////////////////
         !1a.  B dot grad v 
-        If (compute_full_full_shear) Then
+        If (compute_shear) Then
 
             Call ADotGradB(bbuffer,buffer,cbuffer,bindices=binds)
 
@@ -39,7 +62,7 @@ Contains
         Endif
 
         !1b.  -v dot grad B 
-        If (compute_full_full_advec) Then
+        If (compute_advec) Then
 
             Call ADotGradB(bbuffer,buffer,cbuffer,bindices=binds)
 
@@ -64,10 +87,222 @@ Contains
                  ind_theta(:,:,:) = ind_theta(:,:,:)-cbuffer(:,:,:,2)                    
             Endif
             If (compute_quantity(induction_phi)) Then
-                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,2)                    
+                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,3)                    
             Endif
         Endif
 
+        !1c.  -B (div dot v)
+        ! Take care with the logic here...
+
+        If (compute_quantity(induction_comp_r) .or. compute_quantity(induction_r)) Then
+            DO_PSI
+                qty(PSI) = bbuffer(PSI,ind_br)*buffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_r) Call Add_Quantity(qty)
+            If (compute_quantity(induction_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_r)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_theta) .or. compute_quantity(induction_theta)) Then
+            DO_PSI
+                qty(PSI) = bbuffer(PSI,ind_btheta)*buffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_theta)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_theta)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_phi) .or. compute_quantity(induction_phi)) Then
+            DO_PSI
+                qty(PSI) = bbuffer(PSI,ind_bphi)*buffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_phi)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_phi)
+            Endif
+        Endif
+
+
+
+
+        If (    allocated(ind_r)) DeAllocate(ind_r)
+        If (allocated(ind_theta)) DeAllocate(ind_theta)
+        If (  allocated(ind_phi)) DeAllocate(ind_phi)
     End Subroutine Compute_Induction_Terms
+
+    Subroutine Reset_Induction_Flags()
+        Implicit None
+        !/////////////////////////////////////////////////
+        !   Compute_Induction_Terms makes use of several logical flags.
+        !   Before carrying out the computations in that subroutine,
+        !   we set these flags to the appropriate value.
+
+        !  First, reset ALL flags to false
+        !  (This routine should be called at each output iteration)
+        allocate_indr = .false.
+        allocate_indt = .false.
+        allocate_indp = .false.
+        compute_shear = .false.
+        compute_advec = .false.
+        compute_vmbm_shear = .false.
+        compute_vmbm_advec = .false.
+        compute_vmbp_shear = .false.
+        compute_vmbp_advec = .false.
+        compute_vpbp_shear = .false.
+        compute_vpbp_advec = .false.
+        compute_vpbm_shear = .false.
+        compute_vpbm_advec = .false.
+
+        ! 1.  Decide if we need to allocate the induction arrays
+        If (compute_quantity(induction_r     )) allocate_indr = .true.
+        If (compute_quantity(induction_vmbm_r)) allocate_indr = .true.
+        If (compute_quantity(induction_vmbp_r)) allocate_indr = .true.
+        If (compute_quantity(induction_vpbm_r)) allocate_indr = .true.
+        If (compute_quantity(induction_vpbp_r)) allocate_indr = .true.
+
+        If (compute_quantity(induction_theta     )) allocate_indt = .true.
+        If (compute_quantity(induction_vmbm_theta)) allocate_indt = .true.
+        If (compute_quantity(induction_vmbp_theta)) allocate_indt = .true.
+        If (compute_quantity(induction_vpbm_theta)) allocate_indt = .true.
+        If (compute_quantity(induction_vpbp_theta)) allocate_indt = .true.
+
+        If (compute_quantity(induction_phi     )) allocate_indp = .true.
+        If (compute_quantity(induction_vmbm_phi)) allocate_indp = .true.
+        If (compute_quantity(induction_vmbp_phi)) allocate_indp = .true.
+        If (compute_quantity(induction_vpbm_phi)) allocate_indp = .true.
+        If (compute_quantity(induction_vpbp_phi)) allocate_indp = .true.
+
+        !2.  Set flags related to full v x B        
+        If (compute_quantity(induction_r)) Then
+            compute_shear = .true.
+            compute_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_r)) compute_shear = .true.
+        If (compute_quantity(induction_advec_r)) compute_advec = .true.
+
+        If (compute_quantity(induction_theta)) Then
+            compute_shear = .true.
+            compute_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_theta)) compute_shear = .true.
+        If (compute_quantity(induction_advec_theta)) compute_advec = .true.
+
+        If (compute_quantity(induction_phi)) Then
+            compute_shear = .true.
+            compute_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_phi)) compute_shear = .true.
+        If (compute_quantity(induction_advec_phi)) compute_advec = .true.
+
+        !3.  Set flags related to <v> x <B>        
+        If (compute_quantity(induction_vmbm_r)) Then
+            compute_vmbm_shear = .true.
+            compute_vmbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbm_r)) compute_vmbm_shear = .true.
+        If (compute_quantity(induction_advec_vmbm_r)) compute_vmbm_advec = .true.
+
+        If (compute_quantity(induction_vmbm_theta)) Then
+            compute_vmbm_shear = .true.
+            compute_vmbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbm_theta)) compute_vmbm_shear = .true.
+        If (compute_quantity(induction_advec_vmbm_theta)) compute_vmbm_advec = .true.
+
+        If (compute_quantity(induction_vmbm_phi)) Then
+            compute_vmbm_shear = .true.
+            compute_vmbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbm_phi)) compute_vmbm_shear = .true.
+        If (compute_quantity(induction_advec_vmbm_phi)) compute_vmbm_advec = .true.
+
+
+        !4. Set flags related to v' x <B>
+        If (compute_quantity(induction_vpbm_r)) Then
+            compute_vpbm_shear = .true.
+            compute_vpbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbm_r)) compute_vpbm_shear = .true.
+        If (compute_quantity(induction_advec_vpbm_r)) compute_vpbm_advec = .true.
+
+        If (compute_quantity(induction_vpbm_theta)) Then
+            compute_vpbm_shear = .true.
+            compute_vpbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbm_theta)) compute_vpbm_shear = .true.
+        If (compute_quantity(induction_advec_vpbm_theta)) compute_vpbm_advec = .true.
+
+        If (compute_quantity(induction_vpbm_phi)) Then
+            compute_vpbm_shear = .true.
+            compute_vpbm_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbm_phi)) compute_vpbm_shear = .true.
+        If (compute_quantity(induction_advec_vpbm_phi)) compute_vpbm_advec = .true.
+
+        !5. Set flags related to v' x 'B'
+        If (compute_quantity(induction_vpbp_r)) Then
+            compute_vpbp_shear = .true.
+            compute_vpbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbp_r)) compute_vpbp_shear = .true.
+        If (compute_quantity(induction_advec_vpbp_r)) compute_vpbp_advec = .true.
+
+        If (compute_quantity(induction_vpbp_theta)) Then
+            compute_vpbp_shear = .true.
+            compute_vpbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbp_theta)) compute_vpbp_shear = .true.
+        If (compute_quantity(induction_advec_vpbp_theta)) compute_vpbp_advec = .true.
+
+        If (compute_quantity(induction_vpbp_phi)) Then
+            compute_vpbp_shear = .true.
+            compute_vpbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vpbp_phi)) compute_vpbp_shear = .true.
+        If (compute_quantity(induction_advec_vpbp_phi)) compute_vpbp_advec = .true.
+
+        !6. Set flags related to <v> x 'B'
+        If (compute_quantity(induction_vmbp_r)) Then
+            compute_vmbp_shear = .true.
+            compute_vmbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbp_r)) compute_vmbp_shear = .true.
+        If (compute_quantity(induction_advec_vmbp_r)) compute_vmbp_advec = .true.
+
+        If (compute_quantity(induction_vmbp_theta)) Then
+            compute_vmbp_shear = .true.
+            compute_vmbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbp_theta)) compute_vmbp_shear = .true.
+        If (compute_quantity(induction_advec_vmbp_theta)) compute_vmbp_advec = .true.
+
+        If (compute_quantity(induction_vmbp_phi)) Then
+            compute_vmbp_shear = .true.
+            compute_vmbp_advec = .true.
+        Endif
+
+        If (compute_quantity(induction_shear_vmbp_phi)) compute_vmbp_shear = .true.
+        If (compute_quantity(induction_advec_vmbp_phi)) compute_vmbp_advec = .true.
+
+    End Subroutine Reset_Induction_Flags
 
 End Module Diagnostics_Induction
