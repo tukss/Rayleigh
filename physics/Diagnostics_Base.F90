@@ -19,20 +19,102 @@ Module Diagnostics_Base
 
     !/////////////////////////////////////////////////////////
     !  Quantity Codes (some care must be taken to
+
+    ! Velocity field components.
+    ! Fluctuations (denoted by "p") and azimuthal means
+    ! (denoted by "m") may also be output.
     Integer, Parameter :: voffset = 0
 
-    Integer, Parameter :: V_r  = voffset+1    
-    Integer, Parameter :: Vp_r = voffset+2
-    Integer, Parameter :: Vm_r = voffset+3
+    Integer, Parameter :: v_r  = voffset+1         ! Radial velocity
+    Integer, Parameter :: vp_r = voffset+2    
+    Integer, Parameter :: vm_r = voffset+3    
 
-    Integer, Parameter :: V_theta  = voffset+4    
-    Integer, Parameter :: Vp_theta = voffset+5
-    Integer, Parameter :: Vm_theta = voffset+6
+    Integer, Parameter :: dv_r_dr    = voffset+4   ! d{v_r}/dr
+    Integer, Parameter :: dvp_r_dr   = voffset+5    
+    Integer, Parameter :: dvm_r_dr   = voffset+6    
 
-    Integer, Parameter :: V_phi  = voffset+4    
-    Integer, Parameter :: Vp_phi = voffset+5
-    Integer, Parameter :: Vm_phi = voffset+6
+    Integer, Parameter :: dv_r_dt    = voffset+7   ! d{v_r}/dtheta
+    Integer, Parameter :: dvp_r_dt   = voffset+8    
+    Integer, Parameter :: dvm_r_dt   = voffset+9    
 
+    Integer, Parameter :: dv_r_dp    = voffset+10  ! d{v_r}/dphi
+    Integer, Parameter :: dvp_r_dp   = voffset+11    
+
+    Integer, Parameter :: dv_r_dtr   = voffset+12  ! (1/r)d{v_r}/dtheta
+    Integer, Parameter :: dvp_r_dtr  = voffset+13    
+    Integer, Parameter :: dvm_r_dtr  = voffset+14    
+
+    Integer, Parameter :: dv_r_dprs  = voffset+15  ! (1/r 1/sin(theta))d{v_r}/dphi
+    Integer, Parameter :: dvp_r_dprs = voffset+16   
+
+    Integer, Parameter :: v_theta  = voffset+17        ! Theta velocity
+    Integer, Parameter :: vp_theta = voffset+18    
+    Integer, Parameter :: vm_theta = voffset+19    
+
+    Integer, Parameter :: dv_theta_dr    = voffset+20  ! d{v_theta}/dr
+    Integer, Parameter :: dvp_theta_dr   = voffset+21    
+    Integer, Parameter :: dvm_theta_dr   = voffset+22    
+
+    Integer, Parameter :: dv_theta_dt    = voffset+23  ! d{v_theta}/dtheta
+    Integer, Parameter :: dvp_theta_dt   = voffset+24    
+    Integer, Parameter :: dvm_theta_dt   = voffset+25    
+
+    Integer, Parameter :: dv_theta_dp    = voffset+26  ! d{v_theta}/dphi
+    Integer, Parameter :: dvp_theta_dp   = voffset+27    
+
+    Integer, Parameter :: dv_theta_dtr   = voffset+28  ! (1/r)d{v_theta}/dtheta
+    Integer, Parameter :: dvp_theta_dtr  = voffset+29    
+    Integer, Parameter :: dvm_theta_dtr  = voffset+30    
+
+    Integer, Parameter :: dv_theta_dprs  = voffset+31  ! (1/r 1/sin(theta))d{v_theta}/dphi
+    Integer, Parameter :: dvp_theta_dprs = voffset+32   
+
+
+    Integer, Parameter :: v_phi  = voffset+33        ! Phi velocity
+    Integer, Parameter :: vp_phi = voffset+34    
+    Integer, Parameter :: vm_phi = voffset+35    
+
+    Integer, Parameter :: dv_phi_dr    = voffset+36  ! d{v_phi}/dr
+    Integer, Parameter :: dvp_phi_dr   = voffset+37    
+    Integer, Parameter :: dvm_phi_dr   = voffset+38    
+
+    Integer, Parameter :: dv_phi_dt    = voffset+39  ! d{v_phi}/dtheta
+    Integer, Parameter :: dvp_phi_dt   = voffset+40    
+    Integer, Parameter :: dvm_phi_dt   = voffset+41    
+
+    Integer, Parameter :: dv_phi_dp    = voffset+42  ! d{v_phi}/dphi
+    Integer, Parameter :: dvp_phi_dp   = voffset+43    
+
+    Integer, Parameter :: dv_phi_dtr   = voffset+44  ! (1/r)d{v_phi}/dtheta
+    Integer, Parameter :: dvp_phi_dtr  = voffset+45    
+    Integer, Parameter :: dvm_phi_dtr  = voffset+46    
+
+    Integer, Parameter :: dv_phi_dprs  = voffset+47  ! (1/r 1/sin(theta))d{v_phi}/dphi
+    Integer, Parameter :: dvp_phi_dprs = voffset+48   
+
+    !//////////////////////////////////////////////////////////////////////////
+    !///////////////////////////////////////////////////
+    !       Vorticity Outputs
+    Integer, Parameter :: vort_off = 50
+
+    Integer, Parameter :: vort_r  = vort_off+1      ! Radial Current Density
+    Integer, Parameter :: vortp_r = vort_off+2    
+    Integer, Parameter :: vortm_r = vort_off+3 
+
+    Integer, Parameter :: vort_theta  = vort_off+4  ! Theta Current Density
+    Integer, Parameter :: vortp_theta = vort_off+5    
+    Integer, Parameter :: vortm_theta = vort_off+6 
+
+    Integer, Parameter :: vort_phi  = vort_off+7    ! Phi Current Density
+    Integer, Parameter :: vortp_phi = vort_off+8    
+    Integer, Parameter :: vortm_phi = vort_off+9 
+
+    Integer, Parameter :: enstrophy   = vort_off+10
+    Integer, Parameter :: enstrophypm = vort_off+11
+    Integer, Parameter :: enstrophymm = vort_off+12
+    Integer, Parameter :: enstropypp  = vort_off+13
+
+    Integer, Parameter :: tpoffset = 70
 
     Integer, Parameter :: Temperature = 4,    Pressure = 5
 
@@ -46,8 +128,7 @@ Module Diagnostics_Base
     Integer, Parameter :: ke_flux_radial = 18, enth_flux_radial = 19
     Integer, Parameter :: buoyancy_work = 20
 
-    Integer, Parameter :: vort_r = 21, vort_theta = 22, vort_phi = 23
-    Integer, Parameter :: enstrophy = 24
+
 
     !Angular Momentum Transport Diagnostics
     Integer, Parameter :: amom_fluct_r = 25, amom_fluct_theta = 26, &
@@ -91,34 +172,125 @@ Module Diagnostics_Base
     Integer, Parameter :: vr3 = 104, vt3 = 105, vp3 = 106
 
     !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
-    Integer, Parameter :: B_r = 201, B_theta = 202, B_phi = 203
-    Integer, Parameter :: J_r = 204, J_theta = 205, J_phi = 206
+
+
+    !//////////////////////////////////////////////////
+    !               Magnetic field components.
+    ! Fluctuations (denoted by "p") and azimuthal means
+    ! (denoted by "m") may also be output.
+    Integer, Parameter :: boffset = 200
+
+    Integer, Parameter :: b_r  = boffset+1             ! Radial Bfield
+    Integer, Parameter :: bp_r = boffset+2    
+    Integer, Parameter :: bm_r = boffset+3    
+
+    Integer, Parameter :: db_r_dr    = boffset+4       ! d{b_r}/dr
+    Integer, Parameter :: dbp_r_dr   = boffset+5    
+    Integer, Parameter :: dbm_r_dr   = boffset+6    
+
+    Integer, Parameter :: db_r_dt    = boffset+7       ! d{b_r}/dtheta
+    Integer, Parameter :: dbp_r_dt   = boffset+8    
+    Integer, Parameter :: dbm_r_dt   = boffset+9    
+
+    Integer, Parameter :: db_r_dp    = boffset+10      ! d{b_r}/dphi
+    Integer, Parameter :: dbp_r_dp   = boffset+11    
+
+    Integer, Parameter :: db_r_dtr   = boffset+12      ! (1/r)d{b_r}/dtheta
+    Integer, Parameter :: dbp_r_dtr  = boffset+13    
+    Integer, Parameter :: dbm_r_dtr  = boffset+14    
+
+    Integer, Parameter :: db_r_dprs  = boffset+15      ! (1/r 1/sin(theta))d{b_r}/dphi
+    Integer, Parameter :: dbp_r_dprs = boffset+16   
+
+    Integer, Parameter :: b_theta  = boffset+17        ! Theta Bfield
+    Integer, Parameter :: bp_theta = boffset+18    
+    Integer, Parameter :: bm_theta = boffset+19    
+
+    Integer, Parameter :: db_theta_dr    = boffset+20  ! d{b_theta}/dr
+    Integer, Parameter :: dbp_theta_dr   = boffset+21    
+    Integer, Parameter :: dbm_theta_dr   = boffset+22    
+
+    Integer, Parameter :: db_theta_dt    = boffset+23  ! d{b_theta}/dtheta
+    Integer, Parameter :: dbp_theta_dt   = boffset+24    
+    Integer, Parameter :: dbm_theta_dt   = boffset+25    
+
+    Integer, Parameter :: db_theta_dp    = boffset+26  ! d{b_theta}/dphi
+    Integer, Parameter :: dbp_theta_dp   = boffset+27    
+
+    Integer, Parameter :: db_theta_dtr   = boffset+28  ! (1/r)d{b_theta}/dtheta
+    Integer, Parameter :: dbp_theta_dtr  = boffset+29    
+    Integer, Parameter :: dbm_theta_dtr  = boffset+30    
+
+    Integer, Parameter :: db_theta_dprs  = boffset+31  ! (1/r 1/sin(theta))d{b_theta}/dphi
+    Integer, Parameter :: dbp_theta_dprs = boffset+32   
+
+    Integer, Parameter :: b_phi  = boffset+33          ! Phi Bfield
+    Integer, Parameter :: bp_phi = boffset+34    
+    Integer, Parameter :: bm_phi = boffset+35    
+
+    Integer, Parameter :: db_phi_dr    = boffset+36    ! d{b_phi}/dr
+    Integer, Parameter :: dbp_phi_dr   = boffset+37    
+    Integer, Parameter :: dbm_phi_dr   = boffset+38    
+
+    Integer, Parameter :: db_phi_dt    = boffset+39    ! d{b_phi}/dtheta
+    Integer, Parameter :: dbp_phi_dt   = boffset+40    
+    Integer, Parameter :: dbm_phi_dt   = boffset+41    
+
+    Integer, Parameter :: db_phi_dp    = boffset+42    ! d{b_phi}/dphi
+    Integer, Parameter :: dbp_phi_dp   = boffset+43    
+
+    Integer, Parameter :: db_phi_dtr   = boffset+44    ! (1/r)d{b_phi}/dtheta
+    Integer, Parameter :: dbp_phi_dtr  = boffset+45    
+    Integer, Parameter :: dbm_phi_dtr  = boffset+46    
+
+    Integer, Parameter :: db_phi_dprs  = boffset+47    ! (1/r 1/sin(theta))d{b_phi}/dphi
+    Integer, Parameter :: dbp_phi_dprs = boffset+48   
+
+
+    !///////////////////////////////////////////////////
+    !       Current Density Outputs
+    Integer, Parameter :: joffset = 250
+
+    Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
+    Integer, Parameter :: jp_r = joffset+2    
+    Integer, Parameter :: jm_r = joffset+3 
+
+    Integer, Parameter :: j_theta  = joffset+4  ! Theta Current Density
+    Integer, Parameter :: jp_theta = joffset+5    
+    Integer, Parameter :: jm_theta = joffset+6 
+
+    Integer, Parameter :: j_phi  = joffset+7    ! Phi Current Density
+    Integer, Parameter :: jp_phi = joffset+8    
+    Integer, Parameter :: jm_phi = joffset+9 
+
+
+
     Integer, Parameter :: B_sq = 207, magnetic_energy=208, zonal_me = 209
     Integer, Parameter :: merid_me = 210, b_r2 = 211, b_theta2 = 212, b_phi2 = 213
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
     ! "m" and "< >" denote the azimuthal mean.
     ! "p" and " ' " denote perturbations about the azimuthal mean 
+    Integer, Parameter :: loff = 220
+    Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
+    Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
+    Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
 
-    Integer, Parameter :: j_cross_b_r       = 220 ! radial component of j x B
-    Integer, Parameter :: j_cross_b_theta   = 221 !  theta component of j x B
-    Integer, Parameter :: j_cross_b_phi     = 222 !    phi component of j x B
+    Integer, Parameter :: jp_cross_bm_r     = loff+4  ! radial component of j' x <B>  
+    Integer, Parameter :: jp_cross_bm_theta = loff+5  !  theta component of j' x <B>
+    Integer, Parameter :: jp_cross_bm_phi   = loff+6  !    phi component of j' x <B>
 
-    Integer, Parameter :: jp_cross_bm_r     = 223 ! radial component of j' x <B>  
-    Integer, Parameter :: jp_cross_bm_theta = 224 !  theta component of j' x <B>
-    Integer, Parameter :: jp_cross_bm_phi   = 225 !    phi component of j' x <B>
+    Integer, Parameter :: jm_cross_bp_r     = loff+7  ! radial component of <j> x B'
+    Integer, Parameter :: jm_cross_bp_theta = loff+8  !  theta component of <j> x B'
+    Integer, Parameter :: jm_cross_bp_phi   = loff+9  !    phi component of <j> x B'
 
-    Integer, Parameter :: jm_cross_bp_r     = 226 ! radial component of <j> x B'
-    Integer, Parameter :: jm_cross_bp_theta = 227 !  theta component of <j> x B'
-    Integer, Parameter :: jm_cross_bp_phi   = 228 !    phi component of <j> x B'
+    Integer, Parameter :: jm_cross_bm_r     = loff+10 ! radial component of <j> x <B>
+    Integer, Parameter :: jm_cross_bm_theta = loff+11 !  theta component of <j> x <B>  
+    Integer, Parameter :: jm_cross_bm_phi   = loff+12 !    phi component of <j> x <B> 
 
-    Integer, Parameter :: jm_cross_bm_r     = 229 ! radial component of <j> x <B>
-    Integer, Parameter :: jm_cross_bm_theta = 230 !  theta component of <j> x <B>  
-    Integer, Parameter :: jm_cross_bm_phi   = 231 !    phi component of <j> x <B> 
-
-    Integer, Parameter :: jp_cross_bp_r     = 232 ! radial component of j' x B'  
-    Integer, Parameter :: jp_cross_bp_theta = 233 !  theta component of j' x B'
-    Integer, Parameter :: jp_cross_bp_phi   = 234 !    phi component of j' x B'
+    Integer, Parameter :: jp_cross_bp_r     = loff+13 ! radial component of j' x B'  
+    Integer, Parameter :: jp_cross_bp_theta = loff+14 !  theta component of j' x B'
+    Integer, Parameter :: jp_cross_bp_phi   = loff+15 !    phi component of j' x B'
 
 
     !////////////////////////////// Induction Terms ///////////////////////////

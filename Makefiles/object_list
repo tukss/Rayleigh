@@ -6,7 +6,8 @@ IOOBJ = Spherical_IO.o
 POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o NonDimensionalization.o\
         Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o \
         Diagnostics_Base.o Diagnostics_ADotGradB.o \
-        Diagnostics_Velocity_Field.o \
+        Diagnostics_Velocity_Field.o Diagnostics_Magnetic_Field.o \
+        Diagnostics_Current_Density.o \
         Diagnostics_Lorentz_Forces.o Diagnostics_Induction.o Diagnostics_Inertial_Forces.o \
         Diagnostics_Interface.o \
         Benchmarking.o Linear_Terms_Sphere.o \
