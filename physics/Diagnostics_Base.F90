@@ -19,7 +19,21 @@ Module Diagnostics_Base
 
     !/////////////////////////////////////////////////////////
     !  Quantity Codes (some care must be taken to
-    Integer, Parameter :: V_r = 1,   V_theta = 2, V_phi = 3
+    Integer, Parameter :: voffset = 0
+
+    Integer, Parameter :: V_r  = voffset+1    
+    Integer, Parameter :: Vp_r = voffset+2
+    Integer, Parameter :: Vm_r = voffset+3
+
+    Integer, Parameter :: V_theta  = voffset+4    
+    Integer, Parameter :: Vp_theta = voffset+5
+    Integer, Parameter :: Vm_theta = voffset+6
+
+    Integer, Parameter :: V_phi  = voffset+4    
+    Integer, Parameter :: Vp_phi = voffset+5
+    Integer, Parameter :: Vm_phi = voffset+6
+
+
     Integer, Parameter :: Temperature = 4,    Pressure = 5
 
     Integer, Parameter :: v_sq = 6, kinetic_energy = 7

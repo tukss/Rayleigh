@@ -24,12 +24,12 @@ Module Spherical_IO
     !following the endian tag.  Hopefully, reading routines can be backward compatible if
     !significant changes are made to the output structure (and reflected in the version number)
   
-    Integer, Parameter :: shellslice_version = 1
-    Integer, Parameter :: azavg_version = 1
-    Integer, Parameter :: shellavg_version = 2
-    Integer, Parameter :: globalavg_version = 1
-    Integer, Parameter :: shellspectra_version = 1
-    Integer, Parameter :: full3d_version = 1    !currently unused
+    Integer, Parameter :: shellslice_version = 3
+    Integer, Parameter :: azavg_version = 3
+    Integer, Parameter :: shellavg_version = 3
+    Integer, Parameter :: globalavg_version = 3
+    Integer, Parameter :: shellspectra_version = 3
+    Integer, Parameter :: full3d_version = 3    !currently unused
     Type, Public :: DiagnosticInfo
         ! Need to see if we can make these allocatable, but for now..
         ! Each instance of this class has two static arrays used for reading in namelist input
