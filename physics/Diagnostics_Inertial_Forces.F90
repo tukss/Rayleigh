@@ -14,9 +14,8 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
-        Real*8, Allocatable :: vfluct(:,:,:,:), cbuffer(:,:,:,:)
+        Real*8, Allocatable :: cbuffer(:,:,:,:)
 
-        Integer :: vinds(1:12)
 
 
         Logical :: compute_fluctuations = .false.
@@ -93,27 +92,12 @@ Contains
         Endif
 
         Allocate(cbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:3))
-        If (compute_fluctuations) Then
-            Call Compute_Vfluctuations(buffer)
-        Endif
 
-        vinds(1)  = vr
-        vinds(2)  = vtheta
-        vinds(3)  = vphi
-        vinds(4)  = dvrdr
-        vinds(5)  = dvrdt
-        vinds(6)  = dvrdp
-        vinds(7)  = dvtdr
-        vinds(8)  = dvtdt
-        vinds(9)  = dvtdp
-        vinds(10) = dvpdr
-        vinds(11) = dvpdt
-        vinds(12) = dvpdp
 
         !//////////////////////////////////////////////////////////////////////////////////
         !/////////////// v dot grad v (full)//////////////////
         If (compute_full_full) Then
-            Call ADotGradB(buffer,buffer,cbuffer,aindices=vinds,bindices=vinds)
+            Call ADotGradB(buffer,buffer,cbuffer,aindices=vindex,bindices=vindex)
             If (compute_quantity(v_grad_v_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -136,7 +120,7 @@ Contains
 
         !/////////////// v' dot grad v' //////////////////
         If (compute_fluct_fluct) Then
-            Call ADotGradB(vfluct,vfluct,cbuffer)
+            Call ADotGradB(fbuffer,fbuffer,cbuffer,aindices=vindex,bindices=vindex)
             If (compute_quantity(vp_grad_vp_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -159,7 +143,7 @@ Contains
 
         !/////////////// <v> dot grad <v> //////////////////
         If (compute_mean_mean) Then
-            Call ADotGradB(m0_values,m0_values,cbuffer,aindices=vinds,bindices=vinds)
+            Call ADotGradB(m0_values,m0_values,cbuffer,aindices=vindex,bindices=vindex)
             If (compute_quantity(vm_grad_vm_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -182,7 +166,7 @@ Contains
 
         !/////////////// v' dot grad <v> //////////////////
         If (compute_fluct_mean) Then
-            Call ADotGradB(vfluct,m0_values,cbuffer,bindices=vinds)
+            Call ADotGradB(fbuffer,m0_values,cbuffer,aindices = vindex, bindices=vindex)
             If (compute_quantity(vp_grad_vm_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -205,7 +189,7 @@ Contains
 
         !/////////////// <v> dot grad v' //////////////////
         If (compute_mean_fluct) Then
-            Call ADotGradB(m0_values,vfluct,cbuffer,aindices=vinds)
+            Call ADotGradB(m0_values,fbuffer,cbuffer,aindices=vindex,bindices=vindex)
             If (compute_quantity(vm_grad_vp_r)) Then
                 DO_PSI
                     qty(PSI) = cbuffer(PSI,1)*ref%density(r)
@@ -227,8 +211,6 @@ Contains
         Endif
 
         DeAllocate(cbuffer)
-        If (compute_fluctuations) Then
-            DeAllocate(vfluct)
-        Endif
+
     End Subroutine Compute_Inertial_Terms
 End Module Diagnostics_Inertial_Forces

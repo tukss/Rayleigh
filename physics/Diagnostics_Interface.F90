@@ -9,6 +9,7 @@ Module Diagnostics_Interface
     Use Math_Constants
     Use Diagnostics_Base
     Use Diagnostics_Lorentz_Forces
+    Use Diagnostics_Induction
     Use Diagnostics_Inertial_Forces
     Implicit None
 
@@ -72,6 +73,30 @@ Contains
     !   jtheta  -- theta current density
     !   jphi    -- phi current density
 
+
+    ! If Induction Output is needed for this iteration,
+    !   the buffer also holds the derivatives of each
+    !   component of B.
+
+    ! Radial Derivatives:
+    !   dbrdr   -- d(b_r)/dr
+    !   dbtdr   -- d(b_theta)/dr
+    !   dbpdr   -- d(b_phi)/dr
+
+    
+    ! Theta Derivatives:
+    !   dbrdt   -- d(b_r)/dtheta
+    !   dbtdt   -- d(b_theta)/dtheta
+    !   dbpdt   -- d(b_phi)/dtheta
+
+
+    ! Phi Derivatives:
+    !   dbrdp   --  d(b_r)/dphi
+    !   dbtdp   --  d(b_theta)/dphi
+    !   dbpdp   --  d(b_phi)/dphi
+
+
+
     Subroutine PS_Output(buffer,iteration, current_time)
         Implicit None
         Integer, Intent(In) :: iteration
@@ -95,8 +120,9 @@ Contains
             Allocate(m0_values(my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields))
             Call ComputeEll0(buffer,ell0_values)
             Call ComputeM0(buffer,m0_values)
-
-
+            Call Adjust_Bfield(buffer)!<-------------- Check on induction flag
+            Call Compute_Fluctuations(buffer)
+        
 
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
@@ -727,6 +753,7 @@ Contains
 			Call Complete_Output(iteration, current_time)
 
             DeAllocate(ell0_values,m0_values)
+            Call DeAllocate_Fluctuations()
         Endif  ! time_to_output(iteration)
     End Subroutine PS_Output
 
@@ -773,7 +800,7 @@ Contains
 
         Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
-
+        Call Initialize_VBIndices()
         !DeAllocate(tweights)  !<---- Used to deallocate these.  We now use these for the computing the ell0 components
         !DeAllocate(rweights)
         

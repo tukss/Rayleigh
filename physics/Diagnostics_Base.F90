@@ -206,10 +206,12 @@ Module Diagnostics_Base
     Real*8, Allocatable :: rweights(:), tweights(:)
 
     !//////////////////////////////////
-    Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:), bm0_values(:,:,:)
+    Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)
 
-    ! These arrays are used to hold fluctuating v- and b-related quantities      
-    Real*8, Allocatable :: vfluct(:,:,:,:), bfluct(:,:,:,:)	
+    ! This array will hold fluctuating quantities from the buffer { q - <q>}      
+    Real*8, Allocatable :: fbuffer(:,:,:,:)	
+    Integer :: vindex(1:12), bindex(1:12)  ! the indices within fbuffer corresponding to v,B, and their derivatives
+
     ! These indices are used for references fluctuations in vfluct and bfluct
     ! "p" denotes "prime" as in v'
     Integer :: vr_p     = 1, dvrdr_p = 4 ,dvrdt_p = 5 , dvrdp_p = 6
@@ -228,9 +230,9 @@ Module Diagnostics_Base
 
     ! These indices are used to reference the values held in add_fields%p3a
     ! That buffer contains the derivatives of each component of b
-    Integer :: dbrdr_ai = 1 , dbrdt_ai = 2  , dbrdp_ai = 7
-    Integer :: dbtdr_ai = 3 , dbtdt_ai = 4  , dbtdp_ai = 8
-    Integer :: dbpdr_ai = 5 , dbpdt_ai = 6 ,  dbpdp_ai = 9    
+    Integer :: dbrdr = 1 , dbrdt = 2  , dbrdp = 7
+    Integer :: dbtdr = 3 , dbtdt = 4  , dbtdp = 8
+    Integer :: dbpdr = 5 , dbpdt = 6 ,  dbpdp = 9    
 
     Type(SphericalBuffer), public :: add_fields
     !Integer :: dbrdt, dbrdr, dbtdr, dbpdr
@@ -244,77 +246,13 @@ Contains
         !Call Load_Label(v_phi, 'V_phi')
     End Subroutine Generate_Diagnostic_Labels
 
-    Subroutine Compute_Vfluctuations(buffer)
-        Implicit None
-        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
-        Integer :: r,k, t
-        Allocate(vfluct(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
 
 
-
-        ! V_r terms
-        DO_PSI
-            vfluct(PSI,vr_p) = buffer(PSI,vr) - m0_values(PSI2,vr) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvrdr_p) = buffer(PSI,dvrdr) - m0_values(PSI2,dvrdr) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvrdt_p) = buffer(PSI,dvrdt) - m0_values(PSI2,dvrdt) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvrdp_p) = buffer(PSI,dvrdp) 
-        END_DO
-
-        ! V_theta terms
-        DO_PSI
-            vfluct(PSI,vtheta_p) = buffer(PSI,vtheta) - m0_values(PSI2,vtheta) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvtdr_p) = buffer(PSI,dvtdr) - m0_values(PSI2,dvtdr) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvtdt_p) = buffer(PSI,dvtdt) - m0_values(PSI2,dvtdt) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvtdp_p) = buffer(PSI,dvtdp)  
-        END_DO
-
-        ! V_phi terms
-        DO_PSI
-            vfluct(PSI,vphi_p) = buffer(PSI,vphi) - m0_values(PSI2,vphi) 
-        END_DO        
-
-        DO_PSI
-            vfluct(PSI,dvpdr_p) = buffer(PSI,dvpdr) - m0_values(PSI2,dvpdr) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvpdt_p) = buffer(PSI,dvpdt) - m0_values(PSI2,dvpdt) 
-        END_DO
-
-        DO_PSI
-            vfluct(PSI,dvpdp_p) = buffer(PSI,dvpdp) 
-        END_DO
-    End Subroutine Compute_Vfluctuations
-
-    Subroutine Load_Bfield(buffer)
+    Subroutine Adjust_Bfield(buffer)
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t, j
-        Allocate(bvars(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
-        Allocate(bm0_values(my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
-        !At this point, we'll need to reform the b buffer
-        Call add_fields%reform() !moves from p2a to p3a
-        !Call Phi_DerivativesD()
-		!Call fft_to_physical(wsp%p3a,rsc = .true.)
-
+        !This routine will handle the sintheta divisions for the magnetic components
         
 
 		!Call sintheta_divd(add_fieldss%p3a,dbtdr_ai)
@@ -323,66 +261,59 @@ Contains
 		!Call sintheta_divd(add_fields%p3a,dbrdt_ai)
 		!Call sintheta_divd(add_fields%p3a,dbpdp_ai)
 		!Call sintheta_divd(add_fields%p3a,dbtdp_ai)
-        DO_PSI
-            bvars(PSI,br_i)     = buffer(PSI,br)
-        END_DO
-        DO_PSI
-            bvars(PSI,btheta_i) = buffer(PSI,btheta)
-        END_DO
-        DO_PSI
-            bvars(PSI,bphi_i)   = buffer(PSI,bphi)
-        END_DO
-
-        DO_PSI
-            bvars(PSI,dbrdr_i)  = add_fields%p3a(PSI,dbrdr_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbrdt_i)  = add_fields%p3a(PSI,dbrdt_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbrdp_i)  = add_fields%p3a(PSI,dbrdp_ai)
-        END_DO
-
-        DO_PSI
-            bvars(PSI,dbtdr_i)  = add_fields%p3a(PSI,dbtdr_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbtdt_i)  = add_fields%p3a(PSI,dbtdt_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbtdp_i)  = add_fields%p3a(PSI,dbtdp_ai)
-        END_DO
-
-        DO_PSI
-            bvars(PSI,dbpdr_i)  = add_fields%p3a(PSI,dbpdr_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbpdt_i)  = add_fields%p3a(PSI,dbpdt_ai)
-        END_DO
-        DO_PSI
-            bvars(PSI,dbpdp_i)  = add_fields%p3a(PSI,dbpdp_ai)
-        END_DO
-
-
-
         
-        Call ComputeM0(bvars,bm0_values)
-    End Subroutine Load_Bfield
+    End Subroutine Adjust_Bfield
 
-    Subroutine Compute_Bfluctuations()
+
+
+    Subroutine Compute_Fluctuations(buffer)
         Implicit None
-        Integer :: r,k, t, j
-        Allocate(bfluct(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:12))
-        ! B_r terms
-        ! The bvars array is assumed to be ordered as expected by
-        ! the a Dot Grad B routines.  Thus, we just loop over all 12 variables
+        Integer :: r,k, t, j,jmax
+        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
+        jmax = size(buffer,4)
+        Allocate(fbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:jmax))
+        
 
-        Do j = 1, 12
+        Do j = 1, jmax
             DO_PSI
-                bfluct(PSI,j) = bvars(PSI,j) - bm0_values(PSI2,j) 
+                fbuffer(PSI,j) = buffer(PSI,j) - m0_values(PSI2,j) 
             END_DO
         Enddo
 
-    End Subroutine Compute_Bfluctuations
+    End Subroutine Compute_Fluctuations
+
+    Subroutine DeAllocate_Fluctuations()
+        Implicit None
+        DeAllocate(fbuffer)
+    End Subroutine DeAllocate_Fluctuations
+
+    Subroutine Initialize_VBIndices()
+        Implicit None
+        vindex(1)  = vr
+        vindex(2)  = vtheta
+        vindex(3)  = vphi
+        vindex(4)  = dvrdr
+        vindex(5)  = dvrdt
+        vindex(6)  = dvrdp
+        vindex(7)  = dvtdr
+        vindex(8)  = dvtdt
+        vindex(9)  = dvtdp
+        vindex(10) = dvpdr
+        vindex(11) = dvpdt
+        vindex(12) = dvpdp
+
+        bindex(1)  = br
+        bindex(2)  = btheta
+        bindex(3)  = bphi
+        bindex(4)  = dbrdr
+        bindex(5)  = dbrdt
+        bindex(6)  = dbrdp
+        bindex(7)  = dbtdr
+        bindex(8)  = dbtdt
+        bindex(9)  = dbtdp
+        bindex(10) = dbpdr
+        bindex(11) = dbpdt
+        bindex(12) = dbpdp
+    End Subroutine Initialize_VBindices
 
 End Module Diagnostics_Base

@@ -1,4 +1,20 @@
+#define DO_PSI Do t = my_theta%min, my_theta%max;	Do r = my_r%min, my_r%max ;Do k = 1, n_phi
+#define DO_PSI2 Do t = my_theta%min, my_theta%max;	Do r = my_r%min, my_r%max
+#define END_DO2 enddo; enddo
+#define END_DO enddo; enddo; enddo
+#define PSI k,r,t
+#define PSI2 r,t
+
+!///////////////////////////////////////////////////////////////////
+!               DIAGNOSTICS_INDUCTION
+!               This module computes del x (vxB), its 
+!               constituent terms (i.e., B dot grad v), 
+!               and their Reynolds decomposition
+!///////////////////////////////////////////////////////////////////
+
 Module Diagnostics_Induction
+    Use Diagnostics_Base
+    Use Diagnostics_ADotGradB
     Implicit None
     Logical :: allocate_indr = .false.
     Logical :: allocate_indt = .false.
@@ -7,14 +23,22 @@ Module Diagnostics_Induction
     Logical :: compute_advec = .false.
     Logical :: compute_vmbm_shear = .false.
     Logical :: compute_vmbm_advec = .false.
-
+    Logical :: compute_vmbp_shear = .false.
+    Logical :: compute_vmbp_advec = .false.
+    Logical :: compute_vpbm_shear = .false.
+    Logical :: compute_vpbm_advec = .false.
+    Logical :: compute_vpbp_shear = .false.
+    Logical :: compute_vpbp_advec = .false.
 
 Contains
 
     Subroutine Compute_Induction_Terms(buffer)
         Implicit None
+        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8, Allocatable :: ind_r(:,:,:), ind_theta(:,:,:), ind_phi(:,:,:)
-
+        Real*8, Allocatable :: cbuffer(:,:,:,:)  
+        Integer :: r,k, t
+        Allocate(cbuffer(1:n_phi,my_r%min:my_r%max,my_theta%min:my_theta%max,1:3))
         Call Reset_Induction_Flags()
 
         If (allocate_indr) Then
@@ -29,13 +53,13 @@ Contains
 
         !////////////////////////////////////////////////////////////////////////
         !
-        !   Part 1.    Terms involving full v and full B.
+        !   Part 1.    Terms resulting full v cross full B.
         !
         !////////////////////////////////////////////////////////////////////////
         !1a.  B dot grad v 
         If (compute_shear) Then
 
-            Call ADotGradB(bbuffer,buffer,cbuffer,bindices=binds)
+            Call ADotGradB(buffer,buffer,cbuffer,aindices = bindex, bindices=vindex)
 
             If (compute_quantity(induction_shear_r)) Then
                 qty(:,:,:) = cbuffer(:,:,:,1)
@@ -64,7 +88,7 @@ Contains
         !1b.  -v dot grad B 
         If (compute_advec) Then
 
-            Call ADotGradB(bbuffer,buffer,cbuffer,bindices=binds)
+            Call ADotGradB(buffer,buffer,cbuffer,aindices = vindex, bindices=bindex)
 
             If (compute_quantity(induction_advec_r)) Then
                 qty(:,:,:) = -cbuffer(:,:,:,1)
@@ -96,9 +120,9 @@ Contains
 
         If (compute_quantity(induction_comp_r) .or. compute_quantity(induction_r)) Then
             DO_PSI
-                qty(PSI) = bbuffer(PSI,ind_br)*buffer(PSI,vr)*ref%dlnrho(r)
+                qty(PSI) = buffer(PSI,br)*buffer(PSI,vr)*ref%dlnrho(r)
             END_DO
-            If (compute_quantity(induction_comp_r) Call Add_Quantity(qty)
+            If (compute_quantity(induction_comp_r)) Call Add_Quantity(qty)
             If (compute_quantity(induction_r)) Then
                  ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
                  Call Add_Quantity(ind_r)
@@ -107,7 +131,7 @@ Contains
 
         If (compute_quantity(induction_comp_theta) .or. compute_quantity(induction_theta)) Then
             DO_PSI
-                qty(PSI) = bbuffer(PSI,ind_btheta)*buffer(PSI,vr)*ref%dlnrho(r)
+                qty(PSI) = buffer(PSI,btheta)*buffer(PSI,vr)*ref%dlnrho(r)
             END_DO
             If (compute_quantity(induction_comp_theta)) Call Add_Quantity(qty)
             If (compute_quantity(induction_theta)) Then
@@ -118,7 +142,7 @@ Contains
 
         If (compute_quantity(induction_comp_phi) .or. compute_quantity(induction_phi)) Then
             DO_PSI
-                qty(PSI) = bbuffer(PSI,ind_bphi)*buffer(PSI,vr)*ref%dlnrho(r)
+                qty(PSI) = buffer(PSI,bphi)*buffer(PSI,vr)*ref%dlnrho(r)
             END_DO
             If (compute_quantity(induction_comp_phi)) Call Add_Quantity(qty)
             If (compute_quantity(induction_phi)) Then
@@ -127,12 +151,412 @@ Contains
             Endif
         Endif
 
+        !////////////////////////////////////////////////////////////////////////
+        !
+        !   Part 2.    Terms resulting from <v> x B'.
+        !
+        !////////////////////////////////////////////////////////////////////////
+        !2a.  B' dot grad <v> 
+        If (compute_vmbp_shear) Then
+
+            Call ADotGradB(fbuffer,m0_values,cbuffer,aindices = bindex, bindices=vindex)
+
+            If (compute_quantity(induction_shear_vmbp_r)) Then
+                qty(:,:,:) = cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbp_theta)) Then
+                qty(:,:,:) = cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbp_phi)) Then
+                qty(:,:,:) = cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vmbp_r)) Then
+                 ind_r(:,:,:) = cbuffer(:,:,:,1)                  
+            Endif
+            If (compute_quantity(induction_vmbp_theta)) Then
+                 ind_theta(:,:,:) = cbuffer(:,:,:,2)                   
+            Endif
+            If (compute_quantity(induction_vmbp_phi)) Then
+                 ind_phi(:,:,:) = cbuffer(:,:,:,3)                
+            Endif
+        Endif
+
+        !2b.  -<v> dot grad B' 
+        If (compute_vmbp_advec) Then
+
+            Call ADotGradB(m0_values,fbuffer,cbuffer,aindices = vindex, bindices=bindex)
+
+            If (compute_quantity(induction_advec_vmbp_r)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_advec_vmbp_theta)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbp_phi)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vmbp_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)-cbuffer(:,:,:,1)                    
+            Endif
+            If (compute_quantity(induction_vmbp_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)-cbuffer(:,:,:,2)                    
+            Endif
+            If (compute_quantity(induction_vmbp_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,3)                    
+            Endif
+        Endif
+
+        !2c.  -B' (div dot <v>)
+        ! Take care with the logic here...
+
+        If (compute_quantity(induction_comp_vmbp_r) .or. compute_quantity(induction_vmbp_r)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,br)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbp_r)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbp_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_r)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vmbp_theta) .or. compute_quantity(induction_vmbp_theta)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,btheta)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbp_theta)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbp_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_theta)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vmbp_phi) .or. compute_quantity(induction_vmbp_phi)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,bphi)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbp_phi)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbp_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_phi)
+            Endif
+        Endif
+
+        !////////////////////////////////////////////////////////////////////////
+        !
+        !   Part 3.    Terms resulting from v' x <B>.
+        !
+        !////////////////////////////////////////////////////////////////////////
+        !3a.  <B> dot grad v' 
+        If (compute_vpbm_shear) Then
+
+            Call ADotGradB(m0_values,fbuffer,cbuffer,aindices = bindex, bindices=vindex)
+
+            If (compute_quantity(induction_shear_vpbm_r)) Then
+                qty(:,:,:) = cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbm_theta)) Then
+                qty(:,:,:) = cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbm_phi)) Then
+                qty(:,:,:) = cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vpbm_r)) Then
+                 ind_r(:,:,:) = cbuffer(:,:,:,1)                  
+            Endif
+            If (compute_quantity(induction_vpbm_theta)) Then
+                 ind_theta(:,:,:) = cbuffer(:,:,:,2)                   
+            Endif
+            If (compute_quantity(induction_vpbm_phi)) Then
+                 ind_phi(:,:,:) = cbuffer(:,:,:,3)                
+            Endif
+        Endif
+
+        !3b.  -v' dot grad <B> 
+        If (compute_vpbm_advec) Then
+
+            Call ADotGradB(fbuffer,m0_values,cbuffer,aindices = vindex, bindices=bindex)
+
+            If (compute_quantity(induction_advec_vpbm_r)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_advec_vpbm_theta)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbm_phi)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vpbm_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)-cbuffer(:,:,:,1)                    
+            Endif
+            If (compute_quantity(induction_vpbm_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)-cbuffer(:,:,:,2)                    
+            Endif
+            If (compute_quantity(induction_vpbm_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,3)                    
+            Endif
+        Endif
+
+        !3c.  -<B> (div dot v')
+        ! Take care with the logic here...
+
+        If (compute_quantity(induction_comp_vpbm_r) .or. compute_quantity(induction_vpbm_r)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,br)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbm_r)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbm_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_r)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vpbm_theta) .or. compute_quantity(induction_vpbm_theta)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,btheta)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbm_theta)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbm_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_theta)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vpbm_phi) .or. compute_quantity(induction_vpbm_phi)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,bphi)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbm_phi)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbm_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_phi)
+            Endif
+        Endif
 
 
+        !////////////////////////////////////////////////////////////////////////
+        !
+        !   Part 4.    Terms resulting from <v> x <B>.
+        !
+        !////////////////////////////////////////////////////////////////////////
+        !4a.  <B> dot grad <v> 
+        If (compute_vmbm_shear) Then
+
+            Call ADotGradB(m0_values,m0_values,cbuffer,aindices = bindex, bindices=vindex)
+
+            If (compute_quantity(induction_shear_vmbm_r)) Then
+                qty(:,:,:) = cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbm_theta)) Then
+                qty(:,:,:) = cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbm_phi)) Then
+                qty(:,:,:) = cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vmbm_r)) Then
+                 ind_r(:,:,:) = cbuffer(:,:,:,1)                  
+            Endif
+            If (compute_quantity(induction_vmbm_theta)) Then
+                 ind_theta(:,:,:) = cbuffer(:,:,:,2)                   
+            Endif
+            If (compute_quantity(induction_vmbm_phi)) Then
+                 ind_phi(:,:,:) = cbuffer(:,:,:,3)                
+            Endif
+        Endif
+
+        !4b.  -<v> dot grad <B> 
+        If (compute_vmbm_advec) Then
+
+            Call ADotGradB(m0_values,m0_values,cbuffer,aindices = vindex, bindices=bindex)
+
+            If (compute_quantity(induction_advec_vmbm_r)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_advec_vmbm_theta)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vmbm_phi)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vmbm_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)-cbuffer(:,:,:,1)                    
+            Endif
+            If (compute_quantity(induction_vmbm_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)-cbuffer(:,:,:,2)                    
+            Endif
+            If (compute_quantity(induction_vmbm_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,3)                    
+            Endif
+        Endif
+
+        !4c.  -<B> (div dot <v>)
+        ! Take care with the logic here...
+
+        If (compute_quantity(induction_comp_vmbm_r) .or. compute_quantity(induction_vmbm_r)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,br)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbm_r)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbm_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_r)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vmbm_theta) .or. compute_quantity(induction_vmbm_theta)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,btheta)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbm_theta)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbm_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_theta)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vmbm_phi) .or. compute_quantity(induction_vmbm_phi)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,bphi)*m0_values(PSI2,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vmbm_phi)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vmbm_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_phi)
+            Endif
+        Endif
+
+
+        !////////////////////////////////////////////////////////////////////////
+        !
+        !   Part 5.    Terms resulting from v' x B'.
+        !
+        !////////////////////////////////////////////////////////////////////////
+        !5a.  B' dot grad v' 
+        If (compute_vpbp_shear) Then
+
+            Call ADotGradB(fbuffer,fbuffer,cbuffer,aindices = bindex, bindices=vindex)
+
+            If (compute_quantity(induction_shear_vpbp_r)) Then
+                qty(:,:,:) = cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbp_theta)) Then
+                qty(:,:,:) = cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbp_phi)) Then
+                qty(:,:,:) = cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vpbp_r)) Then
+                 ind_r(:,:,:) = cbuffer(:,:,:,1)                  
+            Endif
+            If (compute_quantity(induction_vpbp_theta)) Then
+                 ind_theta(:,:,:) = cbuffer(:,:,:,2)                   
+            Endif
+            If (compute_quantity(induction_vpbp_phi)) Then
+                 ind_phi(:,:,:) = cbuffer(:,:,:,3)                
+            Endif
+        Endif
+
+        !5b.  -v' dot grad B' 
+        If (compute_vpbp_advec) Then
+
+            Call ADotGradB(fbuffer,fbuffer,cbuffer,aindices = vindex, bindices=bindex)
+
+            If (compute_quantity(induction_advec_vpbp_r)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,1)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_advec_vpbp_theta)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,2)
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(induction_shear_vpbp_phi)) Then
+                qty(:,:,:) = -cbuffer(:,:,:,3)
+                Call Add_Quantity(qty)
+            Endif
+
+            If (compute_quantity(induction_vpbp_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)-cbuffer(:,:,:,1)                    
+            Endif
+            If (compute_quantity(induction_vpbp_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)-cbuffer(:,:,:,2)                    
+            Endif
+            If (compute_quantity(induction_vpbp_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)-cbuffer(:,:,:,3)                    
+            Endif
+        Endif
+
+        !5c.  -B' (div dot v')
+        ! Take care with the logic here...
+
+        If (compute_quantity(induction_comp_vpbp_r) .or. compute_quantity(induction_vpbp_r)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,br)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbp_r)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbp_r)) Then
+                 ind_r(:,:,:) = ind_r(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_r)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vpbp_theta) .or. compute_quantity(induction_vpbp_theta)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,btheta)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbp_theta)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbp_theta)) Then
+                 ind_theta(:,:,:) = ind_theta(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_theta)
+            Endif
+        Endif
+
+        If (compute_quantity(induction_comp_vpbp_phi) .or. compute_quantity(induction_vpbp_phi)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,bphi)*fbuffer(PSI,vr)*ref%dlnrho(r)
+            END_DO
+            If (compute_quantity(induction_comp_vpbp_phi)) Call Add_Quantity(qty)
+            If (compute_quantity(induction_vpbp_phi)) Then
+                 ind_phi(:,:,:) = ind_phi(:,:,:)+qty(:,:,:)                    
+                 Call Add_Quantity(ind_phi)
+            Endif
+        Endif
 
         If (    allocated(ind_r)) DeAllocate(ind_r)
         If (allocated(ind_theta)) DeAllocate(ind_theta)
         If (  allocated(ind_phi)) DeAllocate(ind_phi)
+        DeAllocate(cbuffer)
     End Subroutine Compute_Induction_Terms
 
     Subroutine Reset_Induction_Flags()
