@@ -144,6 +144,10 @@ Contains
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
             Call Compute_Velocity_Components(buffer)
+            !Call Compute_Vorticity_Components(buffer)
+            !Call Compute_Kinetic_Energies(buffer)
+            !Call Compute_Energy_Fluxes(buffer)
+            !Call Compute_TandP_Terms(buffer)
             Call Compute_Inertial_Terms(buffer)
             If (compute_quantity(visc_flux_r)) Then
                 !- v dot D |_r
@@ -609,23 +613,12 @@ Contains
 
             !//////////////////// Magnetic Quantities
             If (magnetism) Then
-
+                Call Compute_BField_Components(buffer)
                 Call Compute_Lorentz_Forces(buffer)
+                Call Compute_J_Components(buffer)
+                Call Compute_Induction_Terms(buffer)
+                !Call Compute_Magnetic_Energies(buffer)
 
-                If (compute_quantity(B_r)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(B_theta)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(b_phi)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)
-                    Call Add_Quantity(qty)
-                Endif	
 
                 If (compute_quantity(B_r2)) Then
                     qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)**2
@@ -642,20 +635,7 @@ Contains
                     Call Add_Quantity(qty)
                 Endif	
 
-                If (compute_quantity(J_r)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jr)
-                    Call Add_Quantity(qty)
-                Endif		
 
-                If (compute_quantity(J_theta)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jtheta)
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(j_phi)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,jphi)
-                    Call Add_Quantity(qty)
-                Endif	
 
                 If (compute_quantity(b_sq)) Then
                     qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
