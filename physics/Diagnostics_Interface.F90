@@ -8,9 +8,14 @@ Module Diagnostics_Interface
     Use TransportCoefficients
     Use Math_Constants
     Use Diagnostics_Base
-    Use Diagnostics_Lorentz_Forces
-    Use Diagnostics_Induction
+
+    Use Diagnostics_Velocity_Field
     Use Diagnostics_Inertial_Forces
+    Use Diagnostics_Lorentz_Forces
+
+    Use Diagnostics_Magnetic_Field
+    Use Diagnostics_Current_Density
+    Use Diagnostics_Induction
     Implicit None
 
 
@@ -138,6 +143,7 @@ Contains
             !   computed averages are used for moments in the shell_average output
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
+            Call Compute_Velocity_Components(buffer)
             Call Compute_Inertial_Terms(buffer)
             If (compute_quantity(visc_flux_r)) Then
                 !- v dot D |_r
@@ -205,20 +211,7 @@ Contains
                 DeAllocate(tmp1)
             Endif
 
-            If (compute_quantity(v_r)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)
-                Call Add_Quantity(qty)
-            Endif		
 
-            If (compute_quantity(v_theta)) Then	
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(v_phi)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)
-                Call Add_Quantity(qty)
-            Endif	
 
             If (compute_quantity(vr2)) Then
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
@@ -251,38 +244,7 @@ Contains
             Endif	
 
 
-            If (compute_quantity(rhov_r)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = buffer(p,r,t,vr)*ref%density(r)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
 
-            If (compute_quantity(rhov_theta)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = buffer(p,r,t,vtheta)*ref%density(r)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif				
-
-            If (compute_quantity(rhov_phi)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = buffer(p,r,t,vphi)*ref%density(r)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
 
             If (compute_quantity(temperature)) Then
                 ! This is really d_by_dphi temperature/r with the current logic in Physics.F90

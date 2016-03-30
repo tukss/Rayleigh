@@ -14,6 +14,7 @@ Module Diagnostics_Base
     Use Fields
     Use Math_Constants
     Use ReferenceState
+    Use TransportCoefficients
 
     Implicit None
 
@@ -92,24 +93,37 @@ Module Diagnostics_Base
     Integer, Parameter :: dv_phi_dprs  = voffset+47  ! (1/r 1/sin(theta))d{v_phi}/dphi
     Integer, Parameter :: dvp_phi_dprs = voffset+48   
 
+
+    Integer, Parameter :: rhov_r      = voffset+49
+    Integer, Parameter :: rhovp_r     = voffset+50
+    Integer, Parameter :: rhovm_r     = voffset+51
+
+    Integer, Parameter :: rhov_theta  = voffset+52
+    Integer, Parameter :: rhovp_theta = voffset+53
+    Integer, Parameter :: rhovm_theta = voffset+54
+
+    Integer, Parameter :: rhov_phi    = voffset+55
+    Integer, Parameter :: rhovp_phi   = voffset+56
+    Integer, Parameter :: rhovm_phi   = voffset+57
+
     !//////////////////////////////////////////////////////////////////////////
     !///////////////////////////////////////////////////
     !       Vorticity Outputs
-    Integer, Parameter :: vort_off = 50
+    Integer, Parameter :: vort_off = 57
 
-    Integer, Parameter :: vort_r  = vort_off+1      ! Radial Current Density
+    Integer, Parameter :: vort_r  = vort_off+1      ! Radial
     Integer, Parameter :: vortp_r = vort_off+2    
     Integer, Parameter :: vortm_r = vort_off+3 
 
-    Integer, Parameter :: vort_theta  = vort_off+4  ! Theta Current Density
+    Integer, Parameter :: vort_theta  = vort_off+4  ! Theta Vorticity
     Integer, Parameter :: vortp_theta = vort_off+5    
     Integer, Parameter :: vortm_theta = vort_off+6 
 
-    Integer, Parameter :: vort_phi  = vort_off+7    ! Phi Current Density
+    Integer, Parameter :: vort_phi  = vort_off+7    ! Phi Vorticity
     Integer, Parameter :: vortp_phi = vort_off+8    
     Integer, Parameter :: vortm_phi = vort_off+9 
 
-    Integer, Parameter :: enstrophy   = vort_off+10
+    Integer, Parameter :: enstrophy   = vort_off+10 ! Enstrophy
     Integer, Parameter :: enstrophypm = vort_off+11
     Integer, Parameter :: enstrophymm = vort_off+12
     Integer, Parameter :: enstropypp  = vort_off+13
@@ -123,7 +137,7 @@ Module Diagnostics_Base
     Integer, Parameter :: zonal_ke = 10, merid_ke = 11
     Integer, Parameter :: vol_heating = 12
 
-    Integer, Parameter :: rhoV_r = 13,   rhoV_theta = 14, rhoV_phi = 15
+
     Integer, Parameter :: thermalE_flux_radial = 16, radial_ke = 17
     Integer, Parameter :: ke_flux_radial = 18, enth_flux_radial = 19
     Integer, Parameter :: buoyancy_work = 20
@@ -248,7 +262,7 @@ Module Diagnostics_Base
 
 
     !///////////////////////////////////////////////////
-    !       Current Density Outputs
+    !       Current Density Outputs (Including Ohmic Heating)
     Integer, Parameter :: joffset = 250
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
@@ -263,6 +277,17 @@ Module Diagnostics_Base
     Integer, Parameter :: jp_phi = joffset+8    
     Integer, Parameter :: jm_phi = joffset+9 
 
+    Integer, Parameter :: j_r_sq      = joffset+10 ! (j_r)^2
+    Integer, Parameter :: jp_r_sq     = joffset+11 ! (jp_r)^2
+    Integer, Parameter :: j_theta_sq  = joffset+12 ! (j_theta)^2
+    Integer, Parameter :: jp_theta_sq = joffset+13 ! (jp_theta)^2
+    Integer, Parameter :: j_phi_sq    = joffset+14 ! (j_theta)^2
+    Integer, Parameter :: jp_phi_sq   = joffset+15 ! (jp_theta)^2
+    Integer, Parameter :: j_sq        = joffset+16 ! j dot j
+    Integer, Parameter :: jp_sq       = joffset+17 ! j' dot j'
+    Integer, Parameter :: ohmic_heat    = joffset+18 ! eta{  j  dot  j}
+    Integer, Parameter :: ohmic_heat_pp = joffset+19 ! eta{  j' dot  j'}
+    Integer, Parameter :: ohmic_heat_mm = joffset+20 ! eta{ <j> dot <j>}
 
 
     Integer, Parameter :: B_sq = 207, magnetic_energy=208, zonal_me = 209
@@ -291,6 +316,7 @@ Module Diagnostics_Base
     Integer, Parameter :: jp_cross_bp_r     = loff+13 ! radial component of j' x B'  
     Integer, Parameter :: jp_cross_bp_theta = loff+14 !  theta component of j' x B'
     Integer, Parameter :: jp_cross_bp_phi   = loff+15 !    phi component of j' x B'
+
 
 
     !////////////////////////////// Induction Terms ///////////////////////////

@@ -306,6 +306,75 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
+
+        !/////////////////////////////////////////////////////////////
+        ! Finally, if desired, we compute the mass flux.
+
+        If (compute_quantity(rhov_r)) Then
+            DO_PSI			
+                qty(PSI) = buffer(PSI,vr)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
+        If (compute_quantity(rhovp_r)) Then
+            DO_PSI			
+                qty(PSI) = fbuffer(PSI,vr)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
+
+        If (compute_quantity(rhovm_r)) Then
+            DO_PSI			
+                qty(PSI) = m0_values(PSI2,vr)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
+
+        If (compute_quantity(rhov_theta)) Then
+            DO_PSI			
+                qty(PSI) = buffer(PSI,vtheta)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
+
+        If (compute_quantity(rhovp_theta)) Then
+            DO_PSI			
+                qty(PSI) = fbuffer(PSI,vtheta)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
+
+        If (compute_quantity(rhovm_theta)) Then
+            DO_PSI			
+                qty(PSI) = m0_values(PSI2,vtheta)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
+
+        If (compute_quantity(rhov_phi)) Then
+            DO_PSI			
+                qty(PSI) = buffer(PSI,vphi)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
+        If (compute_quantity(rhovp_phi)) Then
+            DO_PSI			
+                qty(PSI) = fbuffer(PSI,vphi)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
+
+        If (compute_quantity(rhovm_phi)) Then
+            DO_PSI			
+                qty(PSI) = m0_values(PSI2,vphi)*ref%density(r)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
         
     End Subroutine Compute_Velocity_Components
 
