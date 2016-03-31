@@ -131,6 +131,7 @@ Contains
 
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+            Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             over_n_phi = 1.0d0/dble(n_phi)
 
             Do pass_num = 1, 2
@@ -151,7 +152,7 @@ Contains
             Call Compute_Inertial_Terms(buffer)
             If (compute_quantity(visc_flux_r)) Then
                 !- v dot D |_r
-                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+
                 !Radial contribution (mod rho*nu)
                 Do t = my_theta%min, my_theta%max
                     Do r = my_r%min, my_r%max
@@ -691,7 +692,7 @@ Contains
             If (pass_num .eq. 1) Call Finalize_Averages()
             Enddo !Pass_num
 
-			DeAllocate(qty)
+			DeAllocate(qty,tmp1)
 			Call Complete_Output(iteration, current_time)
 
             DeAllocate(ell0_values,m0_values)

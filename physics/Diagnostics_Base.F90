@@ -128,6 +128,11 @@ Module Diagnostics_Base
     Integer, Parameter :: enstrophymm = vort_off+12
     Integer, Parameter :: enstropypp  = vort_off+13
 
+    !//////////////////////////////////////////////////////////
+    !               Radial Energy Fluxes
+    Integer, Parameter :: eoffset = 70
+    Integer, Parameter :: ecrossb_r = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
+
     Integer, Parameter :: tpoffset = 70
 
     Integer, Parameter :: Temperature = 4,    Pressure = 5

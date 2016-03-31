@@ -48,10 +48,7 @@ Module Fields
 	Integer :: emfr,emftheta,emfphi
 	!///////////////////////////////////////////////////////////////////////////
 
-	!///////////////////////////////////////////////////////////////////////////
-	!  Indices for easy reference in physical space
-	Integer :: vr_ps, vt_ps, vp_ps, t_ps ! etc.
-	Integer :: nl_advec_r, nl_advec_t, nl_advec_p, temp_advec
+
 
 	!==============================================================================
 	!		Integer parameters used to reference specific equations and variables

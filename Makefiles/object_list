@@ -8,6 +8,7 @@ POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o Reference
         Diagnostics_Base.o Diagnostics_ADotGradB.o \
         Diagnostics_Velocity_Field.o Diagnostics_Magnetic_Field.o \
         Diagnostics_Current_Density.o \
+        Diagnostics_Energy_Flux.o \
         Diagnostics_Lorentz_Forces.o Diagnostics_Induction.o Diagnostics_Inertial_Forces.o \
         Diagnostics_Interface.o \
         Benchmarking.o Linear_Terms_Sphere.o \
