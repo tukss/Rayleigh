@@ -74,9 +74,9 @@ Contains
     !   br      -- radial magnetic field
     !   btheta  -- theta magnetic field
     !   bphi    -- phi magnetic field
-    !   jr      -- radial current density
-    !   jtheta  -- theta current density
-    !   jphi    -- phi current density
+    !   jr      -- radial current density  (actually [curl B]_r)
+    !   jtheta  -- theta current density (actually [curl B]_theta)
+    !   jphi    -- phi current density (actually [curl B]_phi)
 
 
     ! If Induction Output is needed for this iteration,
@@ -107,7 +107,7 @@ Contains
         Integer, Intent(In) :: iteration
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8, Intent(In) :: current_time
-        Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3, dt_by_dp, dt_by_ds, tpert
+        Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3
 
         Integer :: p,t,r, nfields, bdims(1:4), pass_num
 
@@ -132,6 +132,7 @@ Contains
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
+            Allocate(tmp1d(1:N_R))
             over_n_phi = 1.0d0/dble(n_phi)
 
             Do pass_num = 1, 2
@@ -150,71 +151,6 @@ Contains
             !Call Compute_Energy_Fluxes(buffer)
             !Call Compute_TandP_Terms(buffer)
             Call Compute_Inertial_Terms(buffer)
-            If (compute_quantity(visc_flux_r)) Then
-                !- v dot D |_r
-
-                !Radial contribution (mod rho*nu)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = buffer(p,r,t,vr)*ref%dlnrho(r)/3.0d0+buffer(p,r,t,dvrdr)
-                            qty(p,r,t) = qty(p,r,t)*buffer(p,r,t,vr)*2.0d0
-                        Enddo
-                    Enddo
-                Enddo
-
-                !Theta contribution (mod rho*nu)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
-                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvtdr)-buffer(p,r,t,vtheta)/radius(r)
-                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdt)/radius(r)
-                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vtheta)
-                        Enddo
-                    Enddo
-                Enddo                
-
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
-                        Enddo
-                    Enddo
-                Enddo
-
-                !phi contribution (mod rho*nu)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            tmp1(p,r,t) = (2.0d0/3.0d0)*buffer(p,r,t,vr)*ref%dlnrho(r)
-                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvpdr)-buffer(p,r,t,vphi)/radius(r)
-                            tmp1(p,r,t) = tmp1(p,r,t)+buffer(p,r,t,dvrdp)/radius(r)/sintheta(t)
-                            tmp1(p,r,t) = tmp1(p,r,t)*buffer(p,r,t,vphi)
-                        Enddo
-                    Enddo
-                Enddo                
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = qty(p,r,t)+tmp1(p,r,t)
-                        Enddo
-                    Enddo
-                Enddo
-
-                !Multiply by rho and nu
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi				
-                            qty(p,r,t) = qty(p,r,t)*nu(r)*ref%density(r)                            
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-                DeAllocate(tmp1)
-            Endif
 
 
 
@@ -285,17 +221,7 @@ Contains
                 Call Add_Quantity(qty)
             Endif		
 
-            If (compute_quantity(cond_flux_r)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = ref%density(r) &
-                             & *ref%temperature(r)*kappa(r)*buffer(p,r,t,dtdr)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
+
 
             If (compute_quantity(zonal_ke)) Then
                 Do t = my_theta%min, my_theta%max
@@ -365,57 +291,6 @@ Contains
             Endif	
 
 
-            If (compute_quantity(ke_flux_radial)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)*buffer(1:n_phi,:,:,vr)
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
-
-
-
-
-            If (compute_quantity(Enth_flux_radial)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        dt_by_ds = ref%temperature(r)/pressure_specific_heat
-                        dt_by_dp = 1.0d0/pressure_specific_heat
-                        Do p = 1, n_phi
-                            tpert = dt_by_ds*buffer(p,r,t,tout) &
-                             & + dt_by_dp*buffer(p,r,t,pvar)
-                            tpert = tpert*ref%density(r) ! This is now T'*rho_bar
-                            qty(p,r,t) = tpert*buffer(p,r,t,vr)*pressure_specific_heat
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif
-
-
-            If (compute_quantity(thermalE_flux_radial)) Then
-
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr) &
-                    & *buffer(1:n_phi,:,:,tout)   
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*ref%temperature(r)
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
 
             If (compute_quantity(buoyancy_work)) Then
 
@@ -692,7 +567,7 @@ Contains
             If (pass_num .eq. 1) Call Finalize_Averages()
             Enddo !Pass_num
 
-			DeAllocate(qty,tmp1)
+			DeAllocate(qty,tmp1,tmp1d)
 			Call Complete_Output(iteration, current_time)
 
             DeAllocate(ell0_values,m0_values)

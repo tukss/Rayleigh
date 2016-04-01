@@ -25,7 +25,8 @@ Contains
     Subroutine Compute_Energy_Flux(buffer)
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
-        Integer :: r,k, t
+        Real*8 :: dt_by_dp, dt_by_ds, tpert
+        Integer :: r,k, t, dr, qmean
 
         !First, the radial viscous flux of energy
         If (compute_quantity(visc_flux_r)) Then
@@ -77,6 +78,76 @@ Contains
             Call Add_Quantity(qty)
         Endif	
         
+        !Radial KE Flux
+        If (compute_quantity(ke_flux_radial)) Then
+            qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
+            qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
+            qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
+
+            qty(1:n_phi,:,:) = qty(1:n_phi,:,:)*buffer(1:n_phi,:,:,vr)
+            DO_PSI
+                qty(PSI) = qty(PSI)*ref%density(r)*0.5d0
+            END_DO               
+            Call Add_Quantity(qty)
+        Endif	
+
+        !Enthalpy Flux 
+        If (compute_quantity(Enth_flux_radial)) Then
+
+            Do t = my_theta%min, my_theta%max
+                Do r = my_r%min, my_r%max
+                    dt_by_ds = ref%temperature(r)/pressure_specific_heat
+                    dt_by_dp = 1.0d0/pressure_specific_heat
+                    Do k = 1, n_phi
+                        tpert = dt_by_ds*buffer(PSI,tout) &
+                         & + dt_by_dp*buffer(PSI,pvar)
+                        tpert = tpert*ref%density(r) ! This is now T'*rho_bar
+                        qty(PSI) = tpert*buffer(PSI,vr)*pressure_specific_heat
+                    Enddo
+                Enddo
+            Enddo
+            Call Add_Quantity(qty)
+        Endif
+
+
+        !Thermal Energy Flux (vr {rho_bar T_bar S}  OR vr T)
+        If (compute_quantity(thermalE_flux_radial)) Then  
+            DO_PSI
+                qty(PSI) = buffer(PSI,vr)*buffer(PSI,tout)* &   
+                           & ref%density(r)*ref%temperature(r)
+            END_DO              
+            Call Add_Quantity(qty)
+        Endif	
+
+
+        ! Volume Heating
+        If (compute_quantity(vol_heating)) Then
+            If (allocated(ref%heating)) Then
+                DO_PSI
+                    qty(PSI) = ref%heating(r)* &
+                        & ref%density(r)*ref%temperature(r)
+                END_DO           
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
+            Call Add_Quantity(qty)
+        Endif	
+
+        !The "Flux" associated with the volume heating
+        If (compute_quantity(vol_heat_flux)) Then
+            tmp1d(N_R) = 0.0d0
+            Do r = N_R-1, 1,-1
+                qmean = 0.5d0*(ref%heating(r)+ref%heating(r+1))
+                dr    = radius(r)-radius(r+1)
+                tmp1d(r) = tmp1d(r+1)+r_squared(r)*four_pi* &
+                  &  dr*qmean*ref%density(r)*ref%temperature(r)
+            Enddo
+            tmp1d = (tmp1d(1)-tmp1d)/four_pi/r_squared
+            DO_PSI
+                qty(PSI) = tmp1d(r)
+            END_DO
+        Endif
+
 
 
         !/////////// Radial component of ExB

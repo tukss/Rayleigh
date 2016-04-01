@@ -131,20 +131,31 @@ Module Diagnostics_Base
     !//////////////////////////////////////////////////////////
     !               Radial Energy Fluxes
     Integer, Parameter :: eoffset = 70
-    Integer, Parameter :: ecrossb_r = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
+    Integer, Parameter :: ecrossb_r            = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
+    Integer, Parameter :: ke_flux_radial       = eoffset+2 ! vr*KE
+    Integer, Parameter :: thermalE_flux_radial = eoffset+3 ! vr*rho_bar*T_bar*S OR vr*T
+    Integer, Parameter :: enth_flux_radial     = eoffset+4 ! vr*cp*rho_bar*T
+    Integer, Parameter :: visc_flux_r          = eoffset+5 ! -[Div dot D]_r
+    Integer, Parameter :: vol_heat_flux        = eoffset+6 ! "Flux" associated with volumetric heating
+    Integer, Parameter :: cond_flux_r          = eoffset+7 ! Thermal conductive flux
+    Integer, Parameter :: vol_heating          = eoffset+8 ! Volumetric Heating Function
 
-    Integer, Parameter :: tpoffset = 70
 
-    Integer, Parameter :: Temperature = 4,    Pressure = 5
+
+    !/////////////////////////////////////////////////////////////
+    ! Temperature, Pressure, and their derivatives
+    Integer, Parameter :: tpoffset = 80
+    Integer, Parameter :: Temperature = tpoffset+1
+    Integer, Parameter :: Pressure = tpoffset+5
 
     Integer, Parameter :: v_sq = 6, kinetic_energy = 7
-    Integer, Parameter :: gradt_r = 8, cond_flux_r = 9
+    Integer, Parameter :: gradt_r = 8
     Integer, Parameter :: zonal_ke = 10, merid_ke = 11
-    Integer, Parameter :: vol_heating = 12
 
 
-    Integer, Parameter :: thermalE_flux_radial = 16, radial_ke = 17
-    Integer, Parameter :: ke_flux_radial = 18, enth_flux_radial = 19
+
+    Integer, Parameter :: radial_ke = 17
+
     Integer, Parameter :: buoyancy_work = 20
 
 
@@ -153,8 +164,7 @@ Module Diagnostics_Base
     Integer, Parameter :: amom_fluct_r = 25, amom_fluct_theta = 26, &
          amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
 
-    !Viscous Fluxes
-    Integer, Parameter :: visc_flux_r = 31
+
 
     !////////////////////////  Advection Terms ////////////////////
     ! Reynolds decomposition about the azimuthal mean may also be output
@@ -420,7 +430,7 @@ Module Diagnostics_Base
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: tmp1(:,:,:)  ! A work array
-    Real*8, Allocatable :: rweights(:), tweights(:)
+    Real*8, Allocatable :: rweights(:), tweights(:), tmp1d(:)
 
     !//////////////////////////////////
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)
