@@ -182,6 +182,8 @@ Contains
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 
 		Call self%construct('p3a')
+        !Here, we need self%construct('p3a',extra =nfextra or another number)
+
 		self%p3a(:,:,:,:) = 0.0d0	! This is important because we are going to take an fft later (De-aliasing is implicit here because
 		! we only stripe in data of the de-aliased m's, but we need to make sure the higher m's are zero!
 		!Stripe from the receive buff
@@ -209,7 +211,33 @@ Contains
 			Enddo
 			Enddo
 			Enddo
-			Enddo
+            ! <----------- Here we want another loop if additional fields were added
+            !              send counts, recv counts, send displ, and recv displ will need to be adjusted
+            !   foff = self%nf3a
+            !   nfextra = number of additional fields being sent
+            !   p3a also needs to be bigger (see pseudo code above)
+
+			!Do f = 1,nfextra
+			!Do j = jmin,jmax
+			!Do i = imin,imax
+
+			!	k_ind = pfi%inds_3s(k)*2+1  ! (real) m=0 stored in p3b(1,:,:,:) (img in p3b(2,:,:,:))
+
+			!	self%p3a(k_ind,j,i,foff+1)=self%recv_buff(ii) 
+			!	self%p3a(k_ind+1,j,i,foff+f)=self%recv_buff(ii+1) 			
+
+			!	ii = ii+2
+
+			!Enddo
+			!Enddo
+			!Enddo
+
+
+
+			Enddo ! K
+
+
+
 		Enddo
 		self%config = 'p3a'
 		If (self%dynamic_transpose_buffers) DeAllocate(self%recv_buff)
