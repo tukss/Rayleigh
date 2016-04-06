@@ -12,6 +12,7 @@ Module Diagnostics_Interface
     Use Diagnostics_Velocity_Field
     Use Diagnostics_Inertial_Forces
     Use Diagnostics_Lorentz_Forces
+    Use Diagnostics_Energy_Flux
 
     Use Diagnostics_Magnetic_Field
     Use Diagnostics_Current_Density
@@ -148,7 +149,7 @@ Contains
             Call Compute_Velocity_Components(buffer)
             !Call Compute_Vorticity_Components(buffer)
             !Call Compute_Kinetic_Energies(buffer)
-            !Call Compute_Energy_Fluxes(buffer)
+            Call Compute_Energy_Flux(buffer)
             !Call Compute_TandP_Terms(buffer)
             Call Compute_Inertial_Terms(buffer)
 

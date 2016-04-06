@@ -136,16 +136,19 @@ Contains
         !The "Flux" associated with the volume heating
         If (compute_quantity(vol_heat_flux)) Then
             tmp1d(N_R) = 0.0d0
-            Do r = N_R-1, 1,-1
-                qmean = 0.5d0*(ref%heating(r)+ref%heating(r+1))
-                dr    = radius(r)-radius(r+1)
-                tmp1d(r) = tmp1d(r+1)+r_squared(r)*four_pi* &
-                  &  dr*qmean*ref%density(r)*ref%temperature(r)
-            Enddo
-            tmp1d = (tmp1d(1)-tmp1d)/four_pi/r_squared
+            If (allocated(ref%heating)) Then
+                Do r = N_R-1, 1,-1
+                    qmean = 0.5d0*(ref%heating(r)+ref%heating(r+1))
+                    dr    = radius(r)-radius(r+1)
+                    tmp1d(r) = tmp1d(r+1)+r_squared(r)*four_pi* &
+                      &  dr*qmean*ref%density(r)*ref%temperature(r)
+                Enddo
+                tmp1d = (tmp1d(1)-tmp1d)/four_pi/r_squared
+            Endif
             DO_PSI
                 qty(PSI) = tmp1d(r)
             END_DO
+            Call Add_Quantity(qty)
         Endif
 
 
