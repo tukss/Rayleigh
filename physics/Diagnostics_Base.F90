@@ -146,23 +146,25 @@ Module Diagnostics_Base
     ! Temperature, Pressure, and their derivatives
     Integer, Parameter :: tpoffset = 80
     Integer, Parameter :: Temperature = tpoffset+1
-    Integer, Parameter :: Pressure = tpoffset+5
+    Integer, Parameter :: Pressure = tpoffset+2
 
-    Integer, Parameter :: v_sq = 6, kinetic_energy = 7
-    Integer, Parameter :: gradt_r = 8
-    Integer, Parameter :: zonal_ke = 10, merid_ke = 11
+    Integer, Parameter :: v_sq = tpoffset+3, kinetic_energy = tpoffset+4
+    Integer, Parameter :: gradt_r = tpoffset+5
+    Integer, Parameter :: zonal_ke = tpoffset+6, merid_ke = tpoffset+7
 
 
 
-    Integer, Parameter :: radial_ke = 17
+    Integer, Parameter :: radial_ke = tpoffset+8
 
-    Integer, Parameter :: buoyancy_work = 20
+    Integer, Parameter :: buoyancy_work = tpoffset+9
 
 
 
     !Angular Momentum Transport Diagnostics
-    Integer, Parameter :: amom_fluct_r = 25, amom_fluct_theta = 26, &
-         amom_dr_r = 27, amom_dr_theta = 28, amom_mean_r = 29, amom_mean_theta = 30
+    Integer, Parameter :: amoff = 90
+    Integer, Parameter :: amom_fluct_r = amoff+1, amom_fluct_theta = amoff+2, &
+         amom_dr_r = amoff+3, amom_dr_theta = amoff+4, amom_mean_r = amoff+5, &
+         amom_mean_theta = amoff+6
 
 
 
@@ -172,7 +174,7 @@ Module Diagnostics_Base
     ! "p" and " ' " denote perturbations about the azimuthal mean 
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = 40  ! Output offset for advection terms  
+    Integer, Parameter :: vgv = 100  ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -195,10 +197,10 @@ Module Diagnostics_Base
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
-    Integer, Parameter :: diagnostic1 = 99, diagnostic2 = 100
+    Integer, Parameter :: diagnostic1 = 129, diagnostic2 = 130
     ! We also have some comparison outputs for checking the moments
-    Integer, Parameter :: vr2 = 101, vt2 = 102, vp2 = 103
-    Integer, Parameter :: vr3 = 104, vt3 = 105, vp3 = 106
+    Integer, Parameter :: vr2 = 131, vt2 = 132, vp2 = 133
+    Integer, Parameter :: vr3 = 134, vt3 = 135, vp3 = 136
 
     !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
 

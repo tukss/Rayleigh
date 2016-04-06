@@ -197,8 +197,9 @@ class ShellAverage:
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
         if (self.version == 1):
             self.vals  = np.zeros((nr,nq,nrec),dtype='float64')
-        if (self.version == 2):
+        if (self.version > 1):
             self.vals  = np.zeros((nr,4,nq,nrec),dtype='float64')
+            print 'version is: ', self.version
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
 
@@ -206,7 +207,7 @@ class ShellAverage:
             if (self.version == 1):
                 tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
                 self.vals[:,:,i] = tmp
-            if (self.version == 2):
+            if (self.version > 1):
                 tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*4,swap=bs),(nr,4,nq), order = 'F')
                 self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
@@ -237,7 +238,7 @@ class AzAverage:
     """
 
 
-    def __init__(self,filename='none',path='AZ_Avgs/', verbose = False):
+    def __init__(self,filename='none',path='AZ_Avgs/'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
@@ -245,8 +246,6 @@ class AzAverage:
             the_file = path+'00000001'
         else:
             the_file = path+filename
-        if (verbose):
-            print "Opening file: ", filename
         fd = open(the_file,'rb')
         # We read an integer to assess which endian the file was written in...
         bs = check_endian(fd,314,'int32')
@@ -530,7 +529,7 @@ def TimeAvg_AZAverages(file_list,ofile):
     nr = a.nr
     ntheta = a.ntheta
     nq = a.nq
-    tmp = np.zeros((ntheta,nr,nq),dtype='float64')
+    tmp = np.zeros((nr,ntheta,nq),dtype='float64')
     simtime   = np.zeros(1,dtype='float64')
     iteration = np.zeros(1,dtype='int32')
     icount = np.zeros(1,dtype='int32')
@@ -544,7 +543,7 @@ def TimeAvg_AZAverages(file_list,ofile):
         b = AzAverage(the_file,path='')
         nrec = b.niter
         for j in range(nrec):
-            tmp[0:ntheta,0:nr,0:nq] += b.vals[0:ntheta,0:nr,0:nq,j].astype('float64')
+            tmp[0:nr,0:ntheta,0:nq] += b.vals[0:nr,0:ntheta,0:nq,j].astype('float64')
 
             tfinal[0] = b.time[j]
             ifinal[0] = b.iters[j]
