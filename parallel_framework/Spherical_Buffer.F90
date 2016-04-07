@@ -73,7 +73,9 @@ Module Spherical_Buffer
 		Procedure :: reform => advance_configuration
 		Procedure :: set_buffer_sizes
 		Procedure :: transpose_1a2a
+        Procedure :: Compute_Packet_Sizes12
 		Procedure :: transpose_2a3a  ! Move from 2a to 3a
+        Procedure :: Compute_Packet_Sizes23
 		Procedure :: transpose_3b2b
 		Procedure :: transpose_2b1b
 		Procedure :: write_space
@@ -96,6 +98,49 @@ Contains
 		Class(SphericalBuffer) :: self
 		vals(1:self%ncargo) = self%cargo(1:self%ncargo) 
 	End Subroutine unload_cargo
+
+    Subroutine Compute_Packet_Sizes23(self,numfields)
+        Implicit None
+		Class(SphericalBuffer) :: self
+        Integer, Intent(In), Optional :: numfields
+        Integer :: stemp1, rtemp1, my_max,gmax, np
+        Integer :: nfs, p 
+        If (present(numfields)) Then
+            nfs = numfields
+        Else
+            nfs = self%nf2a
+        Endif
+	    np = pfi%rcomm%np
+		Do p = 0, pfi%rcomm%np-1
+			self%scount23(p) = (pfi%my_1p%delta) * (pfi%all_2p(p)%delta) * (pfi%my_3s%delta) * nfs
+			self%rcount23(p) = (pfi%my_1p%delta) * (pfi%my_2p%delta) * (pfi%all_3s(p)%delta) * nfs
+			self%scount23(p) = self%scount23(p)*2	! times 2 for real/complex part
+			self%rcount23(p) = self%rcount23(p)*2
+		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			! Everyone in the row or column needs to have the same buffer size
+			! (hence the call to allreduce)
+			stemp1 = maxval(self%scount23)
+			rtemp1 = maxval(self%rcount23)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%rcomm)
+			self%scount23(:) = gmax
+			self%rcount23(:) = gmax
+		Endif
+		self%sdisp23(0) = 0
+		self%rdisp23(0) = 0
+		If (np .gt. 1) Then
+			Do p = 1, np -1	
+				self%sdisp23(p) = self%sdisp23(p-1)+self%scount23(p-1)
+				self%rdisp23(p) = self%rdisp23(p-1)+self%rcount23(p-1)
+			Enddo
+		Endif
+
+		self%send_size23 = sum(self%scount23)
+		self%recv_size23 = sum(self%rcount23)
+    End Subroutine Compute_Packet_Sizes23
+
 
 	Subroutine Set_Buffer_Sizes(self)
 			Implicit None
@@ -569,6 +614,46 @@ Contains
 		
     End Subroutine Transpose_1a2a
 
+    Subroutine Compute_Packet_Sizes12(self,numfields)
+        Implicit None
+		Class(SphericalBuffer) :: self
+        Integer, Intent(In), Optional :: numfields
+        Integer :: stemp1, rtemp1, my_max,gmax, np
+        Integer :: nfs,p
+        If (present(numfields)) Then
+            nfs = numfields
+        Else
+            nfs = self%nf1a
+        Endif
+        np = pfi%ccomm%np
+		Do p = 0, pfi%ccomm%np-1
+			self%scount12(p) = (pfi%all_1p(p)%delta) * (my_num_lm)  * (nfs)*2
+			self%rcount12(p) = (pfi%my_1p%delta)     * (num_lm(p)) * (nfs)*2
+		Enddo
+		If (self%pad_buffer) Then
+			! adjustment for using alltoall vs. alltoallv
+			stemp1 = maxval(self%scount12)
+			rtemp1 = maxval(self%rcount12)
+			my_max = max(stemp1,rtemp1)
+			Call Global_Imax(my_max,gmax,pfi%ccomm)
+			self%scount12(:) = gmax
+			self%rcount12(:) = gmax
+		Endif
+
+		self%sdisp12(0) = 0
+		self%rdisp12(0) = 0
+		If (np .gt. 1) Then
+			Do p = 1, np -1	
+				self%sdisp12(p) = self%sdisp12(p-1)+self%scount12(p-1)
+				self%rdisp12(p) = self%rdisp12(p-1)+self%rcount12(p-1)
+			Enddo
+		Endif
+		self%send_size12 = sum(self%scount12)
+		self%recv_size12 = sum(self%rcount12)
+
+
+    End Subroutine Compute_Packet_Sizes12
+
 	Subroutine Write_Space(self,extra_tag)
 		Class(SphericalBuffer) :: self
 		character*120, Optional, Intent(In) :: extra_tag
@@ -702,34 +787,9 @@ Contains
 		Allocate(self%rcount23(0:np-1))
 		Allocate(self%sdisp23(0:np-1))
 		Allocate(self%rdisp23(0:np-1))
-		Do p = 0, pfi%rcomm%np-1
-			self%scount23(p) = (pfi%my_1p%delta) * (pfi%all_2p(p)%delta) * (pfi%my_3s%delta) * (self%nf2a)
-			self%rcount23(p) = (pfi%my_1p%delta) * (pfi%my_2p%delta) * (pfi%all_3s(p)%delta) * (self%nf2a)
-			self%scount23(p) = self%scount23(p)*2	! times 2 for real/complex part
-			self%rcount23(p) = self%rcount23(p)*2
-		Enddo
-		If (self%pad_buffer) Then
-			! adjustment for using alltoall vs. alltoallv
-			! Everyone in the row or column needs to have the same buffer size
-			! (hence the call to allreduce)
-			stemp1 = maxval(self%scount23)
-			rtemp1 = maxval(self%rcount23)
-			my_max = max(stemp1,rtemp1)
-			Call Global_Imax(my_max,gmax,pfi%rcomm)
-			self%scount23(:) = gmax
-			self%rcount23(:) = gmax
-		Endif
-		self%sdisp23(0) = 0
-		self%rdisp23(0) = 0
-		If (np .gt. 1) Then
-			Do p = 1, np -1	
-				self%sdisp23(p) = self%sdisp23(p-1)+self%scount23(p-1)
-				self%rdisp23(p) = self%rdisp23(p-1)+self%rcount23(p-1)
-			Enddo
-		Endif
 
-		self%send_size23 = sum(self%scount23)
-		self%recv_size23 = sum(self%rcount23)
+        Call self%Compute_Packet_Sizes23()
+
 
 		!////////////////////////////////////////////////////////////
 		! ------------ Now the reverse-----------------
@@ -775,30 +835,8 @@ Contains
 		Allocate(self%rcount12(0:np-1))
 		Allocate(self%sdisp12(0:np-1))
 		Allocate(self%rdisp12(0:np-1))
-		Do p = 0, pfi%ccomm%np-1
-			self%scount12(p) = (pfi%all_1p(p)%delta) * (my_num_lm)  * (self%nf1a)*2
-			self%rcount12(p) = (pfi%my_1p%delta)     * (num_lm(p)) * (self%nf1a)*2
-		Enddo
-		If (self%pad_buffer) Then
-			! adjustment for using alltoall vs. alltoallv
-			stemp1 = maxval(self%scount12)
-			rtemp1 = maxval(self%rcount12)
-			my_max = max(stemp1,rtemp1)
-			Call Global_Imax(my_max,gmax,pfi%ccomm)
-			self%scount12(:) = gmax
-			self%rcount12(:) = gmax
-		Endif
 
-		self%sdisp12(0) = 0
-		self%rdisp12(0) = 0
-		If (np .gt. 1) Then
-			Do p = 1, np -1	
-				self%sdisp12(p) = self%sdisp12(p-1)+self%scount12(p-1)
-				self%rdisp12(p) = self%rdisp12(p-1)+self%rcount12(p-1)
-			Enddo
-		Endif
-		self%send_size12 = sum(self%scount12)
-		self%recv_size12 = sum(self%rcount12)
+        Call self%Compute_Packet_Sizes12()
 
 		! Configuration 2 to 1
 		!  Suppose we are going from 2 to 1 (reverse direction)
@@ -975,9 +1013,10 @@ Contains
 		Endif
 	End Subroutine DeAllocate_Spherical_Buffer
 
-	Subroutine Allocate_Spherical_Buffer(self,config)
+	Subroutine Allocate_Spherical_Buffer(self,config,numfields)
 		Class(SphericalBuffer) :: self
 		Character*3, Intent(In) :: config
+        Integer, Intent(In), Optional :: numfields
 		Integer :: mn1, mn2, mn3, mn4
 		Integer :: mx1,mx2,mx3,mx4
 		Integer :: i
@@ -991,7 +1030,11 @@ Contains
 					mn3 = 1
 					mx3 = my_num_lm
 					mn4 = 1
-					mx4 = self%nf1a
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf1a
+                    Endif
 					Allocate(self%p1a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
 			Case('p1b')
@@ -1003,7 +1046,11 @@ Contains
 					mn3 = 1
 					mx3 = my_num_lm
 					mn4 = 1
-					mx4 = self%nf1b
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf1b
+                    Endif
 					Allocate(self%p1b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
 
@@ -1015,8 +1062,12 @@ Contains
 					mx2 = pfi%my_1p%max
 					mn4 = pfi%my_3s%min
 					mx4 = pfi%my_3s%max
-
-					mx3 = self%nf2a*2*(mx2-mn2+1)
+                    If (present(numfields)) Then
+                        mx3 = numfields
+                    Else
+    					mx3 = self%nf2a
+                    Endif
+					mx3 = mx3*2*(mx2-mn2+1)
 					Allocate(self%p2a(mn1:mx1, 1:mx3, mn4:mx4))
 				Endif				
 			Case('p2b')
@@ -1028,7 +1079,12 @@ Contains
 					mn4 = pfi%my_3s%min
 					mx4 = pfi%my_3s%max
 
-					mx3 = self%nf2b*2*(mx2-mn2+1)
+                    If (present(numfields)) Then
+                        mx3 = numfields
+                    Else
+    					mx3 = self%nf2b
+                    Endif
+					mx3 = mx3*2*(mx2-mn2+1)
 					Allocate(self%p2b(mn1:mx1, 1:mx3, mn4:mx4))		
 				Endif
 			Case('p3a')
@@ -1040,7 +1096,11 @@ Contains
 					mn3 = pfi%my_2p%min
 					mx3 = pfi%my_2p%max
 					mn4 = 1
-					mx4 = self%nf3a
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf3a
+                    Endif
 					! might think of calling this p3a rather than rdata 3a
 					Allocate(self%p3a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
@@ -1053,7 +1113,11 @@ Contains
 					mn3 = pfi%my_2p%min
 					mx3 = pfi%my_2p%max
 					mn4 = 1
-					mx4 = self%nf3b
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf3b
+                    Endif
 					!Write(6,*)'Allocating p3b'
 					Allocate(self%p3b(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
@@ -1066,7 +1130,13 @@ Contains
 					! --- partly why spherical and cartesian buffers will be separate
 					mn1 = pfi%my_3s%min
 					mx1 = pfi%my_3s%max
-					mx4  = self%nf2a
+
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf2a
+                    Endif
+
 					mn3 = pfi%my_1p%min
 					mx3 = pfi%my_1p%max
 				
@@ -1088,7 +1158,14 @@ Contains
 					! --- partly why spherical and cartesian buffers will be separate
 					mn1 = pfi%my_3s%min
 					mx1 = pfi%my_3s%max
-					mx4  = self%nf2b
+
+                    If (present(numfields)) Then
+                        mx4 = numfields
+                    Else
+    					mx4 = self%nf2b
+                    Endif
+
+
 					mn3 = pfi%my_1p%min
 					mx3 = pfi%my_1p%max
 				
