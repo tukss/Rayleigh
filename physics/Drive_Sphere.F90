@@ -4,6 +4,7 @@ Module Drive_Sphere
 	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
     Use Diagnostics_Interface, Only : Reboot_Diagnostics
+    Use Spherical_IO, Only : time_to_output
 	Use Checkpointing
 	Use Controls
 	Use Timers
@@ -78,6 +79,10 @@ Contains
             Euler_step = .true.
         Endif
         Do while (iteration .le. last_iteration)    
+            !Check here to see if this is an output iteration.
+            !If so, we will want to transfer additional information within
+            !The transpose buffers
+            output_iteration = time_to_output(iteration)
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
             Else If (finite_element) Then

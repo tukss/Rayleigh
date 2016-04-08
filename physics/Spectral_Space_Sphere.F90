@@ -142,7 +142,11 @@ Contains
 		Call StopWatch(psolve_time)%increment()
 
 		Call StopWatch(ctranspose_time)%startclock()
-		Call wsp%reform()	! move from p1a to s2a
+        If (output_iteration) Then
+            Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
+        Else
+    		Call wsp%reform()	! move from p1a to s2a
+        Endif
 		Call StopWatch(ctranspose_time)%increment()
 	End Subroutine Post_Solve
 
@@ -331,8 +335,14 @@ Contains
 		Call StopWatch(psolve_time)%increment()
 
 		Call StopWatch(ctranspose_time)%startclock()
-		Call wsp%reform()	! move from p1a to s2a
+
+        If (output_iteration) Then
+            Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
+        Else
+    		Call wsp%reform()	! move from p1a to s2a
+        Endif
 		Call StopWatch(ctranspose_time)%increment()
+
 	End Subroutine Post_Solve_Cheby
 
 
@@ -559,7 +569,13 @@ Contains
 		Call StopWatch(psolve_time)%increment()
 
 		Call StopWatch(ctranspose_time)%startclock()
-		Call wsp%reform()	! move from p1a to s2a
+
+        If (output_iteration) Then
+            Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
+        Else
+    		Call wsp%reform()	! move from p1a to s2a
+        Endif
+
 		Call StopWatch(ctranspose_time)%increment()
 	End Subroutine Post_Solve_FE
 

@@ -529,14 +529,15 @@ Contains
 		
     End Subroutine Transpose_2b1b
 
-    Subroutine Transpose_1a2a(self)
+    Subroutine Transpose_1a2a(self,extra_recv)
         ! Go from implicit configuration (1 physical) to configuration 2 (spectral)
         Implicit None
 
         Integer :: r,l, mp, lp, indx, r_min, r_max, dr, cnt,i
         Integer :: n, nfields, offset, delta_r, rmin, rmax, np,p,rind
         Integer :: recv_offset, tnr
-        Integer :: imi
+        Integer :: imi, numalloc
+        Integer, Intent(In), Optional :: extra_recv
         Real*8, Allocatable :: send_buff(:),recv_buff(:)
         Integer :: inext, pcurrent
 
@@ -581,8 +582,13 @@ Contains
 	         self%rcount12, self%rdisp12, pfi%ccomm, self%pad_buffer)
         DeAllocate(send_buff)
 
-        Call self%construct('s2a')
-
+        If (present(extra_recv)) Then
+            !Allocate an s2a buffer that is larger than normal
+            numalloc = extra_recv+self%nf2a
+            Call self%construct('s2a',numfields = numalloc)
+        Else
+            Call self%construct('s2a')
+        Endif
         pcurrent = 0
         inext = num_lm(0)
         recv_offset = 1
@@ -1136,6 +1142,8 @@ Contains
                     Else
     					mx4 = self%nf2a
                     Endif
+                    Write(6,*)'mx4 is: ', mx4
+
 
 					mn3 = pfi%my_1p%min
 					mx3 = pfi%my_1p%max
@@ -1181,7 +1189,8 @@ Contains
 		End Select
 
 	End Subroutine Allocate_Spherical_Buffer
-	Subroutine Advance_Configuration(self)
+	Subroutine Advance_Configuration(self,nextra_recv)
+        Integer, Intent(In), Optional :: nextra_recv
 		Class(SphericalBuffer) :: self		
 		Select Case(self%config)
 			Case ('p2a')
@@ -1195,7 +1204,11 @@ Contains
 				Call self%transpose_2b1b()
 
 			Case ('p1a')
-				Call self%transpose_1a2a
+                If (present(nextra_recv)) Then
+    				Call self%transpose_1a2a(extra_recv = nextra_recv)
+                Else
+    				Call self%transpose_1a2a()
+                Endif
 		End Select
 	End Subroutine Advance_Configuration	
 End Module Spherical_Buffer

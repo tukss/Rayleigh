@@ -90,6 +90,8 @@ Module Controls
     Integer :: nglobal_msgs = 3  ! timestep, elapsed since checkpoint, kill_signal/global message
 
 
+    Integer :: nicknum = 5   ! DO NOT LEAVE THIS HERE -- TEMPORARY LOCATION (AND NAME)
+
 Contains
     Subroutine Initialize_Controls()
         Implicit None
