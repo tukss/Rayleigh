@@ -19,11 +19,15 @@ Module Diagnostics_Base
     Implicit None
 
     !/////////////////////////////////////////////////////////
-    !  Quantity Codes (some care must be taken to
+    !  Diagnostic Quantity Codes 
+    !  Reynolds decompositions are often used in the outputs.
+    !  As a result, some shorthand is used as follows:
+    !   "m" and "< >" denote the azimuthal mean.
+    !   "p" and " ' " denote perturbations about the azimuthal mean 
 
+    !////////////////////////////////////////////////////////
     ! Velocity field components.
-    ! Fluctuations (denoted by "p") and azimuthal means
-    ! (denoted by "m") may also be output.
+
     Integer, Parameter :: voffset = 0
 
     Integer, Parameter :: v_r  = voffset+1         ! Radial velocity
@@ -94,6 +98,8 @@ Module Diagnostics_Base
     Integer, Parameter :: dvp_phi_dprs = voffset+48   
 
 
+    !////////////////////////////////////////////////////////
+    !       Mass Flux Outputs (keep with velocity outputs)
     Integer, Parameter :: rhov_r      = voffset+49
     Integer, Parameter :: rhovp_r     = voffset+50
     Integer, Parameter :: rhovm_r     = voffset+51
@@ -142,39 +148,68 @@ Module Diagnostics_Base
 
 
 
+    !///////////////////////////////////////////////////////////
+    !           Kinetic Energies
+    Integer, Parameter :: keoffset = 80
+    Integer, Parameter :: kinetic_energy = keoffset+1   ! 1/2 rho_bar v^2
+    Integer, Parameter :: radial_ke      = keoffset+2   ! 1/2 rho_bar {v_r}^2
+    Integer, Parameter :: theta_ke       = keoffset+3   ! 1/2 rho_bar {v_theta}^2
+    Integer, Parameter :: zonal_ke       = keoffset+4   ! 1/2 rho_bar {v_phi}^2
+
+    Integer, Parameter :: radial_mke     = keoffset+5   ! 1/2 rho_bar <v_r>^2
+    Integer, Parameter :: theta_mke      = keoffset+6   ! 1/2 rho_bar <v_theta>^2
+    Integer, Parameter :: zonal_mke      = keoffset+7   ! 1/2 rho_bar <v_phi>^2
+
+    Integer, Parameter :: radial_pke     = keoffset+8   ! 1/2 rho_bar {v_r'}^2
+    Integer, Parameter :: theta_pke      = keoffset+9   ! 1/2 rho_bar {v_theta'}^2
+    Integer, Parameter :: zonal_pke      = keoffset+10  ! 1/2 rho_bar {v_phi'}^2
+
+    Integer, Parameter :: radial_vsq     = keoffset+11   ! {v_r}^2
+    Integer, Parameter :: theta_vsq      = keoffset+12   ! {v_theta}^2
+    Integer, Parameter :: zonal_vsq      = keoffset+13   ! {v_phi}^2
+
+    Integer, Parameter :: radial_mvsq    = keoffset+14   ! <v_r>^2
+    Integer, Parameter :: theta_mvsq     = keoffset+15   ! <v_theta>^2
+    Integer, Parameter :: zonal_mvsq     = keoffset+16   ! <v_phi>^2
+
+    Integer, Parameter :: radial_pvsq    = keoffset+17   ! {v_r'}^2
+    Integer, Parameter :: theta_pvsq     = keoffset+18   ! {v_theta'}^2
+    Integer, Parameter :: zonal_pvsq     = keoffset+19   ! {v_phi'}^2
+
+    Integer, Parameter :: vsq            = keoffset+20   ! v^2
+    Integer, Parameter :: mvsq           = keoffset+21   ! <v>^2
+    Integer, Parameter :: pvsq           = keoffset+22   ! {v'}^2
+
     !/////////////////////////////////////////////////////////////
-    ! Temperature, Pressure, and their derivatives
-    Integer, Parameter :: tpoffset = 80
-    Integer, Parameter :: Temperature = tpoffset+1
-    Integer, Parameter :: Pressure = tpoffset+2
+    ! Temperature, Pressure, and their derivatives  (this section in-progress)
+    Integer, Parameter :: tpoffset = 110
+    Integer, Parameter :: Temperature = tpoffset+1  ! Temperature (boussinesq) OR Entropy (anelastic)
+    Integer, Parameter :: Pressure = tpoffset+2     ! Pressure
 
-    Integer, Parameter :: v_sq = tpoffset+3, kinetic_energy = tpoffset+4
-    Integer, Parameter :: gradt_r = tpoffset+5
-    Integer, Parameter :: zonal_ke = tpoffset+6, merid_ke = tpoffset+7
-
-
-
-    Integer, Parameter :: radial_ke = tpoffset+8
-
-    Integer, Parameter :: buoyancy_work = tpoffset+9
+    
+    Integer, Parameter :: gradt_r = tpoffset+5      !dT/dr
 
 
 
+
+    !///////////////////////////////////////////////////////////////////////////////////
     !Angular Momentum Transport Diagnostics
-    Integer, Parameter :: amoff = 90
-    Integer, Parameter :: amom_fluct_r = amoff+1, amom_fluct_theta = amoff+2, &
-         amom_dr_r = amoff+3, amom_dr_theta = amoff+4, amom_mean_r = amoff+5, &
-         amom_mean_theta = amoff+6
+    !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
+    Integer, Parameter :: amoff = 120
+    Integer, Parameter :: amom_fluct_r = amoff+1      ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
+    Integer, Parameter :: amom_fluct_theta = amoff+2  ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
+    Integer, Parameter :: amom_dr_r = amoff+3         ! rho_bar * r * sintheta * <v_r> * <v_phi>
+    Integer, Parameter :: amom_dr_theta = amoff+4     ! rho_bar * r * sintheta * <v_theta> * <v_phi>
+    Integer, Parameter :: amom_mean_r = amoff+5       ! rho_bar * r^2 * sintheta^2 * <v_r> * Omega
+    Integer, Parameter :: amom_mean_theta = amoff+6   ! rho_bar * r^2 * sintheta^2 * <v_theta> * Omega
 
 
 
     !////////////////////////  Advection Terms ////////////////////
     ! Reynolds decomposition about the azimuthal mean may also be output
-    ! "m" and "< >" denote the azimuthal mean.
-    ! "p" and " ' " denote perturbations about the azimuthal mean 
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = 100  ! Output offset for advection terms  
+    Integer, Parameter :: vgv = 130  ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -202,7 +237,8 @@ Module Diagnostics_Base
     Integer, Parameter :: vr2 = 131, vt2 = 132, vp2 = 133
     Integer, Parameter :: vr3 = 134, vt3 = 135, vp3 = 136
 
-    !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
+    !//////////////////////////////////////////////////////////
+    !/////////// Magnetic Outputs.  Start at 200 to additional room for hydro
 
 
     !//////////////////////////////////////////////////
@@ -306,14 +342,29 @@ Module Diagnostics_Base
     Integer, Parameter :: ohmic_heat_pp = joffset+19 ! eta{  j' dot  j'}
     Integer, Parameter :: ohmic_heat_mm = joffset+20 ! eta{ <j> dot <j>}
 
+    !///////////////////////////////////////////////////////////
+    !           Magnetic Energies
+    Integer, Parameter :: meoffset = 280
+    Integer, Parameter :: magnetic_energy = keoffset+1    ! B^2
 
-    Integer, Parameter :: B_sq = 207, magnetic_energy=208, zonal_me = 209
-    Integer, Parameter :: merid_me = 210, b_r2 = 211, b_theta2 = 212, b_phi2 = 213
+    Integer, Parameter :: radial_bsq     = keoffset+11   ! {B_r}^2
+    Integer, Parameter :: theta_bsq      = keoffset+12   ! {B_theta}^2
+    Integer, Parameter :: zonal_bsq      = keoffset+13   ! {B_phi}^2
+
+    Integer, Parameter :: radial_mbsq    = keoffset+14   ! <B_r>^2
+    Integer, Parameter :: theta_mbsq     = keoffset+15   ! <B_theta>^2
+    Integer, Parameter :: zonal_mbsq     = keoffset+16   ! <B_phi>^2
+
+    Integer, Parameter :: radial_pbsq    = keoffset+17   ! {B_r'}^2
+    Integer, Parameter :: theta_pbsq     = keoffset+18   ! {B_theta'}^2
+    Integer, Parameter :: zonal_pbsq     = keoffset+19   ! {B_phi'}^2
+
+    Integer, Parameter :: mbsq           = keoffset+20   ! <B>^2
+    Integer, Parameter :: pbsq           = keoffset+21   ! <B'>^2
+
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
-    ! "m" and "< >" denote the azimuthal mean.
-    ! "p" and " ' " denote perturbations about the azimuthal mean 
-    Integer, Parameter :: loff = 220
+    Integer, Parameter :: loff = 310
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -337,9 +388,7 @@ Module Diagnostics_Base
 
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    ! "m," "< >", "  '  ", and "p" retain the same meaning as above
-
-    Integer, Parameter :: indoff = 250
+    Integer, Parameter :: indoff = 330
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
     Integer, Parameter :: induction_comp_r           = indoff+2  ! radial component of -{div dot v}B
@@ -428,6 +477,13 @@ Module Diagnostics_Base
     Integer, Parameter :: induction_comp_vpbp_phi    = indoff+67 ! phi component of -{div dot v'}B'
     Integer, Parameter :: induction_advec_vpbp_phi   = indoff+68 ! phi component of -{v' dot grad B'}
     Integer, Parameter :: induction_vpbp_phi         = indoff+69 ! phi component of del cros {v' x B'}
+
+
+    ! END QUANTITY CODES
+    ! END QUANTITY CODES
+    ! END QUANTITY CODES
+    !/////////////////////////////////////////////////////////////////////////////////////////////
+
 
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output

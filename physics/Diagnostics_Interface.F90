@@ -224,59 +224,9 @@ Contains
 
 
 
-            If (compute_quantity(zonal_ke)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        ! compute mean v_phi here
-                        tmp = 0.0d0
-                        Do p = 1, n_phi
-                            tmp = tmp+buffer(p,r,t,vphi)
-                        Enddo
-                        tmp = tmp*over_n_phi
-                        tmp = 0.5d0*ref%density(r)*tmp**2
-                        qty(:,r,t) = tmp
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
 
 
-            If (compute_quantity(merid_ke)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        ! compute mean v_phi here
-                        tmp = 0.0d0
-                        tmp2 = 0.0d0
-                        Do p = 1, n_phi
-                            tmp = tmp+buffer(p,r,t,vr)
-                            tmp2 = tmp2+buffer(p,r,t,vtheta)
-                        Enddo
-                        tmp = tmp*over_n_phi
-                        tmp2 = tmp2*over_n_phi
-                        tmp = 0.5d0*ref%density(r)*(tmp**2+tmp2**2)                       
-                        qty(:,r,t) = tmp
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
 
-            If (compute_quantity(v_sq)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-                Call Add_Quantity(qty)
-            Endif	
-            If (compute_quantity(radial_ke)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
-                        Enddo
-                    Enddo
-                Enddo  
-                Call Add_Quantity(qty)
-            Endif	
             If (compute_quantity(kinetic_energy)) Then
                 qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
                 qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
@@ -293,19 +243,7 @@ Contains
 
 
 
-            If (compute_quantity(buoyancy_work)) Then
 
-                qty(1:n_phi,:,:) = -buffer(1:n_phi,:,:,vr) &
-                 & *buffer(1:n_phi,:,:,tout)   
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%gravity_term_s(r)
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
 
 
             If (compute_quantity(vol_heating)) Then
@@ -497,72 +435,6 @@ Contains
                 !Call Compute_Magnetic_Energies(buffer)
 
 
-                If (compute_quantity(B_r2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)**2
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(B_theta2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)**2
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(b_phi2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    Call Add_Quantity(qty)
-                Endif	
-
-
-
-                If (compute_quantity(b_sq)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2
-                    Call Add_Quantity(qty)
-                Endif	
-
-                If (compute_quantity(magnetic_energy)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
-                    qty(1:n_phi,:,:) = (qty(1:n_phi,:,:) &
-                     & +buffer(1:n_phi,:,:,btheta)**2)*over_eight_pi
-                    Call Add_Quantity(qty)
-                Endif	
-
-                If (compute_quantity(zonal_me)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            ! compute mean b_phi here
-                            tmp = 0.0d0
-                            Do p = 1, n_phi
-                                tmp = tmp+buffer(p,r,t,bphi)
-                            Enddo
-                            tmp = tmp*over_n_phi
-                            tmp = over_eight_pi*tmp**2
-                            qty(:,r,t) = tmp
-                        Enddo
-                    Enddo
-                    Call Add_Quantity(qty)
-                Endif	
-
-
-                If (compute_quantity(merid_me)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            tmp = 0.0d0
-                            tmp2 = 0.0d0
-                            Do p = 1, n_phi
-                                tmp = tmp+buffer(p,r,t,br)
-                                tmp2 = tmp2+buffer(p,r,t,btheta)
-                            Enddo
-                            tmp = tmp*over_n_phi
-                            tmp2 = tmp2*over_n_phi
-                            tmp = over_eight_pi*(tmp**2+tmp2**2)                       
-                            qty(:,r,t) = tmp
-                        Enddo
-                    Enddo
-                    Call Add_Quantity(qty)
-                Endif	
 
 			Endif !Magnetism
             If (pass_num .eq. 1) Call Finalize_Averages()
