@@ -1,0 +1,16 @@
+Notes from CIG Telecon Regarding outputs:
+
+1.  Work on the prefactors in front of the magnetic terms so that lorentz force magnetic energies are correct regardless of dimensionalization chosen.
+
+2.  Have a nusselt number output.
+
+3.  Enable outputs of vector fields in cylindrical geometry (theta_hat -> z_hat)
+
+4.  Code up the work terms, like u dot jxb
+
+//////////////////////////////////////////////
+Longer-term changes
+1.  Equatorial plane output
+2.  Run summary files in ASCII containing basic information, like KE and ME
+3.  Power spectra output (?  This wasn't really a suggestion - but might be useful)
+4.  Interpolation onto a cylindrical grid...

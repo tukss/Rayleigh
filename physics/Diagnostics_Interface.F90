@@ -496,6 +496,9 @@ Contains
         !DeAllocate(rweights)
         
         !Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
+
+        Call Initialize_Diagnostics_Buffer()
+
     End Subroutine Initialize_Diagnostics
 
 

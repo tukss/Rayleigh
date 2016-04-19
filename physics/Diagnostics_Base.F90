@@ -519,7 +519,7 @@ Module Diagnostics_Base
     Integer :: dbtdr = 3 , dbtdt = 4  , dbtdp = 8
     Integer :: dbpdr = 5 , dbpdt = 6 ,  dbpdp = 9    
 
-    Type(SphericalBuffer), public :: add_fields
+    Type(SphericalBuffer), public :: diag_fields
     !Integer :: dbrdt, dbrdr, dbtdr, dbpdr
 Contains
 
@@ -531,7 +531,23 @@ Contains
         !Call Load_Label(v_phi, 'V_phi')
     End Subroutine Generate_Diagnostic_Labels
 
+    Subroutine Initialize_Diagnostics_Buffer()
+        Logical :: dbtrans, dbconfig
+        Logical :: test_reduce
+        Integer :: dfcount(3,2)
+        dbtrans = .false.
+        dbconfig = .false.
+        test_reduce = .false.
 
+        dfcount(:,:) = 0
+        dfcount(2,1) = 5  ! These change depending on what we want to transmit
+        dfcount(3,1) = 5
+        !dfcount(2,1) = 4
+        !dfcounts(3,2) = 4
+        Call diag_fields%init(field_count = dfcount, config = 's2a', &
+            dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
+            hold_cargo = test_reduce, padding = pad_alltoall)        
+    End Subroutine Initialize_Diagnostics_Buffer
 
     Subroutine Adjust_Bfield(buffer)
         Implicit None
@@ -600,5 +616,6 @@ Contains
         bindex(11) = dbpdt
         bindex(12) = dbpdp
     End Subroutine Initialize_VBindices
+
 
 End Module Diagnostics_Base

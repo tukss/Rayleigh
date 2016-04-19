@@ -4,7 +4,9 @@ Module Spherical_Buffer
     Use Structures
     Use Load_Balance
     Use General_MPI
+    Implicit None
     Private
+
     Character*6 :: ifmt = '(i4.4)' ! Integer format for indicating processor tag numbers in output
 	Type, Public :: SphericalBuffer
 		! The buffer object for buffer moving between spaces
@@ -166,12 +168,14 @@ Contains
 			Allocate(self%send_buff(1:self%max_send))
 	End Subroutine Set_Buffer_Sizes
 
-	Subroutine Transpose_2a3a(self)
+	Subroutine Transpose_2a3a(self,extra_recv)
 		Class(SphericalBuffer) :: self
 		!Real*8, Allocatable :: send_buff(:), recv_buff(:)
 		Integer :: np
 		Integer :: imin, imax, jmin, jmax, kmin,kmax,ii,nf
 		Integer :: i,f,j,p,k,k_ind,delf,delj
+        Integer, Intent(In), Optional :: extra_recv
+        Integer :: numalloc
 		! This is where we we move from theta, delta_r, delta_m 
 		!  to m, delta_r, delta_theta
 		If (self%dynamic_transpose_buffers) Then
@@ -226,8 +230,16 @@ Contains
 		!--------------------------------------------------
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 
-		Call self%construct('p3a')
         !Here, we need self%construct('p3a',extra =nfextra or another number)
+
+        If (present(extra_recv)) Then
+            !Allocate an s2a buffer that is larger than normal
+            numalloc = extra_recv+self%nf3a
+            Call self%construct('p3a',numfields = numalloc)
+        Else
+            Call self%construct('p3a')
+        Endif
+
 
 		self%p3a(:,:,:,:) = 0.0d0	! This is important because we are going to take an fft later (De-aliasing is implicit here because
 		! we only stripe in data of the de-aliased m's, but we need to make sure the higher m's are zero!
@@ -354,6 +366,8 @@ Contains
 		If (self%dynamic_transpose_buffers) DeAllocate(self%send_buff)
 	
 		Call self%construct('p2b')		! p2a and p2b can share the same buffer space... maybe just call this p2...
+
+
 
 		delj = pfi%my_1p%delta
 		
@@ -1107,7 +1121,7 @@ Contains
                     Else
     					mx4 = self%nf3a
                     Endif
-					! might think of calling this p3a rather than rdata 3a
+                    Write(6,*)'p3a -- mx4 is: ', mx4, numfields, self%nf3a
 					Allocate(self%p3a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
 			Case('p3b')
@@ -1142,17 +1156,13 @@ Contains
                     Else
     					mx4 = self%nf2a
                     Endif
-                    Write(6,*)'mx4 is: ', mx4
-
 
 					mn3 = pfi%my_1p%min
 					mx3 = pfi%my_1p%max
 				
 					Allocate(self%s2a(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
-
-
-
+                    Write(6,*)'mx4 is: ', mx4, numfields, self%nf2a
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
                         Allocate(self%s2a(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))
@@ -1186,6 +1196,7 @@ Contains
 					Enddo
 
 				Endif
+
 		End Select
 
 	End Subroutine Allocate_Spherical_Buffer
@@ -1194,7 +1205,11 @@ Contains
 		Class(SphericalBuffer) :: self		
 		Select Case(self%config)
 			Case ('p2a')
-				Call self%transpose_2a3a()
+                If (present(nextra_recv)) Then
+				    Call self%transpose_2a3a(extra_recv = nextra_recv)
+                Else
+				    Call self%transpose_2a3a()
+                Endif
 			Case ('p3b')
 
 				Call self%transpose_3b2b()

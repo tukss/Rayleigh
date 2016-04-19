@@ -3,7 +3,7 @@
 #define IDX2 m:l_max,r,imi
 #define SBUFFA wsp%s2a(mp)%data
 #define SBUFFB wsp%s2b(mp)%data
-#define ASBUFFA add_fields%s2a(mp)%data
+#define ASBUFFA diag_fields%s2a(mp)%data
 Module Hybrid_Space_Sphere
 
     ! NOTE: WE NEED a 1/density variable
@@ -19,7 +19,7 @@ Module Hybrid_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
     Use Equation_Coefficients
-    Use Diagnostics_Interface, Only : add_fields
+    Use Diagnostics_Interface, Only : diag_fields
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
 
@@ -92,7 +92,13 @@ Contains
 		wsp%config = 'p2a'	
 
 		Call StopWatch(rtranspose_time)%startclock()
-		Call wsp%reform()	! We are now in p3a
+
+        If (output_iteration) Then
+            Call wsp%reform(nextra_recv = nicknum)
+        Else
+    		Call wsp%reform()	! We are now in p3a
+        Endif      
+
 		Call StopWatch(rtranspose_time)%increment()		
 	End Subroutine rlm_spacea
 
@@ -389,14 +395,15 @@ Contains
 	Subroutine Bfield_Derivatives()
 		Implicit None
 		Integer :: r, l, m, mp, imi
-        Integer :: dbrdr, dbtdr, dbpdr, dbrdt
+        Integer :: dbrdr_ia, dbtdr_ia, dbpdr_ia, dbrdt_ia,avar_ia
         !These terms are only needed if we want to output 
         !inductions terms in the diagnostics
-
-        dbrdr = wsp%nf2a+1
-        dbtdr = dbrdr+1
-        dbpdr = dbtdr+1
-        dbrdt = dbpdr+1
+        Call diag_fields%construct('s2a')
+        dbrdr_ia = 1   ! This will change based on what else gets packed into the buffer
+        dbtdr_ia = dbrdr_ia+1
+        dbpdr_ia = dbtdr_ia+1
+        dbrdt_ia = dbpdr_ia+1
+         avar_ia = dbrdt_ia+1
 
 		!/////////////////////////////////
 		!sintheta dB theta dr
@@ -409,11 +416,11 @@ Contains
         END_DO
 
         DO_IDX2			
-            ASBUFFA(IDX2,dbtdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbtdr_ia) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbtdr) = SBUFFA(IDX2,dbtdr)- &
+            ASBUFFA(IDX2,dbtdr_ia) = ASBUFFA(IDX2,dbtdr_ia)- &
                 & SBUFFA(IDX2,btheta)*one_over_r(r)
         END_DO	
 
@@ -427,11 +434,11 @@ Contains
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbpdr_ia) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr) = ASBUFFA(IDX2,dbpdr)- &
+            ASBUFFA(IDX2,dbpdr_ia) = ASBUFFA(IDX2,dbpdr_ia)- &
                 &  SBUFFA(IDX2,bphi)*one_over_r(r)
         END_DO	
 
@@ -439,22 +446,24 @@ Contains
 		!dB r dr	
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr) = l_l_plus1(m:l_max)* & 
+            ASBUFFA(IDX2,dbrdr_ia) = l_l_plus1(m:l_max)* & 
                 & SBUFFA(IDX2,dcdr)*OneOverRSquared(r)
         END_DO
 
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr) = ASBUFFA(IDX2,dbrdr)- &
+            ASBUFFA(IDX2,dbrdr_ia) = ASBUFFA(IDX2,dbrdr_ia)- &
                 & SBUFFA(IDX2,br)*Two_Over_R(r)
         END_DO
 
-		Call d_by_dtheta(wsp%s2a,br,dbrdt)  
-
+		Call d_by_dtheta(wsp%s2a,br,ftemp1)  
+        DO_IDX2
+            ASBUFFA(IDX2,dbrdt_ia) = ftemp1(mp)%data(IDX2)
+        END_DO
 		
 		! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
         DO_IDX2
-            ASBUFFA(IDX2,avar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
+            ASBUFFA(IDX2,avar_ia) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
         END_DO
 	End Subroutine BField_Derivatives
 

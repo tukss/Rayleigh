@@ -31,6 +31,8 @@ Contains
 		Call Phi_Derivatives()
 		Call StopWatch(dphi_time)%increment()
 
+
+
 		! Next perform the FFT
 		Call StopWatch(fft_time)%startclock()
 		Call fft_to_physical(wsp%p3a,rsc = .true.)
@@ -65,6 +67,9 @@ Contains
 		!This is a good spot to do some simple diagnostic output while we debug the code
 		!since velocity components, Pressure, and Temperature are all 
 		!in memory and in physical space at this point in time.
+        If (output_iteration) Then
+            Write(6,*)'Output!'
+        Endif
 		Call ps_output(wsp%p3a, iteration,simulation_time)
         Call Benchmark_Checkup(wsp%p3a, iteration,simulation_time)
 		!////////////////////////////////////////////////////////////////////////
@@ -593,5 +598,47 @@ Contains
 
 		Call StopWatch(ts_time)%increment()
 	End Subroutine Find_MyMinDT
+
+
+    !/////////////////////////////////////////////////////
+    ! Support routines for getting additional diagnostic fields sorted out
+    Subroutine Diagnostics_Prep()
+        Implicit None
+        If (magnetism) Then
+            Call d_by_dphi(wsp%p3a,br,dbrdp)
+    		Call d_by_dphi(wsp%p3a,btheta,dbtdp)
+    		Call d_by_dphi(wsp%p3a,bphi,dbpdp)
+        Endif
+        Call fft_to_physical(wsp%p3a,rsc = .true.)
+
+		Call sintheta_div(dvtdr)
+		Call sintheta_div(dvpdr)
+        
+    End Subroutine Diagnostics_Prep
+
+	Subroutine Compute_dbtheta_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+
+		DO_IDX
+			wsp%p3a(IDX,dbtdt) = -wsp%p3a(IDX,br)*2.0d0 &
+										- radius(r)*diag_fields%p3a(IDX,dvrdr) &
+										- wsp%p3a(IDX,btheta)*cottheta(t) &
+										- wsp%p3a(IDX,dbpdp)*csctheta(t)
+		END_DO
+
+	End Subroutine Compute_dbtheta_by_dtheta
+
+	Subroutine Compute_dbphi_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			wsp%p3a(IDX,dbpdt) = radius(r)*diag_fields%p3a(IDX,avar_ia)+wsp%p3a(IDX,dbtdp)*csctheta(t) &
+            -wsp%p3a(IDX,bphi)*cottheta(t)
+		END_DO
+		!$OMP END PARALLEL DO
+	End Subroutine Compute_dbphi_by_dtheta
+
 
 End Module Physical_Space_Sphere
