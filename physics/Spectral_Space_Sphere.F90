@@ -12,6 +12,7 @@ Module Spectral_Space_Sphere
 	Use ClockInfo
 	Use Timers
 	Use Linear_Terms_Sphere
+    Use Diagnostics_Interface, Only : cobuffer
 	Implicit None
 	Type(SphericalBuffer) :: ctemp ! workspace
 Contains
@@ -213,8 +214,8 @@ Contains
 		Call d_by_dr_cp(wvar,dwdr   ,wsp%p1a,1)		
 		Call d_by_dr_cp(wvar,d2wdr2 ,wsp%p1a,2)
 		! P....n
-		Call d_by_dr_cp(pvar,dpdr,wsp%p1a,1)
-		ctemp%p1a(:,:,:,2) = wsp%p1a(:,:,:,dpdr)
+		Call d_by_dr_cp(pvar,dpdr1,wsp%p1a,1)
+		ctemp%p1a(:,:,:,2) = wsp%p1a(:,:,:,dpdr1)
 		! T
 		Call d_by_dr_cp(tvar,d2tdr2,wsp%p1a,2)
 		ctemp%p1a(:,:,:,3) = wsp%p1a(:,:,:,d2tdr2)
@@ -241,6 +242,12 @@ Contains
 		ctemp%p1a((2*N_r)/3+1:N_r,:,:,:) = 0.0d0	! de-alias
 
 		Call Cheby_From_Spectral(ctemp%p1a,ctemp%p1b)
+        If (output_iteration) Then
+            ! Grab dpdr
+            Call cobuffer%construct('p1a')
+            cobuffer%p1b(:,:,:,dpdr_cb) = ctemp%p1b(:,:,:,2)
+        Endif
+
 
 		Call Add_Derivative(peq,wvar,3,wsp%p1b,ctemp%p1b,1)
 		Call Add_Derivative(weq,pvar,1,wsp%p1b,ctemp%p1b,2)
@@ -313,8 +320,6 @@ Contains
 			!//////////////
 			! A-terms (Toroidal magnetic field)
 		
-	
-
 			Call Add_Derivative(aeq,avar,0,wsp%p1b,wsp%p1a,avar)
 
 			!///////////////////
@@ -336,10 +341,14 @@ Contains
 
 		Call StopWatch(ctranspose_time)%startclock()
 
-        If (output_iteration) Then
-            Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
-        Else
+        !Leaving this code for now.  This was from when I thought I would have 
+        !If (output_iteration) Then
+        !    Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
+        !Else
     		Call wsp%reform()	! move from p1a to s2a
+        !Endif
+        If (output_iteration) Then
+            Call cobuffer%reform()
         Endif
 		Call StopWatch(ctranspose_time)%increment()
 

@@ -34,7 +34,7 @@ Module Fields
 	!////////////////////////////////////////////////////////////////////////////
 	! Variable locations in the global field meta data buffer
 	Integer :: wvar, pvar, tvar, zvar
-	Integer :: dpdr
+	Integer :: dpdr1  ! We reserve dpdr for the final location at output time
 	Integer :: dwdr,  d3wdr3, dtdr, dzdr, d2zdr2, d2tdr2, d2wdr2
 	Integer :: vr, vtheta, vphi,dtdt,dvrdt,dvtdr,dvpdr,dvrdr
 	Integer :: dvrdp, dvtdp, dvpdp, dtdp, tout !tout hold temperature/entropy for output
@@ -62,6 +62,21 @@ Module Fields
 	Real*8, Allocatable :: ABsave(:,:,:,:) !  Have to think about where to do this
 	! Type(rmcontainer) :: ABSave(:)			! Might be most natural to keep this in rlm space
 	Type(SphericalBuffer) :: wsp ! Primary workspace for the entire run
+
+    !======================================================================
+    !Finally, we have some diagnostic field variables
+    ! These indices are used to reference the values held in diag_fields s2a and p3a
+    !Integer :: dbrdr_ia, dbtdr_ia, dbpdr_ia, dbrdt_ia,avar_ia, dpdr_ia
+    ! Or maybe use "db" for diagnostics_buffer
+    Integer :: dpdr_cb, dpdt_cb, dpdp_cb
+    Integer :: dbrdr_cb, dbtdr_cb, dbpdr_cb, dbrdt_cb,avar_cb
+    ! These indices are used to reference the expanded workspace buffer during
+    ! output iterations (for configurations s3a and p3a only)
+    ! They are set in Diagnostics_Base.F90
+    Integer :: dpdr, dpdt, dpdp  ! pressure derivatives
+    Integer :: dbrdr, dbrdt, dbrdp, dbtdr, dbtdt, dbtdp, dbpdr, dbpdt, dbpdp    
+    Integer :: vindex(1:12), bindex(1:12)  ! the indices within the p3a buffer
+    ! (at output time) corresponding to v,B, and their derivatives
 
 Contains
 
@@ -161,13 +176,13 @@ Contains
 		
 
 		Call Add_Field(d3Wdr3  ,arr)
-		Call Add_Field(dPdr    ,arr)
-		Call Add_Field(d2Tdr2  ,arr, overwrite = dpdr)	! replaces dpdr
+		Call Add_Field(dPdr1    ,arr)
+		Call Add_Field(d2Tdr2  ,arr, overwrite = dpdr1)	! replaces dpdr
 		Call Add_field(d2Zdr2  ,arr)
 
 		Call Add_Field(dWdr    ,arr, overwrite = d3wdr3)
 		Call Add_Field(d2Wdr2  ,arr)
-		Call Add_Field(dTdr    ,arr, overwrite = dpdr)	!replaces d2tdr2, which replaced dpdr
+		Call Add_Field(dTdr    ,arr, overwrite = dpdr1)	!replaces d2tdr2, which replaced dpdr
 		Call Add_Field(dZdr    ,arr, overwrite = d2Zdr2)
 
 		if (magnetism) Then
@@ -237,6 +252,70 @@ Contains
 		!Write(6,*)'c3a_counter is: ', c3a_counter
 
 	End Subroutine Initialize_Field_Structure
+    Subroutine Initialize_Diagnostic_Indices()
+        Implicit None
+        Integer :: p3a_size, p3a_offset, abuff_offset
+        vindex(1)  = vr
+        vindex(2)  = vtheta
+        vindex(3)  = vphi
+        vindex(4)  = dvrdr
+        vindex(5)  = dvrdt
+        vindex(6)  = dvrdp
+        vindex(7)  = dvtdr
+        vindex(8)  = dvtdt
+        vindex(9)  = dvtdp
+        vindex(10) = dvpdr
+        vindex(11) = dvpdt
+        vindex(12) = dvpdp
+        p3a_size = wsp%nf3a
 
+        !here we have some indices within the cobuffer
+        ! Config 1
+        dpdr_cb = 1
+
+        ! Config 2
+        dpdt_cb = dpdr_cb+1
+
+        ! Config 3
+        dpdp_cb = dpdt_cb+1
+
+        
+
+        p3a_offset   = p3a_size ! may need to change
+        abuff_offset = 0       ! auxilliary buffer offset
+        If (magnetism) Then
+
+            dbrdr_cb = abuff_offset+1   ! This will change based on what else gets packed into the buffer
+            dbtdr_cb = dbrdr_cb+1
+            dbpdr_cb = dbtdr_cb+1
+            dbrdt_cb = dbpdr_cb+1
+             avar_cb = dbrdt_cb+1
+
+            dbrdr = p3a_offset+1
+            dbtdr = dbrdr+1
+            dbpdr = dbtdr+1
+
+            dbrdt = dbpdr+1
+            dbtdt = dbrdt+1
+            dbpdt = dbtdt+1
+
+            dbrdp = dbpdt+1
+            dbtdp = dbrdp+1
+            dbpdp = dbtdp+1
+
+            bindex(1)  = br
+            bindex(2)  = btheta
+            bindex(3)  = bphi
+            bindex(4)  = dbrdr
+            bindex(5)  = dbrdt
+            bindex(6)  = dbrdp
+            bindex(7)  = dbtdr
+            bindex(8)  = dbtdt
+            bindex(9)  = dbtdp
+            bindex(10) = dbpdr
+            bindex(11) = dbpdt
+            bindex(12) = dbpdp
+        Endif
+    End Subroutine Initialize_Diagnostic_Indices
 
 End Module Fields

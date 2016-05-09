@@ -3,7 +3,7 @@
 #define IDX2 m:l_max,r,imi
 #define SBUFFA wsp%s2a(mp)%data
 #define SBUFFB wsp%s2b(mp)%data
-#define ASBUFFA diag_fields%s2a(mp)%data
+#define ASBUFFA cobuffer%s2a(mp)%data
 Module Hybrid_Space_Sphere
 
     ! NOTE: WE NEED a 1/density variable
@@ -19,19 +19,15 @@ Module Hybrid_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
     Use Equation_Coefficients
-    Use Diagnostics_Interface, Only : diag_fields
+    Use Diagnostics_Interface, Only : cobuffer, dbrdr_cb, dbtdr_cb, dbpdr_cb, dbrdt_cb, avar_cb, &
+            & dbrdr,dbtdr,dbpdr,dbrdt,dbtdt,dbpdt,dbrdp,dbtdp,dbpdp
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
 
 	Type(rmcontainer3D), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 Contains
-!///// TODO
-!		change /rho_rep to *one_over_rhorep
 
-!/////////////////////////////
-	!  This routine calculates terms that involve
-	!      theta derivatives and loads them into
-	!		 the buffer.
+
 	Subroutine Hybrid_Init()
         Integer :: r1, r2
         !Allocate a few useful arrays that prevent extra mult/adds
@@ -51,7 +47,7 @@ Contains
 		Integer :: mp,r,imi,m,l, ind_top
 		Call StopWatch(rlma_time)%startclock()
 
-				! Zero out l_max mode
+		! Zero out l_max mode
 		Do mp = my_mp%min, my_mp%max
 			SBUFFA(l_max,:,:,:) = 0.0d0
 		Enddo
@@ -68,9 +64,19 @@ Contains
 
 		If (magnetism) Call compute_BandJ()
 
-        If (output_iteration .and. magnetism) Then
-            ! We compute some derivatives of B as well
-            Call BField_Derivatives()
+        If (output_iteration) Then
+		    Do mp = my_mp%min, my_mp%max
+			    ASBUFFA(l_max,:,:,:) = 0.0d0
+		    Enddo
+            Call Hydro_Output_Derivatives()
+            If (magnetism) Then
+                ! We compute some derivatives of B as well
+                Call BField_Derivatives()
+            Endif
+            Call cobuffer%construct('p2a')
+            Call Legendre_Transform(cobuffer%s2a,cobuffer%p2a)
+            Call cobuffer%reform()
+            Call cobuffer%deconstruct('s2a')
         Endif
 
 		Call DeAllocate_rlm_Field(ftemp1)
@@ -198,6 +204,17 @@ Contains
 
 
 	End Subroutine rlm_spaceb
+
+    Subroutine Hydro_Output_Derivatives()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+        !Compute sin(theta) dP/dtheta and 
+        !place it in the cobuffer
+        Call d_by_dtheta(wsp%s2a,pvar,ftemp1)
+        DO_IDX2
+            ASBUFFA(IDX2,dpdt_cb) = ftemp1(mp)%data(IDX2)
+        END_DO
+    End Subroutine Hydro_Output_Derivatives
 
 	Subroutine Velocity_Components()
 		Implicit None
@@ -355,7 +372,7 @@ Contains
         !/////////////J Theta ///////////////////////
         Call d_by_dphi(  wsp%s2a,d2cdr2,ftemp2)       !get phi derivative of d2cdr2-Br
 
-        ! Combine with ftemp1 to build J_theta (overwrites d2cdr2)
+        ! Combine with ftemp1 to build rsintheta J_theta (overwrites d2cdr2)
         DO_IDX2
             SBUFFA(IDX2,jtheta) = alf_const*(ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
         END_DO
@@ -387,23 +404,15 @@ Contains
         DO_IDX2
             SBUFFA(IDX2,dcdr) = ftemp2(mp)%data(IDX2)-ftemp1(mp)%data(IDX2)
         END_DO
-
-
-
 	End Subroutine Compute_BandJ
 
 	Subroutine Bfield_Derivatives()
 		Implicit None
 		Integer :: r, l, m, mp, imi
-        Integer :: dbrdr_ia, dbtdr_ia, dbpdr_ia, dbrdt_ia,avar_ia
+
         !These terms are only needed if we want to output 
         !inductions terms in the diagnostics
-        Call diag_fields%construct('s2a')
-        dbrdr_ia = 1   ! This will change based on what else gets packed into the buffer
-        dbtdr_ia = dbrdr_ia+1
-        dbpdr_ia = dbtdr_ia+1
-        dbrdt_ia = dbpdr_ia+1
-         avar_ia = dbrdt_ia+1
+
 
 		!/////////////////////////////////
 		!sintheta dB theta dr
@@ -416,16 +425,16 @@ Contains
         END_DO
 
         DO_IDX2			
-            ASBUFFA(IDX2,dbtdr_ia) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbtdr_cb) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbtdr_ia) = ASBUFFA(IDX2,dbtdr_ia)- &
-                & SBUFFA(IDX2,btheta)*one_over_r(r)
-        END_DO	
+            ASBUFFA(IDX2,dbtdr_cb) = ASBUFFA(IDX2,dbtdr_cb)- &
+                & SBUFFA(IDX2,btheta)*OneOverRSquared(r)  !(take care) btheta is really rsintheta btheta
+        END_DO	                                          !hence 1/r^2 instead of 1/r
 
 		!/////////////////////////////////
-		!sinphi dB phi dr 
+		!sintheta dB phi dr 
 		Call d_by_dphi(wsp%s2a,d2cdr2,ftemp1)	
 		Call d_by_dtheta(wsp%s2a,dadr,	ftemp2)	   		
 
@@ -434,36 +443,37 @@ Contains
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr_ia) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbpdr_cb) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr_ia) = ASBUFFA(IDX2,dbpdr_ia)- &
-                &  SBUFFA(IDX2,bphi)*one_over_r(r)
+            ASBUFFA(IDX2,dbpdr_cb) = ASBUFFA(IDX2,dbpdr_cb)- &
+                &  SBUFFA(IDX2,bphi)*OneOverRSquared(r) !(take care) bphi is really rsinthetabphi
         END_DO	
 
 		!/////////////////////////////////////////  
 		!dB r dr	
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr_ia) = l_l_plus1(m:l_max)* & 
+            ASBUFFA(IDX2,dbrdr_cb) = l_l_plus1(m:l_max)* & 
                 & SBUFFA(IDX2,dcdr)*OneOverRSquared(r)
         END_DO
 
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr_ia) = ASBUFFA(IDX2,dbrdr_ia)- &
+            ASBUFFA(IDX2,dbrdr_cb) = ASBUFFA(IDX2,dbrdr_cb)- &
                 & SBUFFA(IDX2,br)*Two_Over_R(r)
         END_DO
 
+        !sintheta dbrdr
 		Call d_by_dtheta(wsp%s2a,br,ftemp1)  
         DO_IDX2
-            ASBUFFA(IDX2,dbrdt_ia) = ftemp1(mp)%data(IDX2)
+            ASBUFFA(IDX2,dbrdt_cb) = ftemp1(mp)%data(IDX2)
         END_DO
 		
 		! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
         DO_IDX2
-            ASBUFFA(IDX2,avar_ia) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
+            ASBUFFA(IDX2,avar_cb) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
         END_DO
 	End Subroutine BField_Derivatives
 

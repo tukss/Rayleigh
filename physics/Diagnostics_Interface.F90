@@ -126,7 +126,6 @@ Contains
             Allocate(m0_values(my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields))
             Call ComputeEll0(buffer,ell0_values)
             Call ComputeM0(buffer,m0_values)
-            Call Adjust_Bfield(buffer)!<-------------- Check on induction flag
             Call Compute_Fluctuations(buffer)
         
 
@@ -462,7 +461,7 @@ Contains
 
     Subroutine Initialize_Diagnostics()
         Implicit None
-        Integer :: i
+        Integer :: i, isize
         Real*8 :: delr
         
         Allocate(tweights(1:n_theta))
@@ -491,7 +490,7 @@ Contains
 
         Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
-        Call Initialize_VBIndices()
+        Call Initialize_Diagnostic_Indices()
         !DeAllocate(tweights)  !<---- Used to deallocate these.  We now use these for the computing the ell0 components
         !DeAllocate(rweights)
         

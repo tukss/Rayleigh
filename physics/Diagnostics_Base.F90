@@ -495,32 +495,11 @@ Module Diagnostics_Base
 
     ! This array will hold fluctuating quantities from the buffer { q - <q>}      
     Real*8, Allocatable :: fbuffer(:,:,:,:)	
-    Integer :: vindex(1:12), bindex(1:12)  ! the indices within fbuffer corresponding to v,B, and their derivatives
 
-    ! These indices are used for references fluctuations in vfluct and bfluct
-    ! "p" denotes "prime" as in v'
-    Integer :: vr_p     = 1, dvrdr_p = 4 ,dvrdt_p = 5 , dvrdp_p = 6
-    Integer :: vtheta_p = 2, dvtdr_p = 7 ,dvtdt_p = 8 , dvtdp_p = 9
-    Integer :: vphi_p   = 3, dvpdr_p = 10,dvpdt_p = 11, dvpdp_p = 12
 
-    Integer :: br_p     = 1, dbrdr_p = 4 ,dbrdt_p = 5 , dbrdp_p = 6
-    Integer :: btheta_p = 2, dbtdr_p = 7 ,dbtdt_p = 8 , dbtdp_p = 9
-    Integer :: bphi_p   = 3, dbpdr_p = 10,dbpdt_p = 11, dbpdp_p = 12
 
-    Real*8, Allocatable :: bvars(:,:,:,:)  ! Holds the components of b and their derivatives
-    ! These indices are used to reference the values held in bvars
-    Integer :: br_i     = 1, dbrdr_i = 4 ,dbrdt_i = 5  , dbrdp_i = 6
-    Integer :: btheta_i = 2, dbtdr_i = 7 ,dbtdt_i = 8  , dbtdp_i = 9
-    Integer :: bphi_i   = 3, dbpdr_i = 10,dbpdt_i = 11 , dbpdp_i = 12
+    Type(SphericalBuffer), public :: cobuffer
 
-    ! These indices are used to reference the values held in add_fields%p3a
-    ! That buffer contains the derivatives of each component of b
-    Integer :: dbrdr = 1 , dbrdt = 2  , dbrdp = 7
-    Integer :: dbtdr = 3 , dbtdt = 4  , dbtdp = 8
-    Integer :: dbpdr = 5 , dbpdt = 6 ,  dbpdp = 9    
-
-    Type(SphericalBuffer), public :: diag_fields
-    !Integer :: dbrdt, dbrdr, dbtdr, dbpdr
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
@@ -544,26 +523,12 @@ Contains
         dfcount(3,1) = 5
         !dfcount(2,1) = 4
         !dfcounts(3,2) = 4
-        Call diag_fields%init(field_count = dfcount, config = 's2a', &
+        Call cobuffer%init(field_count = dfcount, config = 'p1a', &
             dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
             hold_cargo = test_reduce, padding = pad_alltoall)        
     End Subroutine Initialize_Diagnostics_Buffer
 
-    Subroutine Adjust_Bfield(buffer)
-        Implicit None
-        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
-        Integer :: r,k, t, j
-        !This routine will handle the sintheta divisions for the magnetic components
-        
 
-		!Call sintheta_divd(add_fieldss%p3a,dbtdr_ai)
-		!Call sintheta_divd(add_fields%p3a,dbpdr_ai)
-		!Call sintheta_divd(add_fields%p3a,dbtdt_ai)
-		!Call sintheta_divd(add_fields%p3a,dbrdt_ai)
-		!Call sintheta_divd(add_fields%p3a,dbpdp_ai)
-		!Call sintheta_divd(add_fields%p3a,dbtdp_ai)
-        
-    End Subroutine Adjust_Bfield
 
 
 
@@ -587,35 +552,6 @@ Contains
         Implicit None
         DeAllocate(fbuffer)
     End Subroutine DeAllocate_Fluctuations
-
-    Subroutine Initialize_VBIndices()
-        Implicit None
-        vindex(1)  = vr
-        vindex(2)  = vtheta
-        vindex(3)  = vphi
-        vindex(4)  = dvrdr
-        vindex(5)  = dvrdt
-        vindex(6)  = dvrdp
-        vindex(7)  = dvtdr
-        vindex(8)  = dvtdt
-        vindex(9)  = dvtdp
-        vindex(10) = dvpdr
-        vindex(11) = dvpdt
-        vindex(12) = dvpdp
-
-        bindex(1)  = br
-        bindex(2)  = btheta
-        bindex(3)  = bphi
-        bindex(4)  = dbrdr
-        bindex(5)  = dbrdt
-        bindex(6)  = dbrdp
-        bindex(7)  = dbtdr
-        bindex(8)  = dbtdt
-        bindex(9)  = dbtdp
-        bindex(10) = dbpdr
-        bindex(11) = dbpdt
-        bindex(12) = dbpdp
-    End Subroutine Initialize_VBindices
 
 
 End Module Diagnostics_Base
