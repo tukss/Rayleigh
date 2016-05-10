@@ -1121,7 +1121,7 @@ Contains
                     Else
     					mx4 = self%nf3a
                     Endif
-                    Write(6,*)'p3a -- mx4 is: ', mx4, numfields, self%nf3a
+                    !Write(6,*)'p3a -- mx4 is: ', mx4, numfields, self%nf3a
 					Allocate(self%p3a(mn1:mx1, mn2:mx2, mn3:mx3, mn4:mx4))
 				Endif
 			Case('p3b')
@@ -1162,7 +1162,7 @@ Contains
 				
 					Allocate(self%s2a(mn1:mx1))
 					mx2 = maxval(pfi%inds_3s)	! l_max = m_max
-                    Write(6,*)'mx4 is: ', mx4, numfields, self%nf2a
+                    !Write(6,*)'mx4 is: ', mx4, numfields, self%nf2a
 					Do i = mn1, mx1
 						mn2 = pfi%inds_3s(i)		!l_min = m
                         Allocate(self%s2a(i)%data(mn2:mx2,mn3:mx3,1:2,1:mx4))

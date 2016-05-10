@@ -74,9 +74,7 @@ Contains
 		!This is a good spot to do some simple diagnostic output while we debug the code
 		!since velocity components, Pressure, and Temperature are all 
 		!in memory and in physical space at this point in time.
-        If (output_iteration) Then
-            Write(6,*)'Output!'
-        Endif
+
 		Call ps_output(wsp%p3a, iteration,simulation_time)
         Call Benchmark_Checkup(wsp%p3a, iteration,simulation_time)
 		!////////////////////////////////////////////////////////////////////////

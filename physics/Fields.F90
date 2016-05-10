@@ -138,7 +138,9 @@ Contains
 
         !  Note:  wsp_indices is a simple object used for keeping track of
         !  of the field indexing.  This indexing be done manually 
-        !  (albeit carefully) without wsp_indices
+        !  (albeit carefully) without wsp_indices.  The advantage here
+        !  is that additional fields can be added at any stage without
+        !  manually shifting around all the indices.
 
         !  Once a field is added using Add_Field, its memory space
         !  is assumed to persist throughout that leg of the loop.

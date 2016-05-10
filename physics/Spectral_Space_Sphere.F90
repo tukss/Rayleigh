@@ -244,7 +244,7 @@ Contains
         If (output_iteration) Then
             ! Grab dpdr
             Call cobuffer%construct('p1a')
-            cobuffer%p1b(:,:,:,dpdr_cb) = ctemp%p1b(:,:,:,2)
+            cobuffer%p1a(:,:,:,dpdr_cb) = ctemp%p1b(:,:,:,2)
         Endif
 
 

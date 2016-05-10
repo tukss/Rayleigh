@@ -56,6 +56,8 @@ Contains
 		Call Allocate_rlm_Field(ftemp1)
 		Call Allocate_rlm_Field(ftemp2)
 
+        If (output_iteration) Call Hybrid_Output_Initial()
+
 		Call Velocity_Components()	
 		Call Velocity_Derivatives()
 		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
@@ -63,20 +65,9 @@ Contains
 
 		If (magnetism) Call compute_BandJ()
 
-        If (output_iteration) Then
-		    Do mp = my_mp%min, my_mp%max
-			    ASBUFFA(l_max,:,:,:) = 0.0d0
-		    Enddo
-            Call Hydro_Output_Derivatives()
-            If (magnetism) Then
-                ! We compute some derivatives of B as well
-                Call BField_Derivatives()
-            Endif
-            Call cobuffer%construct('p2a')
-            Call Legendre_Transform(cobuffer%s2a,cobuffer%p2a)
-            Call cobuffer%reform()
-            Call cobuffer%deconstruct('s2a')
-        Endif
+        If (output_iteration) Call Hybrid_Output_Final()
+
+
 
 		Call DeAllocate_rlm_Field(ftemp1)
 		Call DeAllocate_rlm_Field(ftemp2)
@@ -470,12 +461,41 @@ Contains
             ASBUFFA(IDX2,dbrdt_cb) = ftemp1(mp)%data(IDX2)
         END_DO
 		
-		! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
-        DO_IDX2
-            ASBUFFA(IDX2,avar_cb) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
-        END_DO
+
 	End Subroutine BField_Derivatives
 
+    Subroutine Hybrid_Output_Initial()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+        If (magnetism) Then
+            ! We need to grab avar before it's overwritten by b_theta
+		    ! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
+            DO_IDX2
+                ASBUFFA(IDX2,avar_cb) = l_l_plus1(m:l_max)* &
+                                        SBUFFA(IDX2,avar)*one_over_r(r)
+            END_DO
+        Endif
+    End Subroutine Hybrid_Output_Initial
+
+    Subroutine Hybrid_Output_Final()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+	    Do mp = my_mp%min, my_mp%max
+		    ASBUFFA(l_max,:,:,:) = 0.0d0
+	    Enddo
+        Call Hydro_Output_Derivatives()
+        If (magnetism) Then
+            ! We compute some derivatives of B as well
+            Call BField_Derivatives()
+        Endif
+        Call cobuffer%construct('p2a')
+        cobuffer%config = 'p2a'
+        Call Legendre_Transform(cobuffer%s2a,cobuffer%p2a)
+        Call cobuffer%deconstruct('s2a')
+
+        Call cobuffer%reform()
+           
+    End Subroutine Hybrid_Output_Final
 
 	Subroutine Adjust_Emf()
 		Implicit None
