@@ -59,9 +59,9 @@ Contains
         Call Compute_Diffusion_Coefs()
         Call Init_Equation_Coefficients()
 		Call Write_Reference(ndrf)
-		
+		Call Initialize_Field_Structure()
 		Call Initialize_Diagnostics()
-		Call Initialize_Field_Structure()	! organization
+
 		Call Full_Barrier()
 		!Call Initialize_Benchmark_Equations()
 		!Call Compute_Benchmark_Coefficients()

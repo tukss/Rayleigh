@@ -497,9 +497,6 @@ Module Diagnostics_Base
     Real*8, Allocatable :: fbuffer(:,:,:,:)	
 
 
-
-    Type(SphericalBuffer), public :: cobuffer
-
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
@@ -513,17 +510,12 @@ Contains
     Subroutine Initialize_Diagnostics_Buffer()
         Logical :: dbtrans, dbconfig
         Logical :: test_reduce
-        Integer :: dfcount(3,2)
+
         dbtrans = .false.
         dbconfig = .false.
         test_reduce = .false.
 
-        dfcount(:,:) = 0
-        dfcount(2,1) = 5  ! These change depending on what we want to transmit
-        dfcount(3,1) = 5
-        !dfcount(2,1) = 4
-        !dfcounts(3,2) = 4
-        Call cobuffer%init(field_count = dfcount, config = 'p1a', &
+        Call cobuffer%init(field_count = cbfcount, config = 'p1a', &
             dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
             hold_cargo = test_reduce, padding = pad_alltoall)        
     End Subroutine Initialize_Diagnostics_Buffer

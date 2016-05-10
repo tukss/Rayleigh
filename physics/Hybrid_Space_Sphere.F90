@@ -19,8 +19,7 @@ Module Hybrid_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
     Use Equation_Coefficients
-    Use Diagnostics_Interface, Only : cobuffer, dbrdr_cb, dbtdr_cb, dbpdr_cb, dbrdt_cb, avar_cb, &
-            & dbrdr,dbtdr,dbpdr,dbrdt,dbtdt,dbpdt,dbrdp,dbtdp,dbpdp
+
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
 
@@ -100,7 +99,7 @@ Contains
 		Call StopWatch(rtranspose_time)%startclock()
 
         If (output_iteration) Then
-            Call wsp%reform(nextra_recv = nicknum)
+            Call wsp%reform(nextra_recv = output_nextra)
         Else
     		Call wsp%reform()	! We are now in p3a
         Endif      

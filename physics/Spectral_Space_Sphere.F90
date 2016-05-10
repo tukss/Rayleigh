@@ -12,7 +12,6 @@ Module Spectral_Space_Sphere
 	Use ClockInfo
 	Use Timers
 	Use Linear_Terms_Sphere
-    Use Diagnostics_Interface, Only : cobuffer
 	Implicit None
 	Type(SphericalBuffer) :: ctemp ! workspace
 Contains

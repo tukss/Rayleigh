@@ -10,9 +10,7 @@ Module Physical_Space_Sphere
 	Use Fourier_Transform
 	Use Spectral_Derivatives
 	Use Fields
-	Use Diagnostics_Interface, Only : PS_Output, cobuffer, &
-            & dbrdr_cb, dbtdr_cb, dbpdr_cb, dbrdt_cb, avar_cb, &
-            & dbrdr,dbtdr,dbpdr,dbrdt,dbtdt,dbpdt,dbrdp,dbtdp,dbpdp
+	Use Diagnostics_Interface, Only : PS_Output
 	Use General_MPI, Only : global_max
 	Use Timers
     Use Equation_Coefficients
@@ -153,7 +151,6 @@ Contains
 
 	Subroutine Temperature_Advection()
 		Integer :: t,r,k
-
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
@@ -543,10 +540,6 @@ Contains
 		Implicit None
 		Integer :: r,t,k
 		
-		DO_IDX
-			FIELDSP(IDX,tout) = FIELDSP(IDX,tvar)*radius(r)  ! hang on to t
-		END_DO
-
 
 		Call d_by_dphi(wsp%p3a,vr,dvrdp)
 		Call d_by_dphi(wsp%p3a,vtheta,dvtdp)
@@ -615,10 +608,14 @@ Contains
 
     Subroutine Diagnostics_Copy_and_Derivs()
         Implicit None
+        Integer :: t,r,k
         !Copy everything from out auxiliary output buffer into the main buffer
 
         wsp%p3a(:,:,:,dpdr) = cobuffer%p3a(:,:,:,dpdr_cb)
         wsp%p3a(:,:,:,dpdt) = cobuffer%p3a(:,:,:,dpdt_cb)
+		DO_IDX
+			FIELDSP(IDX,tvar) = FIELDSP(IDX,tvar)*radius(r)  ! t was really t/r 
+		END_DO
         If (magnetism) Then
             wsp%p3a(:,:,:,dbrdr) = cobuffer%p3a(:,:,:,dbrdr_cb)
             wsp%p3a(:,:,:,dbtdr) = cobuffer%p3a(:,:,:,dbtdr_cb)
@@ -668,10 +665,10 @@ Contains
 		Integer :: t, r,k
 
 		DO_IDX
-			wsp%p3a(IDX,dbtdt) = -wsp%p3a(IDX,br)*2.0d0 &
-										- radius(r)*cobuffer%p3a(IDX,dvrdr) &
-										- wsp%p3a(IDX,btheta)*cottheta(t) &
-										- wsp%p3a(IDX,dbpdp)*csctheta(t)
+			wsp%p3a(IDX,dbtdt) = - wsp%p3a(IDX,br)*2.0d0 &
+								 - radius(r)*cobuffer%p3a(IDX,dvrdr) &
+								 - wsp%p3a(IDX,btheta)*cottheta(t) &
+								 - wsp%p3a(IDX,dbpdp)*csctheta(t)
 		END_DO
 
 	End Subroutine Compute_dbtheta_by_dtheta
