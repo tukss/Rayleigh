@@ -1,5 +1,37 @@
 import numpy as np
 import os
+
+class RayleighTiming:
+
+    def __init__(self,filename,byteswap=True):
+        """filename  : The reference state file to read.
+        """       
+        fd = open(filename,'rb')
+        # We read an integer to assess which endian the file was written in...
+        #bs = check_endian(fd,314,'int32')
+        bs = byteswap
+        self.ncol    = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.nrow    = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.ntimers = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.nr      = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.lmax    = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.niter   = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.np = self.nrow*self.ncol
+        self.col_rank = np.reshape(swapread(fd,dtype='int32',count=self.np,swap=bs),(self.np), order = 'F')
+        self.row_rank = np.reshape(swapread(fd,dtype='int32',count=self.np,swap=bs),(self.np), order = 'F')
+        tcount = self.np*self.ntimers
+        self.times = np.reshape(swapread(fd,dtype='float64',count=tcount,swap=bs),
+                        (self.ntimers,self.np), order = 'F')
+
+        self.names = ['Main Loop', 'Legendre Transform', 'FFT',
+                      'Implicit Solve', 'Row Transpose', 'Column Transpose',
+                      'Hybrid Space (Return)', 'Hybrid Space (Forward)',
+                      'Physical Space', 'Post Solve', 'D_by_Dphi', 'Nonlinear Terms',
+                      'Sin(theta) Division', 'CFL Calculation', 'NULL', 
+                      'Linear Coefficients/Implicit Matrix Computation',
+                      'Run Initialization', 'Checkpointing (Read)', 'Checkpointing (Write)',
+                      'Total Runtime'] 
+
 class RayleighProfile:
     """Rayleigh Reference State Structure
     ----------------------------------
