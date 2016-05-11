@@ -1,2 +1,2 @@
 Please pardon the mess!  Rayleigh will be released soon, but in the meantime, the code and (and presently incomplete) documentation are in a state of flux.  See the Wiki and the documentation directory (in the source) for tips!
-![eq_0000.jpg](https://bitbucket.org/repo/Rp975y/images/1781279572-eq_0000.jpg)
+![rotator_and_cutaway.jpg](https://bitbucket.org/repo/Rp975y/images/1513682443-rotator_and_cutaway.jpg)
