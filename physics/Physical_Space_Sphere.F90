@@ -25,6 +25,7 @@ Module Physical_Space_Sphere
 Contains
 	Subroutine physical_space()
 		Implicit None
+		Integer :: t, r,k
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
 		Call StopWatch(dphi_time)%startclock()
@@ -53,6 +54,12 @@ Contains
 		Call sintheta_div(dvrdt)
 		Call sintheta_div(dvpdp)
 		Call sintheta_div(dvtdp)
+
+        ! This feels a little out-of place here, but it needs to be done
+        ! both for output purposes AND for benchmarking purposes.
+		DO_IDX
+			FIELDSP(IDX,tvar) = FIELDSP(IDX,tvar)*radius(r)  ! t was really t/r 
+		END_DO
 
 		Call Compute_dvtheta_by_dtheta()
 		Call Compute_dvphi_by_dtheta()
@@ -611,9 +618,7 @@ Contains
 
         wsp%p3a(:,:,:,dpdr) = cobuffer%p3a(:,:,:,dpdr_cb)
         wsp%p3a(:,:,:,dpdt) = cobuffer%p3a(:,:,:,dpdt_cb)
-		DO_IDX
-			FIELDSP(IDX,tvar) = FIELDSP(IDX,tvar)*radius(r)  ! t was really t/r 
-		END_DO
+
         If (magnetism) Then
             wsp%p3a(:,:,:,dbrdr) = cobuffer%p3a(:,:,:,dbrdr_cb)
             wsp%p3a(:,:,:,dbtdr) = cobuffer%p3a(:,:,:,dbtdr_cb)
