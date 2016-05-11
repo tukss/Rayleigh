@@ -39,7 +39,7 @@ Module Fields
 	Integer :: dpdr1  ! We reserve dpdr for the final location at output time
 	Integer :: dwdr,  d3wdr3, dtdr, dzdr, d2zdr2, d2tdr2, d2wdr2
 	Integer :: vr, vtheta, vphi,dtdt,dvrdt,dvtdr,dvpdr,dvrdr
-	Integer :: dvrdp, dvtdp, dvpdp, dtdp, tout !tout hold temperature/entropy for output
+	Integer :: dvrdp, dvtdp, dvpdp, dtdp
 
 	Integer :: dvtdt, dvpdt
 

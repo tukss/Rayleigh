@@ -902,7 +902,7 @@ Contains
         Allocate(obs_inds(1:nobs))
         obs_inds(1) = vr
         obs_inds(2) = vphi
-        obs_inds(3) = tout 
+        obs_inds(3) = tvar 
         if (magnetism) obs_inds(4) = btheta
 
         indst(:) = 1

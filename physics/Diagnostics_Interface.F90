@@ -188,11 +188,10 @@ Contains
 
 
             If (compute_quantity(temperature)) Then
-                ! This is really d_by_dphi temperature/r with the current logic in Physics.F90
                 Do t = my_theta%min, my_theta%max
                     Do r = my_r%min, my_r%max
                         Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,tout)
+                            qty(p,r,t) = buffer(p,r,t,tvar)
                         Enddo
                     Enddo
                 Enddo

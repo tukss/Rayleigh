@@ -99,7 +99,7 @@ Contains
                     dt_by_ds = ref%temperature(r)/pressure_specific_heat
                     dt_by_dp = 1.0d0/pressure_specific_heat
                     Do k = 1, n_phi
-                        tpert = dt_by_ds*buffer(PSI,tout) &
+                        tpert = dt_by_ds*buffer(PSI,tvar) &
                          & + dt_by_dp*buffer(PSI,pvar)
                         tpert = tpert*ref%density(r) ! This is now T'*rho_bar
                         qty(PSI) = tpert*buffer(PSI,vr)*pressure_specific_heat
@@ -113,7 +113,7 @@ Contains
         !Thermal Energy Flux (vr {rho_bar T_bar S}  OR vr T)
         If (compute_quantity(thermalE_flux_radial)) Then  
             DO_PSI
-                qty(PSI) = buffer(PSI,vr)*buffer(PSI,tout)* &   
+                qty(PSI) = buffer(PSI,vr)*buffer(PSI,tvar)* &   
                            & ref%density(r)*ref%temperature(r)
             END_DO              
             Call Add_Quantity(qty)
