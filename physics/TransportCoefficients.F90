@@ -86,6 +86,11 @@ Contains
             kappa_top = 1.0d0
             eta_top = Prandtl_Number/Magnetic_Prandtl_Number
         Endif
+        If (Nondimensional_Anelastic) Then
+            nu_top = Ekman_Number
+            kappa_top = nu_top/Prandtl_Number
+            eta_top = nu_top/Magnetic_Prandtl_Number
+        Endif
 		Call Initialize_Nu()							! Viscosity
 		Call Initialize_Kappa()						! Thermal Diffusivity
 		If (magnetism) Call Initialize_Eta()	! Magnetic Diffusivity

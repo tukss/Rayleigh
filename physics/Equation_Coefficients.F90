@@ -32,7 +32,7 @@ Subroutine Init_Equation_Coefficients
     !The buoyancy term
     !    ---- Normally set as part of the reference state, but if we're nondimensional,
     !    we set it to Ra times (r/r_ref)^n
-    If (.not. dimensional) Then
+    If ( (.not. dimensional) and. (.not. NonDimensional_Anelastic) ) Then
         amp = Rayleigh_Number/Prandtl_Number
         grav_r_ref = radius(1)
         Do i = 1, N_R
@@ -48,6 +48,10 @@ Subroutine Init_Equation_Coefficients
         Else
 			coriolis_term = 2.0d0/Ekman_Number*Prandtl_Number
         Endif
+        If (NonDimensional_Anelastic) Then
+            coriolis_term = 2.0d0
+        Endif
+
 	Endif
 
     ! Viscous Heating Coefficient
@@ -59,6 +63,11 @@ Subroutine Init_Equation_Coefficients
         Else
         	viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)
         Endif
+        If (NonDimensional_Anelastic) Then
+            viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)* &
+                                           & Dissipation_Number/Modified_Rayleigh_Number
+        Endif
+
     Endif
 
 

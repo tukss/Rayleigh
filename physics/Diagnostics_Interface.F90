@@ -154,40 +154,12 @@ Contains
 
 
 
-            If (compute_quantity(vr2)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vt2)) Then	
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**2
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vp2)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                Call Add_Quantity(qty)
-            Endif	
-
-            If (compute_quantity(vr3)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**3
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vt3)) Then	
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**3
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vp3)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**3
-                Call Add_Quantity(qty)
-            Endif	
 
 
 
 
-            If (compute_quantity(temperature)) Then
+
+            If (compute_quantity(entropy)) Then
                 Do t = my_theta%min, my_theta%max
                     Do r = my_r%min, my_r%max
                         Do p = 1, n_phi
@@ -209,7 +181,7 @@ Contains
                 Call Add_Quantity(qty)
             Endif		
 
-            If (compute_quantity(gradt_r)) Then
+            If (compute_quantity(entropy_dr)) Then
                 Do t = my_theta%min, my_theta%max
                     Do r = my_r%min, my_r%max
                         Do p = 1, n_phi
