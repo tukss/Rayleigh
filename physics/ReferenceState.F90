@@ -71,7 +71,7 @@ Module ReferenceState
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
             & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file, &
             & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
-            & Dissipation_Number, poly_m, Modified_Rayleigh_Number
+            & Dissipation_Number, Modified_Rayleigh_Number
 Contains
 
     Subroutine Initialize_Reference()
@@ -143,13 +143,14 @@ Contains
         !Now, the second logarithmic derivative of rho :  d2lnrho = (n/T)*d2Tdr2 - n*(dlnT^2)
         ref%d2lnrho = -poly_n*(ref%dlnT**2)  
 
-        dtmparr = (poly_n/ref%temperature)*(2.0d0*Dissipation_Number*ref%gravity/radius/ref%temperature) ! (n/T)*d2Tdr2
+        dtmparr = (poly_n/ref%temperature)*(2.0d0*Dissipation_Number*ref%gravity/radius) ! (n/T)*d2Tdr2
         ref%d2lnrho = ref%d2lnrho+dtmparr
 
         DeAllocate(dtmparr)
 
         ref%entropy(:) = 0.0d0  ! Might need to adjust this later
            ref%dsdr(:) = 0.0d0
+            ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
         
     End Subroutine Polytropic_Reference_DevelND
 

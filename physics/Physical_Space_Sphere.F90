@@ -644,7 +644,14 @@ Contains
 
     Subroutine Diagnostics_Prep()
         Implicit None
+        Integer :: t,r,k
         Call sintheta_div(dpdt)
+        !convert d/dr(p/rho) to dpdr
+        DO_IDX
+            wsp%p3a(IDX,dpdr) = wsp%p3a(IDX,dpdr)*ref%density(r)+ &
+                                & wsp%p3a(IDX,pvar)*ref%dlnrho(r)
+        END_DO
+
         If (magnetism) Then
 
             Call rsintheta_div(dbtdp)

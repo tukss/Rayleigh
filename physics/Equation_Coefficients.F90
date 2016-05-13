@@ -32,7 +32,7 @@ Subroutine Init_Equation_Coefficients
     !The buoyancy term
     !    ---- Normally set as part of the reference state, but if we're nondimensional,
     !    we set it to Ra times (r/r_ref)^n
-    If ( (.not. dimensional) and. (.not. NonDimensional_Anelastic) ) Then
+    If ( (.not. dimensional) .and. (.not. NonDimensional_Anelastic) ) Then
         amp = Rayleigh_Number/Prandtl_Number
         grav_r_ref = radius(1)
         Do i = 1, N_R
