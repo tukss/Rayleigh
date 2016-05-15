@@ -13,6 +13,7 @@ Module Diagnostics_Interface
     Use Diagnostics_Inertial_Forces
     Use Diagnostics_Lorentz_Forces
     Use Diagnostics_Energy_Flux
+    Use Diagnostics_Energies
 
     Use Diagnostics_Magnetic_Field
     Use Diagnostics_Current_Density
@@ -147,7 +148,7 @@ Contains
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
             Call Compute_Velocity_Components(buffer)
             !Call Compute_Vorticity_Components(buffer)
-            !Call Compute_Kinetic_Energies(buffer)
+            Call Compute_Kinetic_Energy(buffer)
             Call Compute_Energy_Flux(buffer)
             !Call Compute_TandP_Terms(buffer)
             Call Compute_Inertial_Terms(buffer)
@@ -197,19 +198,6 @@ Contains
 
 
 
-            If (compute_quantity(kinetic_energy)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
 
 
 
@@ -402,7 +390,7 @@ Contains
                 Call Compute_Lorentz_Forces(buffer)
                 Call Compute_J_Components(buffer)
                 Call Compute_Induction_Terms(buffer)
-                !Call Compute_Magnetic_Energies(buffer)
+                Call Compute_Magnetic_Energy(buffer)
 
 
 

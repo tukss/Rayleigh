@@ -53,6 +53,9 @@ Module ReferenceState
 
     Real*8 :: Angular_Velocity = 1.0d0
 
+    Real*8 :: kinetic_energy_factor = 1.0d0
+    Real*8 :: magnetic_energy_factor = 1.0d0
+
     !/////////////////////////////////////////////////////////////////////////////////////
     ! Nondimensional Parameters
     Real*8 :: Rayleigh_Number         = 1.0d0
@@ -83,6 +86,7 @@ Contains
 
         If (reference_type .eq. 2) Then
             Call Polytropic_Reference()
+
         Endif
 
         If (reference_type .eq. 3) Then

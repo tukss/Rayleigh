@@ -22,6 +22,16 @@ Subroutine Init_Equation_Coefficients
     Implicit None
     Integer :: i
     Real*8 :: amp, grav_r_ref
+
+    kinetic_energy_factor = Half
+    magnetic_energy_factor =  over_eight_pi
+    If (.not. dimensional) Then
+        magnetic_energy_factor = half/Ekman_Number/Magnetic_Prandtl_Number
+    Endif
+    !Need logic here for non-dimensional anelastic cases
+
+
+
     Allocate(dpdr_w_term(1:N_R))
     !dpdr_w_term = ref%density/Ekman_Number
     dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark

@@ -128,7 +128,7 @@ Module Diagnostics_Base
     !//////////////////////////////////////////////////////////////////
     !  Pressure, Entropy or Temperature, and Their Derivatives
     !  Note:  In Boussinesq Mode, Temperature is Output Instead of Entropy
-    Integer, Parameter :: pt_off = 63
+    Integer, Parameter :: pt_off = voffset+63 ! = 63
 
     !------------ Fields ---------------------!    
     Integer, Parameter :: entropy    = pt_off+1 ! Full
@@ -193,7 +193,7 @@ Module Diagnostics_Base
     !//////////////////////////////////////////////////////////////////////////
     !///////////////////////////////////////////////////
     !       Vorticity Outputs
-    Integer, Parameter :: vort_off = 93
+    Integer, Parameter :: vort_off = pt_off+30 ! = 93
 
     Integer, Parameter :: vort_r      = vort_off+1  ! Full
     Integer, Parameter :: vort_theta  = vort_off+2
@@ -215,7 +215,7 @@ Module Diagnostics_Base
 
     !//////////////////////////////////////////////////////////
     !               Radial Energy Fluxes
-    Integer, Parameter :: eoffset = 96
+    Integer, Parameter :: eoffset = vort_off+ 13 ! =106
     Integer, Parameter :: ecrossb_r            = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
     Integer, Parameter :: ke_flux_radial       = eoffset+2 ! vr*KE
     Integer, Parameter :: thermalE_flux_radial = eoffset+3 ! vr*rho_bar*T_bar*S OR vr*T
@@ -229,41 +229,46 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////////////
     !           Kinetic Energies
-    Integer, Parameter :: keoffset = 104
+    Integer, Parameter :: keoffset = eoffset+8 ! = 114
     Integer, Parameter :: kinetic_energy = keoffset+1   ! 1/2 rho_bar v^2
     Integer, Parameter :: radial_ke      = keoffset+2   ! 1/2 rho_bar {v_r}^2
     Integer, Parameter :: theta_ke       = keoffset+3   ! 1/2 rho_bar {v_theta}^2
-    Integer, Parameter :: zonal_ke       = keoffset+4   ! 1/2 rho_bar {v_phi}^2
+    Integer, Parameter :: phi_ke         = keoffset+4   ! 1/2 rho_bar {v_phi}^2
 
-    Integer, Parameter :: radial_mke     = keoffset+5   ! 1/2 rho_bar <v_r>^2
-    Integer, Parameter :: theta_mke      = keoffset+6   ! 1/2 rho_bar <v_theta>^2
-    Integer, Parameter :: zonal_mke      = keoffset+7   ! 1/2 rho_bar <v_phi>^2
+    Integer, Parameter :: mkinetic_energy = keoffset+5 ! 1/2 rho_bar <v>^2
+    Integer, Parameter :: radial_mke      = keoffset+6 ! 1/2 rho_bar <v_r>^2
+    Integer, Parameter :: theta_mke       = keoffset+7 ! 1/2 rho_bar <v_theta>^2
+    Integer, Parameter :: phi_mke         = keoffset+8 ! 1/2 rho_bar <v_phi>^2
 
-    Integer, Parameter :: radial_pke     = keoffset+8   ! 1/2 rho_bar {v_r'}^2
-    Integer, Parameter :: theta_pke      = keoffset+9   ! 1/2 rho_bar {v_theta'}^2
-    Integer, Parameter :: zonal_pke      = keoffset+10  ! 1/2 rho_bar {v_phi'}^2
+    Integer, Parameter :: pkinetic_energy = keoffset+9  ! 1/2 rho_bar {v'}^2
+    Integer, Parameter :: radial_pke      = keoffset+10 ! 1/2 rho_bar {v_r'}^2
+    Integer, Parameter :: theta_pke       = keoffset+11 ! 1/2 rho_bar {v_theta'}^2
+    Integer, Parameter :: phi_pke         = keoffset+12 ! 1/2 rho_bar {v_phi'}^2
 
-    Integer, Parameter :: radial_vsq     = keoffset+11   ! {v_r}^2
-    Integer, Parameter :: theta_vsq      = keoffset+12   ! {v_theta}^2
-    Integer, Parameter :: zonal_vsq      = keoffset+13   ! {v_phi}^2
+    !--- Since density varies with radius, it may be useful to output the 
+    !--- squared fields, sans density, as well.
+    Integer, Parameter :: vsq         = keoffset+13   ! v^2
+    Integer, Parameter :: radial_vsq  = keoffset+14   ! {v_r}^2
+    Integer, Parameter :: theta_vsq   = keoffset+15   ! {v_theta}^2
+    Integer, Parameter :: phi_vsq     = keoffset+16   ! {v_phi}^2
 
-    Integer, Parameter :: radial_mvsq    = keoffset+14   ! <v_r>^2
-    Integer, Parameter :: theta_mvsq     = keoffset+15   ! <v_theta>^2
-    Integer, Parameter :: zonal_mvsq     = keoffset+16   ! <v_phi>^2
+    Integer, Parameter :: mvsq        = keoffset+17   ! <v>^2
+    Integer, Parameter :: radial_mvsq = keoffset+18   ! <v_r>^2
+    Integer, Parameter :: theta_mvsq  = keoffset+19   ! <v_theta>^2
+    Integer, Parameter :: phi_mvsq    = keoffset+20   ! <v_phi>^2
 
-    Integer, Parameter :: radial_pvsq    = keoffset+17   ! {v_r'}^2
-    Integer, Parameter :: theta_pvsq     = keoffset+18   ! {v_theta'}^2
-    Integer, Parameter :: zonal_pvsq     = keoffset+19   ! {v_phi'}^2
+    Integer, Parameter :: pvsq        = keoffset+21   ! {v'}^2
+    Integer, Parameter :: radial_pvsq = keoffset+22   ! {v_r'}^2
+    Integer, Parameter :: theta_pvsq  = keoffset+23   ! {v_theta'}^2
+    Integer, Parameter :: phi_pvsq    = keoffset+24   ! {v_phi'}^2
 
-    Integer, Parameter :: vsq            = keoffset+20   ! v^2
-    Integer, Parameter :: mvsq           = keoffset+21   ! <v>^2
-    Integer, Parameter :: pvsq           = keoffset+22   ! {v'}^2
+
 
 
     !///////////////////////////////////////////////////////////////////////////////////
     !Angular Momentum Transport Diagnostics
     !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
-    Integer, Parameter :: amoff = 126
+    Integer, Parameter :: amoff = keoffset+ 24        ! = 138
     Integer, Parameter :: amom_fluct_r = amoff+1      ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
     Integer, Parameter :: amom_fluct_theta = amoff+2  ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
     Integer, Parameter :: amom_dr_r = amoff+3         ! rho_bar * r * sintheta * <v_r> * <v_phi>
@@ -286,7 +291,7 @@ Module Diagnostics_Base
     ! Reynolds decomposition about the azimuthal mean may also be output
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = 132  ! Output offset for advection terms  
+    Integer, Parameter :: vgv = amoff+6 ! = 134    ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -309,7 +314,7 @@ Module Diagnostics_Base
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
-    Integer, Parameter :: dcheck_off = 147
+    Integer, Parameter :: dcheck_off = vgv+ 15 ! = 149
     Integer, Parameter :: diagnostic1 = dcheck_off+1, diagnostic2 = dcheck_off+2
 
 
@@ -392,7 +397,7 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
-    Integer, Parameter :: joffset = 250
+    Integer, Parameter :: joffset = boffset+50 ! = 250
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
     Integer, Parameter :: jp_r = joffset+2    
@@ -420,27 +425,27 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////////////
     !           Magnetic Energies
-    Integer, Parameter :: meoffset = 280
-    Integer, Parameter :: magnetic_energy = keoffset+1    ! B^2
+    Integer, Parameter :: meoffset = joffset+20 ! = 270
 
-    Integer, Parameter :: radial_bsq     = keoffset+11   ! {B_r}^2
-    Integer, Parameter :: theta_bsq      = keoffset+12   ! {B_theta}^2
-    Integer, Parameter :: zonal_bsq      = keoffset+13   ! {B_phi}^2
+    Integer, Parameter :: magnetic_energy = meoffset+1 ! B^2
+    Integer, Parameter :: radial_me       = meoffset+2 ! {B_r}^2
+    Integer, Parameter :: theta_me        = meoffset+3 ! {B_theta}^2
+    Integer, Parameter :: phi_me        = meoffset+4 ! {B_phi}^2
 
-    Integer, Parameter :: radial_mbsq    = keoffset+14   ! <B_r>^2
-    Integer, Parameter :: theta_mbsq     = keoffset+15   ! <B_theta>^2
-    Integer, Parameter :: zonal_mbsq     = keoffset+16   ! <B_phi>^2
+    Integer, Parameter :: mmagnetic_energy = meoffset+5 ! <B>^2
+    Integer, Parameter :: radial_mme       = meoffset+6 ! <B_r>^2
+    Integer, Parameter :: theta_mme        = meoffset+7 ! <B_theta>^2
+    Integer, Parameter :: phi_mme        = meoffset+8 ! <B_phi>^2
 
-    Integer, Parameter :: radial_pbsq    = keoffset+17   ! {B_r'}^2
-    Integer, Parameter :: theta_pbsq     = keoffset+18   ! {B_theta'}^2
-    Integer, Parameter :: zonal_pbsq     = keoffset+19   ! {B_phi'}^2
+    Integer, Parameter :: pmagnetic_energy = meoffset+9  ! {B'}^2
+    Integer, Parameter :: radial_pme       = meoffset+10 ! {B_r'}^2
+    Integer, Parameter :: theta_pme        = meoffset+11 ! {B_theta'}^2
+    Integer, Parameter :: phi_pme        = meoffset+12 ! {B_phi'}^2
 
-    Integer, Parameter :: mbsq           = keoffset+20   ! <B>^2
-    Integer, Parameter :: pbsq           = keoffset+21   ! <B'>^2
 
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
-    Integer, Parameter :: loff = 310
+    Integer, Parameter :: loff = joffset+12 ! =282
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -464,7 +469,7 @@ Module Diagnostics_Base
 
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    Integer, Parameter :: indoff = 330
+    Integer, Parameter :: indoff = loff + 15 ! = 297
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
     Integer, Parameter :: induction_comp_r           = indoff+2  ! radial component of -{div dot v}B
