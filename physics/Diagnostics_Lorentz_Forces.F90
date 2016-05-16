@@ -14,28 +14,27 @@ Contains
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
 
-
         ! Full JxB terms
         If (compute_quantity(j_cross_b_r)) Then
             DO_PSI
-                qty(PSI) = buffer(PSI,jtheta)*buffer(PSI,bphi)- &
-                         & buffer(PSI,btheta)*buffer(PSI,jphi)
+                qty(PSI) = (buffer(PSI,jtheta)*buffer(PSI,bphi)- &
+                         & buffer(PSI,btheta)*buffer(PSI,jphi) ) *lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(j_cross_b_theta)) Then
             DO_PSI
-                qty(PSI) = buffer(PSI,br)*buffer(PSI,jphi)- &
-                         & buffer(PSI,jr)*buffer(PSI,bphi)
+                qty(PSI) = ( buffer(PSI,br)*buffer(PSI,jphi)- &
+                         & buffer(PSI,jr)*buffer(PSI,bphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(j_cross_b_phi)) Then
             DO_PSI
-                qty(PSI) = buffer(PSI,jr)*buffer(PSI,btheta)- &
-                           & buffer(PSI,br)*buffer(PSI,jtheta)
+                qty(PSI) = ( buffer(PSI,jr)*buffer(PSI,btheta)- &
+                           & buffer(PSI,br)*buffer(PSI,jtheta) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
@@ -45,24 +44,24 @@ Contains
 
         If (compute_quantity(jm_cross_bm_r)) Then
             DO_PSI2
-                qty(1:n_phi,PSI2) = m0_values(PSI2,jtheta)*m0_values(PSI2,bphi)- &
-                                  & m0_values(PSI2,btheta)*m0_values(PSI2,jphi)
+                qty(1:n_phi,PSI2) = ( m0_values(PSI2,jtheta)*m0_values(PSI2,bphi)- &
+                                  & m0_values(PSI2,btheta)*m0_values(PSI2,jphi) )*lorentz_coefficient
             END_DO2
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jm_cross_bm_theta)) Then
             DO_PSI2
-                qty(1:n_phi,PSI2) = m0_values(PSI2,br)*m0_values(PSI2,jphi)- &
-                                  & m0_values(PSI2,jr)*m0_values(PSI2,bphi)
+                qty(1:n_phi,PSI2) = ( m0_values(PSI2,br)*m0_values(PSI2,jphi)- &
+                                  & m0_values(PSI2,jr)*m0_values(PSI2,bphi) )*lorentz_coefficient
             END_DO2
             Call Add_Quantity(qty)
         Endif       
 
         If (compute_quantity(jm_cross_bm_phi)) Then
             DO_PSI2
-                qty(1:n_phi,PSI2) = m0_values(PSI2,jr)*m0_values(PSI2,btheta)- &
-                                  & m0_values(PSI2,br)*m0_values(PSI2,jtheta)
+                qty(1:n_phi,PSI2) = ( m0_values(PSI2,jr)*m0_values(PSI2,btheta)- &
+                                  & m0_values(PSI2,br)*m0_values(PSI2,jtheta) )*lorentz_coefficient
             END_DO2
             Call Add_Quantity(qty)
         Endif
@@ -72,24 +71,24 @@ Contains
         !  J' X B' terms
         If (compute_quantity(jp_cross_bp_r)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,jtheta)*fbuffer(PSI,bphi)- &
-                         & fbuffer(PSI,btheta)*fbuffer(PSI,jphi)
+                qty(PSI) = ( fbuffer(PSI,jtheta)*fbuffer(PSI,bphi)- &
+                         & fbuffer(PSI,btheta)*fbuffer(PSI,jphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jp_cross_bp_theta)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,br)*fbuffer(PSI,jphi)- &
-                         & fbuffer(PSI,jr)*fbuffer(PSI,bphi)
+                qty(PSI) = ( fbuffer(PSI,br)*fbuffer(PSI,jphi)- &
+                         & fbuffer(PSI,jr)*fbuffer(PSI,bphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jp_cross_bp_phi)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,jr)*fbuffer(PSI,btheta)- &
-                           & fbuffer(PSI,br)*fbuffer(PSI,jtheta)
+                qty(PSI) = ( fbuffer(PSI,jr)*fbuffer(PSI,btheta)- &
+                           & fbuffer(PSI,br)*fbuffer(PSI,jtheta) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
@@ -99,24 +98,24 @@ Contains
         !               J' x <B> terms
         If (compute_quantity(jp_cross_bm_r)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,jtheta)*m0_values(PSI2,bphi)- &
-                         & m0_values(PSI2,btheta)*fbuffer(PSI,jphi)
+                qty(PSI) = ( fbuffer(PSI,jtheta)*m0_values(PSI2,bphi)- &
+                         & m0_values(PSI2,btheta)*fbuffer(PSI,jphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jp_cross_bm_theta)) Then
             DO_PSI
-                qty(PSI) = m0_values(PSI2,br)*fbuffer(PSI,jphi)- &
-                         & fbuffer(PSI,jr)*m0_values(PSI2,bphi)
+                qty(PSI) = ( m0_values(PSI2,br)*fbuffer(PSI,jphi)- &
+                         & fbuffer(PSI,jr)*m0_values(PSI2,bphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jp_cross_bm_phi)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,jr)*m0_values(PSI2,btheta)- &
-                           & m0_values(PSI2,br)*fbuffer(PSI,jtheta)
+                qty(PSI) = ( fbuffer(PSI,jr)*m0_values(PSI2,btheta)- &
+                           & m0_values(PSI2,br)*fbuffer(PSI,jtheta) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
@@ -127,24 +126,24 @@ Contains
         !  J' X B' terms
         If (compute_quantity(jm_cross_bp_r)) Then
             DO_PSI
-                qty(PSI) = m0_values(PSI2,jtheta)*fbuffer(PSI,bphi)- &
-                         & fbuffer(PSI,btheta)*m0_values(PSI2,jphi)
+                qty(PSI) = ( m0_values(PSI2,jtheta)*fbuffer(PSI,bphi)- &
+                         & fbuffer(PSI,btheta)*m0_values(PSI2,jphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jm_cross_bp_theta)) Then
             DO_PSI
-                qty(PSI) = fbuffer(PSI,br)*m0_values(PSI2,jphi)- &
-                         & m0_values(PSI2,jr)*fbuffer(PSI,bphi)
+                qty(PSI) = ( fbuffer(PSI,br)*m0_values(PSI2,jphi)- &
+                         & m0_values(PSI2,jr)*fbuffer(PSI,bphi) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif
 
         If (compute_quantity(jm_cross_bp_phi)) Then
             DO_PSI
-                qty(PSI) = m0_values(PSI2,jr)*fbuffer(PSI,btheta)- &
-                           & fbuffer(PSI,br)*m0_values(PSI2,jtheta)
+                qty(PSI) = ( m0_values(PSI2,jr)*fbuffer(PSI,btheta)- &
+                           & fbuffer(PSI,br)*m0_values(PSI2,jtheta) )*lorentz_coefficient
             END_DO
             Call Add_Quantity(qty)
         Endif

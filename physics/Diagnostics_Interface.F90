@@ -14,6 +14,7 @@ Module Diagnostics_Interface
     Use Diagnostics_Lorentz_Forces
     Use Diagnostics_Energy_Flux
     Use Diagnostics_Energies
+    Use Diagnostics_Linear_Forces
 
     Use Diagnostics_Magnetic_Field
     Use Diagnostics_Current_Density

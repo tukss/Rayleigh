@@ -7,7 +7,7 @@
 
 !///////////////////////////////////////////////////////////////////
 !               DIAGNOSTICS_CURRENT_DENSITY
-!               This module computes the components of the current density. 
+!               This module computes the components of del x B. 
 !               Zonal means and fluctuations about those means are 
 !               also computed (if desired).
 !///////////////////////////////////////////////////////////////////
