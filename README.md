@@ -11,4 +11,4 @@ The pseudo-spectral nature of Rayleigh means that its parallelization necessaril
 
 
 # When Will Rayleigh Be Released?#
-Rayleigh is sleighted for release on June 19, 2016.  In the meantime, please pardon the mess.  The code and (and presently incomplete) documentation are in a state of flux.  See the Wiki and the documentation directory (in the source) for tips.  Some videos corresponding to the images below can be found [here](http://www.youtube.com/user/feathern24).
+Rayleigh is scheduled for release on June 19, 2016.  In the meantime, please pardon the mess.  The code and (and presently incomplete) documentation are in a state of flux.  See the Wiki and the documentation directory (in the source) for tips.  Some videos corresponding to the images below can be found [here](http://www.youtube.com/user/feathern24).
