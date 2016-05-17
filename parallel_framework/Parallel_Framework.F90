@@ -1,3 +1,8 @@
+!///////////////////////////////////////////////////////////////////////////////////////
+!       "Let the yolk fall from your shoulders.  Don't carry it all, don't carry it all.
+!           We are all our hands and holders beneath this bold and brilliant sun."
+!                               - The Decemberists
+!///////////////////////////////////////////////////////////////////////////////////////
 Module Parallel_Framework
 	Use MPI_LAYER
 	Use General_MPI

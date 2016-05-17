@@ -190,10 +190,15 @@ Module Diagnostics_Base
     Integer, Parameter :: entropy_m_dprs   = pt_off+29 ! Mean
     Integer, Parameter :: pressure__m_dprs = pt_off+30
 
+    !--------- Also compute terms of the form rho_bar d_by_dr(P/rho_bar)
+    Integer, Parameter :: rhopressure_dr  = pt_off+31
+    Integer, Parameter :: rhopressurep_dr = pt_off+32
+    Integer, Parameter :: rhopressurem_dr = pt_off+33
+
     !//////////////////////////////////////////////////////////////////////////
     !///////////////////////////////////////////////////
     !       Vorticity Outputs
-    Integer, Parameter :: vort_off = pt_off+30 ! = 93
+    Integer, Parameter :: vort_off = pt_off+33 ! = 96
 
     Integer, Parameter :: vort_r      = vort_off+1  ! Full
     Integer, Parameter :: vort_theta  = vort_off+2
@@ -215,7 +220,7 @@ Module Diagnostics_Base
 
     !//////////////////////////////////////////////////////////
     !               Radial Energy Fluxes
-    Integer, Parameter :: eoffset = vort_off+ 13 ! =106
+    Integer, Parameter :: eoffset = vort_off+ 13 ! =109
     Integer, Parameter :: ecrossb_r            = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
     Integer, Parameter :: ke_flux_radial       = eoffset+2 ! vr*KE
     Integer, Parameter :: thermalE_flux_radial = eoffset+3 ! vr*rho_bar*T_bar*S OR vr*T
@@ -268,7 +273,7 @@ Module Diagnostics_Base
     !///////////////////////////////////////////////////////////////////////////////////
     !Angular Momentum Transport Diagnostics
     !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
-    Integer, Parameter :: amoff = keoffset+ 24        ! = 138
+    Integer, Parameter :: amoff = keoffset+ 24        ! = 141
     Integer, Parameter :: amom_fluct_r = amoff+1      ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
     Integer, Parameter :: amom_fluct_theta = amoff+2  ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
     Integer, Parameter :: amom_dr_r = amoff+3         ! rho_bar * r * sintheta * <v_r> * <v_phi>
@@ -282,7 +287,7 @@ Module Diagnostics_Base
     ! Reynolds decomposition about the azimuthal mean may also be output
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = amoff+6 ! = 134    ! Output offset for advection terms  
+    Integer, Parameter :: vgv = amoff+6 ! = 147    ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -304,24 +309,13 @@ Module Diagnostics_Base
     Integer, Parameter :: vm_grad_vm_phi   = vgv+15 !    phi component of <v> dot grad <v>
 
     !/////////////////////////////////////////////////////////////
-    !  Linear Forces
-    Integer, Parameter :: force_offset = vgv+15
+    !  Linear Forces 
+    !  Note:  the pressure gradient codes are  above
+    Integer, Parameter :: force_offset = vgv+162
 
     Integer, Parameter :: buoyancy_force  =  force_offset+1
     Integer, Parameter :: buoyancy_pforce =  force_offset+2
     Integer, Parameter :: buoyancy_mforce =  force_offset+3
-
-    Integer, Parameter :: pressure_Force_r      = force_offset+4
-    Integer, Parameter :: pressure_Force_theta  = force_offset+5
-    Integer, Parameter :: pressure_Force_phi    = force_offset+6
-
-    Integer, Parameter :: pressure_pForce_r     = force_offset+7
-    Integer, Parameter :: pressure_pForce_theta = force_offset+8
-    Integer, Parameter :: pressure_pForce_phi   = force_offset+9
-
-    Integer, Parameter :: pressure_mForce_r     = force_offset+10
-    Integer, Parameter :: pressure_mForce_theta = force_offset+11
-    Integer, Parameter :: pressure_mForce_phi   = force_offset+12
 
     Integer, Parameter :: Coriolis_Force_r      = force_offset+13
     Integer, Parameter :: Coriolis_Force_theta  = force_offset+14
