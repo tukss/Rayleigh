@@ -8,6 +8,7 @@
 Module Diagnostics_Lorentz_Forces
 
     Use Diagnostics_Base
+    Implicit None
 Contains
 
     Subroutine Compute_Lorentz_Forces(buffer)

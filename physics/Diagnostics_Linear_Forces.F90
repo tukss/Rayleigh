@@ -15,7 +15,6 @@ Contains
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Call Compute_Buoyancy_Force(buffer)
         Call Compute_Coriolis_Force(buffer)
-        Call Compute_Pressure_Force(buffer)
         Call Compute_Viscous_Force(buffer)
     End Subroutine Compute_Linear_Forces
 
@@ -23,6 +22,7 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
+        ! Buoyancy forces as they contribute to the ell .ne. 0 components of the momentum equation
 
         ! -- full buoyancy 
         If (compute_quantity(buoyancy_force)) Then
@@ -55,18 +55,166 @@ Contains
     Subroutine Compute_Coriolis_Force(buffer)
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
+        Integer :: r,k, t
+        If(compute_quantity(Coriolis_Force_r)) Then
+            DO_PSI
+                qty(PSI) = -ref%density(r)*coriolis_term*sintheta(t)*buffer(PSI,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If(compute_quantity(Coriolis_pForce_r)) Then
+            DO_PSI
+                qty(PSI) = -ref%density(r)*coriolis_term*sintheta(t)*fbuffer(PSI,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If(compute_quantity(Coriolis_mForce_r)) Then
+            DO_PSI
+                qty(PSI) = -ref%density(r)*coriolis_term*sintheta(t)*m0_values(PSI2,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(Coriolis_Force_Theta)) Then
+            DO_PSI
+                qty(PSI) = ref%density(r)*coriolis_term*costheta(t)*buffer(PSI,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(Coriolis_pForce_Theta)) Then
+            DO_PSI
+                qty(PSI) = ref%density(r)*coriolis_term*costheta(t)*fbuffer(PSI,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(Coriolis_mForce_Theta)) Then
+            DO_PSI
+                qty(PSI) = ref%density(r)*coriolis_term*costheta(t)*m0_values(PSI2,vphi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+
+        If (compute_quantity(Coriolis_Force_Phi)) Then
+            DO_PSI
+                qty(PSI) = - coriolis_term*costheta(t)*buffer(PSI,vtheta) &
+					       - coriolis_term*sintheta(t)*buffer(PSI,vr)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(Coriolis_pForce_Phi)) Then
+            DO_PSI
+                qty(PSI) = - coriolis_term*costheta(t)*fbuffer(PSI,vtheta) &
+					       - coriolis_term*sintheta(t)*fbuffer(PSI,vr)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(Coriolis_mForce_Phi)) Then
+            DO_PSI
+                qty(PSI) = - coriolis_term*costheta(t)*m0_values(PSI2,vtheta) &
+					       - coriolis_term*sintheta(t)*m0_values(PSI2,vr)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
 
     End Subroutine Compute_Coriolis_Force
 
-    Subroutine Compute_Pressure_Force(buffer)
-        Implicit None
-        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
 
-    End Subroutine Compute_Pressure_Force
 
     Subroutine Compute_Viscous_Force(buffer)
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
+        Integer :: r,k, t
+        Integer, Parameter :: viscous_Force_r       = force_offset+22
+        Integer, Parameter :: viscous_Force_theta   = force_offset+23
+        Integer, Parameter :: viscous_Force_phi     = force_offset+24
+
+        Integer, Parameter :: viscous_pForce_r      = force_offset+25
+        Integer, Parameter :: viscous_pForce_theta  = force_offset+26
+        Integer, Parameter :: viscous_pForce_phi    = force_offset+27
+
+        Integer, Parameter :: viscous_mForce_r      = force_offset+28
+        Integer, Parameter :: viscous_mForce_theta  = force_offset+29
+        Integer, Parameter :: viscous_mForce_phi    = force_offset+30
+        ! Placeholder
+        ! The radial force term can be grabbed easily enough following the solve.
+        ! 
+        ! The other two components are a bit complicated to calculate due to the higher order
+        ! derivatives involved.  Will return to this later...
+        ! It's  possible that this should be special routine, allowed to transform
+        ! back to ell-space for the derivatives.
+        If (compute_quantity(viscous_Force_r)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_pForce_r)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_mForce_r)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+
+
+        If (compute_quantity(viscous_Force_theta)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_pForce_theta)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_mForce_theta)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+
+
+        If (compute_quantity(viscous_Force_phi)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_pForce_phi)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(viscous_mForce_phi)) Then
+            DO_PSI
+                qty(PSI) = 0.0d0
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
 
     End Subroutine Compute_Viscous_Force
 

@@ -347,12 +347,9 @@ Contains
 
 		Call StopWatch(ctranspose_time)%startclock()
 
-        !Leaving this code for now.  This was from when I thought I would have 
-        !If (output_iteration) Then
-        !    Call wsp%reform(nextra_recv = nicknum) ! The s2a buffer needs to be larger than normal
-        !Else
-    		Call wsp%reform()	! move from p1a to s2a
-        !Endif
+
+    	Call wsp%reform()	! move from p1a to s2a
+
         If (output_iteration) Then
             Call cobuffer%reform()
         Endif

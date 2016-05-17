@@ -10,14 +10,21 @@ Module Diagnostics_Interface
     Use Diagnostics_Base
 
     Use Diagnostics_Velocity_Field
+    Use Diagnostics_Magnetic_Field
+    Use Diagnostics_Energies
+
+    Use Diagnostics_Thermodynamic_Gradients
+
+    Use Diagnostics_Vorticity_Field
+    Use Diagnostics_Current_Density
+
+    Use Diagnostics_Linear_Forces
     Use Diagnostics_Inertial_Forces
     Use Diagnostics_Lorentz_Forces
-    Use Diagnostics_Energy_Flux
-    Use Diagnostics_Energies
-    Use Diagnostics_Linear_Forces
 
-    Use Diagnostics_Magnetic_Field
-    Use Diagnostics_Current_Density
+    Use Diagnostics_Energy_Flux
+
+
     Use Diagnostics_Induction
     Implicit None
 
@@ -148,56 +155,12 @@ Contains
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
             Call Compute_Velocity_Components(buffer)
-            !Call Compute_Vorticity_Components(buffer)
+            Call Compute_Vorticity_Field(buffer)
             Call Compute_Kinetic_Energy(buffer)
             Call Compute_Energy_Flux(buffer)
-            !Call Compute_TandP_Terms(buffer)
+            Call Compute_Thermodynamic_Gradients(buffer)
             Call Compute_Inertial_Terms(buffer)
-
-
-
-
-
-
-
-
-            If (compute_quantity(entropy)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,tvar)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(pressure)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,pvar)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(entropy_dr)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,dtdr)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-
-
-
-
+            Call Compute_Linear_Forces(buffer)
 
 
 

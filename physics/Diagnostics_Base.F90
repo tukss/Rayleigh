@@ -14,6 +14,7 @@ Module Diagnostics_Base
     Use Fields
     Use Math_Constants
     Use ReferenceState
+    Use Equation_Coefficients
     Use TransportCoefficients
 
     Implicit None
@@ -148,57 +149,57 @@ Module Diagnostics_Base
     Integer, Parameter :: pressure_p_dr  = pt_off+10
 
     Integer, Parameter :: entropy_m_dr   = pt_off+11 ! Mean
-    Integer, Parameter :: pressure__m_dr = pt_off+12
+    Integer, Parameter :: pressure_m_dr = pt_off+12
 
     !------------ Theta Derivatives ---------------!
-    Integer, Parameter :: entropy_dt     = pt_off+13 ! Full
-    Integer, Parameter :: pressure_dt    = pt_off+14
+    Integer, Parameter :: entropy_dtheta     = pt_off+13 ! Full
+    Integer, Parameter :: pressure_dtheta    = pt_off+14
 
-    Integer, Parameter :: entropy_p_dt   = pt_off+15 ! Fluctuating
-    Integer, Parameter :: pressure_p_dt  = pt_off+16
+    Integer, Parameter :: entropy_p_dtheta   = pt_off+15 ! Fluctuating
+    Integer, Parameter :: pressure_p_dtheta  = pt_off+16
 
-    Integer, Parameter :: entropy_m_dt   = pt_off+17 ! Mean
-    Integer, Parameter :: pressure__m_dt = pt_off+18
+    Integer, Parameter :: entropy_m_dtheta   = pt_off+17 ! Mean
+    Integer, Parameter :: pressure_m_dtheta = pt_off+18
 
     !------------ Phi Derivatives -----------------!
-    Integer, Parameter :: entropy_dp     = pt_off+13 ! Full
-    Integer, Parameter :: pressure_dp    = pt_off+14
+    Integer, Parameter :: entropy_dphi     = pt_off+19 ! Full
+    Integer, Parameter :: pressure_dphi    = pt_off+20
 
-    Integer, Parameter :: entropy_p_dp   = pt_off+15 ! Fluctuating
-    Integer, Parameter :: pressure_p_dp  = pt_off+16
+    Integer, Parameter :: entropy_p_dphi   = pt_off+21 ! Fluctuating
+    Integer, Parameter :: pressure_p_dphi  = pt_off+22
 
-    Integer, Parameter :: entropy_m_dp   = pt_off+17 ! Mean
-    Integer, Parameter :: pressure__m_dp = pt_off+18
+    Integer, Parameter :: entropy_m_dphi   = pt_off+23 ! Mean
+    Integer, Parameter :: pressure_m_dphi = pt_off+24
 
     !------------ (1/r) * Theta Derivatives --------!
-    Integer, Parameter :: entropy_dtr     = pt_off+19 ! Full
-    Integer, Parameter :: pressure_dtr    = pt_off+20
+    Integer, Parameter :: entropy_dtr     = pt_off+25 ! Full
+    Integer, Parameter :: pressure_dtr    = pt_off+26
 
-    Integer, Parameter :: entropy_p_dtr   = pt_off+21 ! Fluctuating
-    Integer, Parameter :: pressure_p_dtr  = pt_off+22
+    Integer, Parameter :: entropy_p_dtr   = pt_off+27 ! Fluctuating
+    Integer, Parameter :: pressure_p_dtr  = pt_off+28
 
-    Integer, Parameter :: entropy_m_dtr   = pt_off+23 ! Mean
-    Integer, Parameter :: pressure__m_dtr = pt_off+24
+    Integer, Parameter :: entropy_m_dtr   = pt_off+29 ! Mean
+    Integer, Parameter :: pressure_m_dtr  = pt_off+30
 
     !--- (1/{r sintheta}) * Phi Derivatives ---------!
-    Integer, Parameter :: entropy_dprs     = pt_off+25 ! Full
-    Integer, Parameter :: pressure_dprs    = pt_off+26
+    Integer, Parameter :: entropy_dprs     = pt_off+31 ! Full
+    Integer, Parameter :: pressure_dprs    = pt_off+32
 
-    Integer, Parameter :: entropy_p_dprs   = pt_off+27 ! Fluctuating
-    Integer, Parameter :: pressure_p_dprs  = pt_off+28
+    Integer, Parameter :: entropy_p_dprs   = pt_off+33 ! Fluctuating
+    Integer, Parameter :: pressure_p_dprs  = pt_off+34
 
-    Integer, Parameter :: entropy_m_dprs   = pt_off+29 ! Mean
-    Integer, Parameter :: pressure__m_dprs = pt_off+30
+    Integer, Parameter :: entropy_m_dprs   = pt_off+35 ! Mean
+    Integer, Parameter :: pressure_m_dprs  = pt_off+36
 
     !--------- Also compute terms of the form rho_bar d_by_dr(P/rho_bar)
-    Integer, Parameter :: rhopressure_dr  = pt_off+31
-    Integer, Parameter :: rhopressurep_dr = pt_off+32
-    Integer, Parameter :: rhopressurem_dr = pt_off+33
+    Integer, Parameter :: rhopressure_dr  = pt_off+37
+    Integer, Parameter :: rhopressurep_dr = pt_off+38
+    Integer, Parameter :: rhopressurem_dr = pt_off+39
 
     !//////////////////////////////////////////////////////////////////////////
     !///////////////////////////////////////////////////
     !       Vorticity Outputs
-    Integer, Parameter :: vort_off = pt_off+33 ! = 96
+    Integer, Parameter :: vort_off = pt_off+39 ! = 102
 
     Integer, Parameter :: vort_r      = vort_off+1  ! Full
     Integer, Parameter :: vort_theta  = vort_off+2
@@ -220,7 +221,7 @@ Module Diagnostics_Base
 
     !//////////////////////////////////////////////////////////
     !               Radial Energy Fluxes
-    Integer, Parameter :: eoffset = vort_off+ 13 ! =109
+    Integer, Parameter :: eoffset = vort_off+ 13 ! =115
     Integer, Parameter :: ecrossb_r            = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
     Integer, Parameter :: ke_flux_radial       = eoffset+2 ! vr*KE
     Integer, Parameter :: thermalE_flux_radial = eoffset+3 ! vr*rho_bar*T_bar*S OR vr*T
@@ -229,12 +230,12 @@ Module Diagnostics_Base
     Integer, Parameter :: vol_heat_flux        = eoffset+6 ! "Flux" associated with volumetric heating
     Integer, Parameter :: cond_flux_r          = eoffset+7 ! Thermal conductive flux
     Integer, Parameter :: vol_heating          = eoffset+8 ! Volumetric Heating Function
-
+    Integer, Parameter :: visc_heating         = eoffset+9 ! Viscous Heating
 
 
     !///////////////////////////////////////////////////////////
     !           Kinetic Energies
-    Integer, Parameter :: keoffset = eoffset+8 ! = 114
+    Integer, Parameter :: keoffset = eoffset+9 ! = 124
     Integer, Parameter :: kinetic_energy = keoffset+1   ! 1/2 rho_bar v^2
     Integer, Parameter :: radial_ke      = keoffset+2   ! 1/2 rho_bar {v_r}^2
     Integer, Parameter :: theta_ke       = keoffset+3   ! 1/2 rho_bar {v_theta}^2
@@ -273,7 +274,7 @@ Module Diagnostics_Base
     !///////////////////////////////////////////////////////////////////////////////////
     !Angular Momentum Transport Diagnostics
     !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
-    Integer, Parameter :: amoff = keoffset+ 24        ! = 141
+    Integer, Parameter :: amoff = keoffset+ 24        ! = 148
     Integer, Parameter :: amom_fluct_r = amoff+1      ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
     Integer, Parameter :: amom_fluct_theta = amoff+2  ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
     Integer, Parameter :: amom_dr_r = amoff+3         ! rho_bar * r * sintheta * <v_r> * <v_phi>
@@ -287,7 +288,7 @@ Module Diagnostics_Base
     ! Reynolds decomposition about the azimuthal mean may also be output
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = amoff+6 ! = 147    ! Output offset for advection terms  
+    Integer, Parameter :: vgv = amoff+6 ! = 154    ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -310,8 +311,8 @@ Module Diagnostics_Base
 
     !/////////////////////////////////////////////////////////////
     !  Linear Forces 
-    !  Note:  the pressure gradient codes are  above
-    Integer, Parameter :: force_offset = vgv+162
+    !  Note:  the pressure gradient diagnostic codes are  above
+    Integer, Parameter :: force_offset = vgv+15 ! 169
 
     Integer, Parameter :: buoyancy_force  =  force_offset+1
     Integer, Parameter :: buoyancy_pforce =  force_offset+2
@@ -328,42 +329,36 @@ Module Diagnostics_Base
     Integer, Parameter :: Coriolis_mForce_r     = force_offset+19
     Integer, Parameter :: Coriolis_mForce_theta = force_offset+20
     Integer, Parameter :: Coriolis_mForce_phi   = force_offset+21
-    
-    Integer, Parameter :: viscous_Force_r       = force_offset+22
-    Integer, Parameter :: viscous_Force_theta   = force_offset+23
-    Integer, Parameter :: viscous_Force_phi     = force_offset+24
 
-    Integer, Parameter :: viscous_pForce_r      = force_offset+25
-    Integer, Parameter :: viscous_pForce_theta  = force_offset+26
-    Integer, Parameter :: viscous_pForce_phi    = force_offset+27
+    ! Viscous forces - in development    
+    !Integer, Parameter :: viscous_Force_r       = force_offset+22
+    !Integer, Parameter :: viscous_Force_theta   = force_offset+23
+    !Integer, Parameter :: viscous_Force_phi     = force_offset+24
 
-    Integer, Parameter :: viscous_mForce_r      = force_offset+28
-    Integer, Parameter :: viscous_mForce_theta  = force_offset+29
-    Integer, Parameter :: viscous_mForce_phi    = force_offset+30
+    !Integer, Parameter :: viscous_pForce_r      = force_offset+25
+    !Integer, Parameter :: viscous_pForce_theta  = force_offset+26
+    !Integer, Parameter :: viscous_pForce_phi    = force_offset+27
 
-
-    !////////////////////////////////////////
-    ! Placeholder for buoyancy force terms  (pressure is already taken care of above)
-
-    !////////////////////////////////////////
-    ! Placeholder for Viscous Forces -- ugh
-
+    !Integer, Parameter :: viscous_mForce_r      = force_offset+28
+    !Integer, Parameter :: viscous_mForce_theta  = force_offset+29
+    !Integer, Parameter :: viscous_mForce_phi    = force_offset+30
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
-    Integer, Parameter :: dcheck_off = vgv+ 15 ! = 149
+    Integer, Parameter :: dcheck_off = force_offset+ 30 ! = 199
     Integer, Parameter :: diagnostic1 = dcheck_off+1, diagnostic2 = dcheck_off+2
 
 
     !//////////////////////////////////////////////////////////
-    !/////////// Magnetic Outputs.  Start at 200 to additional room for hydro
+    !/////////// Magnetic Outputs.  Start at 300 to leave room 
+    !//////////                     for additional hydro
 
 
     !//////////////////////////////////////////////////
     !               Magnetic field components.
     ! Fluctuations (denoted by "p") and azimuthal means
     ! (denoted by "m") may also be output.
-    Integer, Parameter :: boffset = 200
+    Integer, Parameter :: boffset = 300
 
     !------------ Field Components ----------!
     Integer, Parameter :: b_r      = boffset+1 ! Full 
@@ -449,6 +444,7 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
+    !       This is Curl B -- rename accordingly
     Integer, Parameter :: joffset = boffset+50 ! = 250
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
@@ -525,6 +521,7 @@ Module Diagnostics_Base
 
     !////////////////////////////// Induction Terms ///////////////////////////
     Integer, Parameter :: indoff = loff + 15 ! = 297
+    ! NOTE:  The diffusion terms are not calculated at the moment
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
     Integer, Parameter :: induction_comp_r           = indoff+2  ! radial component of -{div dot v}B
@@ -636,6 +633,7 @@ Module Diagnostics_Base
     ! This array will hold fluctuating quantities from the buffer { q - <q>}      
     Real*8, Allocatable :: fbuffer(:,:,:,:)	
 
+    Logical :: azimuthal_mean = .true. ! when false, the m0_values are overwritten with the ell0_values
 
 Contains
 

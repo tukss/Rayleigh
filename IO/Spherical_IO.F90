@@ -17,7 +17,7 @@ Module Spherical_IO
     ! 7. PDFs taken on slices of the sphere
 
 	!////////////////////////////////////////////
-    Integer, Parameter :: nqmax=400, nshellmax=100
+    Integer, Parameter :: nqmax=600, nshellmax=100
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
 
     !Each diagnostic type has an associated version number that is written to the file
