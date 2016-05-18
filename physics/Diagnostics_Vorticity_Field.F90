@@ -22,31 +22,39 @@ Contains
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
 
+        !Integer, Parameter :: enstrophy   = vort_off+10 ! Enstrophy
+        !Integer, Parameter :: enstrophypm = vort_off+11 ! (fluctuating-mean)
+        !Integer, Parameter :: enstrophymm = vort_off+12 ! (mean-mean)
+        !Integer, Parameter :: enstropypp  = vort_off+13 ! (fluct-fluct)
+
+        
+
         !/////////////////////////////////////////
         ! 1. terms involving radial vorticity
-        If (compute_quantity(vort_r)) Then
+        If (compute_quantity(vort_r) .or. compute_quantity(enstrophy)) Then
             DO_PSI
-                qty(PSI) = One_Over_R(r)*( buffer(PSI,dvpdt)- &
-                           csctheta(t)*buffer(PSI,dvtdp)  +&
-                           cottheta(t)*buffer(PSI,vphi) )
+                qty(PSI) = One_Over_R(r)*( buffer(PSI,dvpdt) + &
+                           cottheta(t)*buffer(PSI,vphi) - &
+                           csctheta(t)*buffer(PSI,dvtdp) )
             END_DO
             Call Add_Quantity(qty)
         Endif	
 
         If (compute_quantity(vortp_r)) Then
             DO_PSI
-                qty(PSI) = One_Over_R(r)*( fbuffer(PSI,dvpdt)- &
-                           csctheta(t)*fbuffer(PSI,dvtdp)  +&
-                           cottheta(t)*fbuffer(PSI,vphi) )
+                qty(PSI) = One_Over_R(r)*( fbuffer(PSI,dvpdt)+ &
+                           cottheta(t)*fbuffer(PSI,vphi) - &
+                           csctheta(t)*fbuffer(PSI,dvtdp))
+
             END_DO
             Call Add_Quantity(qty)
         Endif	
 
         If (compute_quantity(vortm_r)) Then
             DO_PSI
-                qty(PSI) = One_Over_R(r)*( m0_values(PSI2,dvpdt)- &
-                           csctheta(t)*m0_values(PSI2,dvtdp)  +&
-                           cottheta(t)*m0_values(PSI2,vphi) )
+                qty(PSI) = One_Over_R(r)*( m0_values(PSI2,dvpdt) +&
+                           cottheta(t)*m0_values(PSI2,vphi) - &
+                           csctheta(t)*m0_values(PSI2,dvtdp) )
             END_DO
             Call Add_Quantity(qty)
         Endif	
@@ -79,6 +87,25 @@ Contains
 
         !///////////////////////////////////////////
         ! 3. terms involving phi vorticity
+        If (compute_quantity(vort_phi)) Then
+            DO_PSI
+                qty(PSI) = buffer(PSI,vtheta) + buffer(PSI,dvtdr)-One_Over_R(r)*buffer(PSI,dvrdt)
+            END_DO
+        Endif
+
+        If (compute_quantity(vortp_phi)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,vtheta) + fbuffer(PSI,dvtdr)-One_Over_R(r)*fbuffer(PSI,dvrdt)
+            END_DO
+        Endif
+
+        If (compute_quantity(vortm_phi)) Then
+            DO_PSI
+                qty(PSI) = fbuffer(PSI,vtheta) + fbuffer(PSI,dvtdr)-One_Over_R(r)*fbuffer(PSI,dvrdt)
+            END_DO
+        Endif
+
+
 
     End Subroutine Compute_Vorticity_Field
 

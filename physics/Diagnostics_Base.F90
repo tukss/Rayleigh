@@ -24,7 +24,7 @@ Module Diagnostics_Base
     !  Reynolds decompositions are often used in the outputs.
     !  As a result, some shorthand is used as follows:
     !   "m" and "< >" denote the azimuthal OR spherical mean.
-    !   "p" and " ' " denote perturbations about the azimuthal mean 
+    !   "p" and " ' " denote perturbations about that mean
 
     !////////////////////////////////////////////////////////
     ! Velocity field components and it's derivatives
@@ -80,9 +80,9 @@ Module Diagnostics_Base
     Integer, Parameter :: dvp_theta_dp = voffset+32 ! (same as full if    
     Integer, Parameter :: dvp_phi_dp   = voffset+33 !  mean is azimuthal)
 
-    Integer, Parameter :: dvm_r_dp     = voffset+34 ! Mean    
-    Integer, Parameter :: dvm_theta_dp = voffset+35 ! (nonzero only when mean is 
-    Integer, Parameter :: dvm_phi_dp   = voffset+36 !  spherical, not azimuthal)
+    Integer, Parameter :: dvm_r_dp     = voffset+34 ! We keep the phi derivatives of the mean    
+    Integer, Parameter :: dvm_theta_dp = voffset+35 ! here, even though they are zero.
+    Integer, Parameter :: dvm_phi_dp   = voffset+36 ! Somewhat useful placeholders...
 
     !------------ (1/r) * Theta Derivatives -------!
     Integer, Parameter :: dv_r_dtr      = voffset+37 ! Full 
