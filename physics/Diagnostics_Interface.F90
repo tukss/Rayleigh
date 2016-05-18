@@ -184,64 +184,8 @@ Contains
                 Call Add_Quantity(qty)
             Endif	
 
-            If (compute_quantity(enstrophy)) Then
-                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
-            Endif
-
-            If (compute_quantity(vort_r) .or. compute_quantity(enstrophy)) Then
-
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,zvar)
-
-                If (compute_quantity(vort_r)) Call Add_Quantity(qty)
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = qty**2
-                Endif
-            Endif
-
-            If (compute_quantity(vort_theta) .or. compute_quantity(enstrophy)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,dvrdp)*csctheta(t) &
-                             & - buffer(p,r,t,dvpdr) &
-                             & - buffer(p,r,t,vphi)*one_over_r(r)
-
-                        Enddo
-                    Enddo
-                Enddo
-
-                If (compute_quantity(vort_theta)) Call Add_Quantity(qty)
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = tmp1+qty**2
-                Endif
-
-            Endif
-
 		
-            If (compute_quantity(vort_phi) .or. compute_quantity(enstrophy)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,vtheta)*one_over_r(r) &
-                             & + buffer(p,r,t,dvtdr) &
-                             & - buffer(p,r,t,dvrdt)*one_over_r(r)
 
-                        Enddo
-                    Enddo
-                Enddo
-
-                If (compute_quantity(vort_phi)) Call Add_Quantity(qty)
-
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = tmp1+qty**2
-                Endif
-
-            Endif
-
-            If (compute_quantity(enstrophy)) Then
-                Call Add_Quantity(tmp1)
-                DeAllocate(tmp1)
-            Endif
             
             If (compute_quantity(amom_fluct_r)) Then
 

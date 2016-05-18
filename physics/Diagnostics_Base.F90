@@ -213,10 +213,10 @@ Module Diagnostics_Base
     Integer, Parameter :: vortm_theta = vort_off+8
     Integer, Parameter :: vortm_phi   = vort_off+9
 
-    Integer, Parameter :: enstrophy   = vort_off+10 ! Enstrophy
-    Integer, Parameter :: enstrophypm = vort_off+11 ! (fluctuating-mean)
-    Integer, Parameter :: enstrophymm = vort_off+12 ! (mean-mean)
-    Integer, Parameter :: enstropypp  = vort_off+13 ! (fluct-fluct)
+    Integer, Parameter :: enstrophy    = vort_off+10 ! Enstrophy
+    Integer, Parameter :: enstrophy_pm = vort_off+11 ! (fluctuating-mean)
+    Integer, Parameter :: enstrophy_mm = vort_off+12 ! (mean-mean)
+    Integer, Parameter :: enstrophy_pp  = vort_off+13 ! (fluct-fluct)
 
 
     !//////////////////////////////////////////////////////////
