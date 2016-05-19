@@ -11,7 +11,6 @@ Module Equation_Coefficients
     Implicit None
     Real*8 :: coriolis_term
     Real*8 :: Lorentz_Coefficient
-    Real*8 :: alf_const
 
     Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
     Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
@@ -22,14 +21,6 @@ Subroutine Init_Equation_Coefficients
     Implicit None
     Integer :: i
     Real*8 :: amp, grav_r_ref
-
-    kinetic_energy_factor = Half
-    magnetic_energy_factor =  over_eight_pi
-    If (.not. dimensional) Then
-        magnetic_energy_factor = half/Ekman_Number/Magnetic_Prandtl_Number
-    Endif
-    !Need logic here for non-dimensional anelastic cases
-
 
 
     Allocate(dpdr_w_term(1:N_R))
@@ -85,26 +76,17 @@ Subroutine Init_Equation_Coefficients
 	If (magnetism) Then
         !Lorentz Force Coefficient (for JXB)
         If (.not. dimensional) Then
+            ! DOUBLE CHECK THIS LATER -- This should be consistent, but CHECK
             Lorentz_Coefficient = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
         Else
-            Lorentz_Coefficient = 1.0d0
+            Lorentz_Coefficient = 1.0d0/four_pi
         Endif
-        ! Ohmic heating coefficient (for J^2)
+        ! Ohmic heating coefficient (multiplies {DelxB}^2)
         If (ohmic_heating) Then
             Allocate(ohmic_heating_coeff(1:N_R))
-            If (.not. dimensional) Then
-                ohmic_heating_coeff = 1.0d0     ! <--------- PROBABLY WRONG - CHECK!
-            Else
-                ohmic_heating_coeff = four_pi*eta/ref%density/ref%temperature
-            Endif
+            ohmic_heating_coeff = lorentz_coefficient*eta/ref%density/ref%temperature
         Endif
 
-        !Alfven Speed Constant (for CFL)
-        If (.not. dimensional) Then
-            alf_const = 1.0d0
-        Else
-            alf_const = 1.0d0/four_pi
-        Endif
 	Endif
 
 End Subroutine Init_Equation_Coefficients

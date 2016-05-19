@@ -63,7 +63,7 @@ Contains
 		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
         
 
-		If (magnetism) Call compute_BandJ()
+		If (magnetism) Call compute_BandCurlB()
 
         If (output_iteration) Call Hybrid_Output_Final()
 
@@ -319,9 +319,12 @@ Contains
         END_DO
 	End Subroutine Velocity_Derivatives
 
-	Subroutine Compute_BandJ()
+	Subroutine Compute_BandCurlB()
 		Implicit None
 		Integer :: imi, m, mp, r 
+
+        ! This routine computes B and Del X B
+        ! The shorthand for Del X B in the buffer is "j"
        
 		!/////////////// BR /////////////////////		
 		!First convert C to Br  !! Br overwrites C
@@ -329,10 +332,10 @@ Contains
 			SBUFFA(IDX2,Br) = l_l_plus1(m:l_max)*SBUFFA(IDX2,Br)*OneOverRSquared(r)
         END_DO     
 
-		!////////////////// JR ///////////////////////////
+		!////////////////// [Del x B]_r ///////////////////////////
 		!Compute Jr (Jr does not overwrite any existing fields)
         DO_IDX2
-			SBUFFA(IDX2,Jr) = alf_const*l_l_plus1(m:l_max) &
+			SBUFFA(IDX2,Jr) = l_l_plus1(m:l_max) &
                *SBUFFA(IDX2,Avar)*OneOverRSquared(r)
         END_DO  
 
@@ -345,7 +348,7 @@ Contains
 		Call d_by_dtheta(wsp%s2a,dadr,ftemp1)	 
 		Call d_by_dphi(  wsp%s2a,dadr,ftemp2)
 
-        !////////// J _PHI //////////////////////////
+        !////////// [Del x B]_phi //////////////////////////
         ! overwrite d_a_dr with d_d_phi(d_a_dr)
         DO_IDX2
             SBUFFA(IDX2,dadr) = ftemp2(mp)%data(IDX2)
@@ -356,15 +359,15 @@ Contains
         ! Add this term to d_d_phi(d_a_dr) to build rsintheta J_phi (overwrite dadr)
         DO_IDX2
             SBUFFA(IDX2,jphi) = SBUFFA(IDX2,jphi)+ftemp2(mp)%data(IDX2)
-            SBUFFA(IDX2,jphi) = alf_const*SBUFFA(IDX2,jphi)
+            SBUFFA(IDX2,jphi) = SBUFFA(IDX2,jphi)
         END_DO
 
-        !/////////////J Theta ///////////////////////
+        !/////////////[Del x B]_theta ///////////////////////
         Call d_by_dphi(  wsp%s2a,d2cdr2,ftemp2)       !get phi derivative of d2cdr2-Br
 
         ! Combine with ftemp1 to build rsintheta J_theta (overwrites d2cdr2)
         DO_IDX2
-            SBUFFA(IDX2,jtheta) = alf_const*(ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
+            SBUFFA(IDX2,jtheta) = (ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
         END_DO
 
 
@@ -394,7 +397,7 @@ Contains
         DO_IDX2
             SBUFFA(IDX2,dcdr) = ftemp2(mp)%data(IDX2)-ftemp1(mp)%data(IDX2)
         END_DO
-	End Subroutine Compute_BandJ
+	End Subroutine Compute_BandCurlB
 
 	Subroutine Bfield_Derivatives()
 		Implicit None

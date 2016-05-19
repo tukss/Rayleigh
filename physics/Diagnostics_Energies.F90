@@ -26,7 +26,7 @@ Contains
         ! the magnetic_energy_factor this way.
 
         !Note that kinetic_energy_factor is 1/2 by default
-        dfact = ref%density*kinetic_energy_factor
+        dfact = ref%density*Half
 
 
         ! Energies associated with the full (fluctuating + mean) velocity field
@@ -238,7 +238,8 @@ Contains
         Integer :: r,k, t
 
         !This changes depending on the non-dimensionalization (dimensionalization) employed
-        mfact = magnetic_energy_factor
+        mfact = half*lorentz_coefficient
+
 
         ! Energies associated with the full (fluctuating + mean) magnetic field
         If (compute_quantity(magnetic_energy)) Then

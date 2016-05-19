@@ -20,12 +20,15 @@ Module Diagnostics_Interface
 
     Use Diagnostics_Linear_Forces
     Use Diagnostics_Inertial_Forces
+    Use Diagnostics_Angular_Momentum
     Use Diagnostics_Lorentz_Forces
 
     Use Diagnostics_Energy_Flux
 
 
     Use Diagnostics_Induction
+
+    Use Diagnostics_Miscellaneous
     Implicit None
 
 
@@ -117,7 +120,7 @@ Contains
         Integer, Intent(In) :: iteration
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8, Intent(In) :: current_time
-        Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3
+        Real*8 :: over_n_phi, tmp, tmp2, tmp3
 
         Integer :: p,t,r, nfields, bdims(1:4), pass_num
 
@@ -144,8 +147,7 @@ Contains
             Allocate(tmp1d(1:N_R))
             over_n_phi = 1.0d0/dble(n_phi)
 
-            Do pass_num = 1, 2
-            !////////////////////////
+
             ! All requested Shell_Average quantities are computed twice
             ! During the first pass, ell = 0 and m = 0 averages are computed
             !   (for the shell_average quantities)
@@ -153,157 +155,32 @@ Contains
             !   file output is conducted, and the previously
             !   computed averages are used for moments in the shell_average output
             ! Compute_quantity returns false on the first pass for everything but shell_averages
-            Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
-            Call Compute_Velocity_Components(buffer)
-            Call Compute_Vorticity_Field(buffer)
-            Call Compute_Kinetic_Energy(buffer)
-            Call Compute_Energy_Flux(buffer)
-            Call Compute_Thermodynamic_Gradients(buffer)
-            Call Compute_Inertial_Terms(buffer)
-            Call Compute_Linear_Forces(buffer)
+            !////////////////////////
+            Do pass_num = 1, 2
+
+                ! Set the averaging flag, so that all quantities or only shell averages are computed
+                Call Set_Avg_Flag(pass_num)  
+                Call Compute_Velocity_Components(buffer)
+                Call Compute_Vorticity_Field(buffer)
+                Call Compute_Kinetic_Energy(buffer)
+                Call Compute_Energy_Flux(buffer)
+                Call Compute_Thermodynamic_Gradients(buffer)
+                Call Compute_Inertial_Terms(buffer)
+                Call Compute_Linear_Forces(buffer)
+                Call Compute_Angular_Momentum_Balance(buffer)
 
 
+                Call Compute_Misc_Diagnostics(buffer)
 
-
-
-
-
-            If (compute_quantity(vol_heating)) Then
-                If (allocated(ref%heating)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            Do p = 1, n_phi
-                                qty(p,r,t) = ref%heating(r) &
-                                 & *ref%density(r)*ref%temperature(r)
-                            Enddo
-                        Enddo
-                    Enddo                
-                Else
-                    qty(:,:,:) = 0.0d0
-                Endif
-                Call Add_Quantity(qty)
-            Endif	
-
-		
-
-            
-            If (compute_quantity(amom_fluct_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *((buffer(:,r,t,vr)-m0_values(r,t,vr))*(buffer(:,r,t,vphi) &
-                            & -m0_values(r,t,vphi)))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_fluct_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *((buffer(:,r,t,vtheta)-m0_values(r,t,vtheta)) & 
-                            & *(buffer(:,r,t,vphi)-m0_values(r,t,vphi)))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-
-            If (compute_quantity(amom_dr_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *(m0_values(r,t,vr)*m0_values(r,t,vphi))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_dr_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *(m0_values(r,t,vtheta)*m0_values(r,t,vphi))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_mean_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
-                            & *(m0_values(r,t,vr)*Angular_Velocity)
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_mean_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
-                            & *(m0_values(r,t,vtheta)*Angular_Velocity)
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif              
-               
-
-
-            !////////////////////////////////////////////////////////
-            ! Diagnostics for verifying output is working
-            If (compute_quantity(diagnostic1)) Then
-                mypi = acos(-1.0d0)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = sin(p*2.0d0*mypi/n_phi) &
-                             & *(sintheta(t)**2)*radius(r)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif
-
-            If (compute_quantity(diagnostic2)) Then
-                mypi = acos(-1.0d0)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = sin(p*4.0d0*mypi/n_phi) &
-                             & *(sintheta(t)*costheta(t))*radius(r)**2
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif
-
-            !//////////////////// Magnetic Quantities
-            If (magnetism) Then
-                Call Compute_BField_Components(buffer)
-                Call Compute_Lorentz_Forces(buffer)
-                Call Compute_J_Components(buffer)
-                Call Compute_Induction_Terms(buffer)
-                Call Compute_Magnetic_Energy(buffer)
-
-
-
-			Endif !Magnetism
-            If (pass_num .eq. 1) Call Finalize_Averages()
+                !//////////////////// Magnetic Quantities
+                If (magnetism) Then
+                    Call Compute_BField_Components(buffer)
+                    Call Compute_Lorentz_Forces(buffer)
+                    Call Compute_J_Components(buffer)
+                    Call Compute_Induction_Terms(buffer)
+                    Call Compute_Magnetic_Energy(buffer)
+			    Endif 
+                If (pass_num .eq. 1) Call Finalize_Averages()
             Enddo !Pass_num
 
 			DeAllocate(qty,tmp1,tmp1d)
