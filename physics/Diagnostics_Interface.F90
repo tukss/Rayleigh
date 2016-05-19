@@ -157,7 +157,6 @@ Contains
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             !////////////////////////
             Do pass_num = 1, 2
-                Write(6,*)'pass num: ', pass_num, my_rank
                 ! Set the averaging flag, so that all quantities or only shell averages are computed
                 Call Set_Avg_Flag(pass_num)  
 
@@ -176,14 +175,12 @@ Contains
 
                 !////// Magnetic Quantities
                 If (magnetism) Then
-                    Write(6,*)'myid/qval:',my_rank,'in mag'
                     Call Compute_BField_Components(buffer)
                     Call Compute_Lorentz_Forces(buffer)
                     Call Compute_J_Components(buffer)
                     Call Compute_Induction_Terms(buffer)
                     Call Compute_Magnetic_Diffusion(buffer)
                     Call Compute_Magnetic_Energy(buffer)
-                    Write(6,*)'myid/qval:',my_rank,'out mag'
 			    Endif 
                 If (pass_num .eq. 1) Call Finalize_Averages()
             Enddo

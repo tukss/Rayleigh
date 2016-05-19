@@ -916,9 +916,7 @@ Contains
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
                 Call Global_Averages%getq_now(yesno)
-                If (yesno) Then
-                    Write(6,*)'myid/qval:',myid,qval, IOAvg_Flag
-                Endif
+
             Endif
         Endif
     End function Compute_quantity
@@ -945,7 +943,6 @@ Contains
     Subroutine Set_Avg_Flag(flag_val)
         Integer, Intent(In) :: flag_val
         IOavg_flag = flag_val
-        Write(6,*)'Flag set to : ', IOavg_flag, myid
     End Subroutine Set_Avg_Flag
 	Subroutine Add_Quantity(qty)
 		Implicit None
@@ -1076,7 +1073,6 @@ Contains
     			    Allocate(globav_outputs(1:Global_Averages%nq))			
     		    Endif
                 globav_ind = Global_Averages%ind
-                Write(6,*)'myid/gind: ', myid,globav_ind
 			    globav_outputs(globav_ind) = this_average
                 If (myid .eq. 0) Global_Averages%oqvals(globav_ind) = current_qval
                 Call Global_Averages%AdvanceInd()
