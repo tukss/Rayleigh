@@ -157,31 +157,36 @@ Contains
             ! Compute_quantity returns false on the first pass for everything but shell_averages
             !////////////////////////
             Do pass_num = 1, 2
-
+                Write(6,*)'pass num: ', pass_num, my_rank
                 ! Set the averaging flag, so that all quantities or only shell averages are computed
                 Call Set_Avg_Flag(pass_num)  
+
                 Call Compute_Velocity_Components(buffer)
-                Call Compute_Vorticity_Field(buffer)
-                Call Compute_Kinetic_Energy(buffer)
-                Call Compute_Energy_Flux(buffer)
                 Call Compute_Thermodynamic_Gradients(buffer)
+                Call Compute_Vorticity_Field(buffer)
+                Call Compute_Energy_Flux(buffer)
+                Call Compute_Kinetic_Energy(buffer)
+                Call Compute_Angular_Momentum_Balance(buffer)
                 Call Compute_Inertial_Terms(buffer)
                 Call Compute_Linear_Forces(buffer)
-                Call Compute_Angular_Momentum_Balance(buffer)
+
 
 
                 Call Compute_Misc_Diagnostics(buffer)
 
-                !//////////////////// Magnetic Quantities
+                !////// Magnetic Quantities
                 If (magnetism) Then
+                    Write(6,*)'myid/qval:',my_rank,'in mag'
                     Call Compute_BField_Components(buffer)
                     Call Compute_Lorentz_Forces(buffer)
                     Call Compute_J_Components(buffer)
                     Call Compute_Induction_Terms(buffer)
+                    Call Compute_Magnetic_Diffusion(buffer)
                     Call Compute_Magnetic_Energy(buffer)
+                    Write(6,*)'myid/qval:',my_rank,'out mag'
 			    Endif 
                 If (pass_num .eq. 1) Call Finalize_Averages()
-            Enddo !Pass_num
+            Enddo
 
 			DeAllocate(qty,tmp1,tmp1d)
 			Call Complete_Output(iteration, current_time)

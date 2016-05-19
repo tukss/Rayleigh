@@ -84,8 +84,8 @@ Contains
         If (compute_quantity(dvm_r_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvrdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif		
 
         !-- -- {1/r d(v_r)/dtheta}
@@ -125,8 +125,8 @@ Contains
         If (compute_quantity(dvm_r_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvrdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif		
 
         !/////////////////////////////////////////
@@ -191,8 +191,8 @@ Contains
         If (compute_quantity(dvm_theta_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvtdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         !-- -- {1/r d(v_theta)/dtheta}
@@ -232,8 +232,8 @@ Contains
         If (compute_quantity(dvm_theta_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvtdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
 
@@ -300,8 +300,8 @@ Contains
         If (compute_quantity(dvm_phi_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvpdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         !-- -- {1/r d(v_phi)/dtheta}
@@ -340,8 +340,8 @@ Contains
         If (compute_quantity(dvm_phi_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dvpdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         !/////////////////////////////////////////////////////////////

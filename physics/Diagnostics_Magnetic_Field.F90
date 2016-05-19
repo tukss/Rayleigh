@@ -84,8 +84,8 @@ Contains
         If (compute_quantity(dbm_r_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbrdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         !-- -- {1/r d(b_r)/dtheta}
@@ -126,8 +126,8 @@ Contains
         If (compute_quantity(dbm_r_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbrdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif		
 
 
@@ -192,8 +192,8 @@ Contains
         If (compute_quantity(dbm_theta_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbtdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
 
@@ -234,8 +234,8 @@ Contains
         If (compute_quantity(dbm_theta_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbtdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
 
@@ -301,8 +301,8 @@ Contains
         If (compute_quantity(dbm_phi_dp)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbpdp)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         !-- -- {1/r d(b_phi)/dtheta}
@@ -341,8 +341,8 @@ Contains
         If (compute_quantity(dbm_phi_dprs)) Then
             DO_PSI
                 qty(PSI) = m0_values(PSI2,dbpdp)*one_over_r(r)*csctheta(t)
-                Call Add_Quantity(qty)
             END_DO
+            Call Add_Quantity(qty)
         Endif	
 
         

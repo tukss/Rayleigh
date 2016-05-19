@@ -275,12 +275,12 @@ Module Diagnostics_Base
     !Angular Momentum Transport Diagnostics
     !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
     Integer, Parameter :: amoff = keoffset+ 24        ! = 148
-    Integer, Parameter :: amom_fluct_r = amoff+1      ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
-    Integer, Parameter :: amom_fluct_theta = amoff+2  ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
-    Integer, Parameter :: amom_dr_r = amoff+3         ! rho_bar * r * sintheta * <v_r> * <v_phi>
-    Integer, Parameter :: amom_dr_theta = amoff+4     ! rho_bar * r * sintheta * <v_theta> * <v_phi>
-    Integer, Parameter :: amom_mean_r = amoff+5       ! rho_bar * r^2 * sintheta^2 * <v_r> * Omega
-    Integer, Parameter :: amom_mean_theta = amoff+6   ! rho_bar * r^2 * sintheta^2 * <v_theta> * Omega
+    Integer, Parameter :: amom_fluct_r     = amoff+1 ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
+    Integer, Parameter :: amom_fluct_theta = amoff+2 ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
+    Integer, Parameter :: amom_dr_r        = amoff+3 ! rho_bar * r * sintheta * <v_r> * <v_phi>
+    Integer, Parameter :: amom_dr_theta    = amoff+4 ! rho_bar * r * sintheta * <v_theta> * <v_phi>
+    Integer, Parameter :: amom_mean_r      = amoff+5 ! rho_bar * r^2 * sintheta^2 * <v_r> * Omega
+    Integer, Parameter :: amom_mean_theta  = amoff+6 ! rho_bar * r^2 * sintheta^2 * <v_theta> * Omega
 
     ! Quantity codes for magnetic torques are defined with the Lorentz Forces
 
@@ -318,35 +318,36 @@ Module Diagnostics_Base
     Integer, Parameter :: buoyancy_pforce =  force_offset+2
     Integer, Parameter :: buoyancy_mforce =  force_offset+3
 
-    Integer, Parameter :: Coriolis_Force_r      = force_offset+13
-    Integer, Parameter :: Coriolis_Force_theta  = force_offset+14
-    Integer, Parameter :: Coriolis_Force_phi    = force_offset+15
+    Integer, Parameter :: Coriolis_Force_r      = force_offset+4
+    Integer, Parameter :: Coriolis_Force_theta  = force_offset+5
+    Integer, Parameter :: Coriolis_Force_phi    = force_offset+6
 
-    Integer, Parameter :: Coriolis_pForce_r     = force_offset+16
-    Integer, Parameter :: Coriolis_pForce_theta = force_offset+17
-    Integer, Parameter :: Coriolis_pForce_phi   = force_offset+18
+    Integer, Parameter :: Coriolis_pForce_r     = force_offset+7
+    Integer, Parameter :: Coriolis_pForce_theta = force_offset+8
+    Integer, Parameter :: Coriolis_pForce_phi   = force_offset+9
 
-    Integer, Parameter :: Coriolis_mForce_r     = force_offset+19
-    Integer, Parameter :: Coriolis_mForce_theta = force_offset+20
-    Integer, Parameter :: Coriolis_mForce_phi   = force_offset+21
+    Integer, Parameter :: Coriolis_mForce_r     = force_offset+10
+    Integer, Parameter :: Coriolis_mForce_theta = force_offset+11
+    Integer, Parameter :: Coriolis_mForce_phi   = force_offset+12
 
     ! Viscous forces - in development    
-    !Integer, Parameter :: viscous_Force_r       = force_offset+22
-    !Integer, Parameter :: viscous_Force_theta   = force_offset+23
-    !Integer, Parameter :: viscous_Force_phi     = force_offset+24
+    Integer, Parameter :: viscous_Force_r       = force_offset+13
+    Integer, Parameter :: viscous_Force_theta   = force_offset+14
+    Integer, Parameter :: viscous_Force_phi     = force_offset+15
 
-    !Integer, Parameter :: viscous_pForce_r      = force_offset+25
-    !Integer, Parameter :: viscous_pForce_theta  = force_offset+26
-    !Integer, Parameter :: viscous_pForce_phi    = force_offset+27
+    Integer, Parameter :: viscous_pForce_r      = force_offset+16
+    Integer, Parameter :: viscous_pForce_theta  = force_offset+17
+    Integer, Parameter :: viscous_pForce_phi    = force_offset+18
 
-    !Integer, Parameter :: viscous_mForce_r      = force_offset+28
-    !Integer, Parameter :: viscous_mForce_theta  = force_offset+29
-    !Integer, Parameter :: viscous_mForce_phi    = force_offset+30
+    Integer, Parameter :: viscous_mForce_r      = force_offset+19
+    Integer, Parameter :: viscous_mForce_theta  = force_offset+20
+    Integer, Parameter :: viscous_mForce_phi    = force_offset+21
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
-    Integer, Parameter :: dcheck_off = force_offset+ 30 ! = 199
-    Integer, Parameter :: diagnostic1 = dcheck_off+1, diagnostic2 = dcheck_off+2
+    Integer, Parameter :: dcheck_off = force_offset+ 21 ! = 190
+    Integer, Parameter :: diagnostic1 = dcheck_off+1
+    Integer, Parameter :: diagnostic2 = dcheck_off+2
 
 
     !//////////////////////////////////////////////////////////
@@ -445,7 +446,7 @@ Module Diagnostics_Base
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
     !       This is Curl B -- rename accordingly
-    Integer, Parameter :: joffset = boffset+50 ! = 350
+    Integer, Parameter :: joffset = boffset+54 ! = 350
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
     Integer, Parameter :: jp_r = joffset+2    
@@ -473,7 +474,7 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////////////
     !           Magnetic Energies
-    Integer, Parameter :: meoffset = joffset+20 ! = 370
+    Integer, Parameter :: meoffset = joffset+20 ! = 374
 
     Integer, Parameter :: magnetic_energy = meoffset+1 ! B^2
     Integer, Parameter :: radial_me       = meoffset+2 ! {B_r}^2
@@ -496,7 +497,7 @@ Module Diagnostics_Base
     !  lorentz_coefficient * (del x B) x B 
     !  lorentz_coefficient = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
     !  j (below) is shorthand for lorentz_coefficient*delxB  (not quite the current density)
-    Integer, Parameter :: loff = joffset+12 ! =382
+    Integer, Parameter :: loff = meoffset+12 ! =386
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -525,8 +526,8 @@ Module Diagnostics_Base
     Integer, Parameter :: magnetic_torque_theta = loff+19 ! -rsintheta <B_theta><B_phi>*Lorentz_Coeff
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    Integer, Parameter :: indoff = loff + 19 ! = 401
-    ! NOTE:  The diffusion terms are not calculated at the moment
+    Integer, Parameter :: indoff = loff + 19 ! = 405
+
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
     Integer, Parameter :: induction_comp_r           = indoff+2  ! radial component of -{div dot v}B
@@ -619,11 +620,8 @@ Module Diagnostics_Base
 
 
     !///////////////////////////////////////////////////////////////////////////////////////////////
-    ! Magnetic Diffusion Terms (To Be Implemented)
+    ! Magnetic Diffusion Terms -- To Be Implemented
 
-    ! END QUANTITY CODES
-    ! END QUANTITY CODES
-    ! END QUANTITY CODES
     !/////////////////////////////////////////////////////////////////////////////////////////////
 
 

@@ -182,7 +182,11 @@ Contains
         Endif
 
         If (compute_quantity(visc_heating)) Then
-            Call Viscous_Heating_Diagnostics(buffer)
+            If (viscous_heating) Then
+                Call Viscous_Heating_Diagnostics(buffer)
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
             Call Add_Quantity(qty)
         Endif 
 

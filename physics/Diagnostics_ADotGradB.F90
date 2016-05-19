@@ -139,7 +139,7 @@ Contains
         !
         !Inputs:
         !   abuff -- 4-D array containing r,theta,phi components of A on r,theta,phi grid
-        !   bbuff -- 4-D array containing r,theta,phi, components of B and their derivatives
+        !   bbuff -- 3-D array containing r,theta,phi, components of B and their derivatives
         !               on r,theta grid
         !
         !Optional Inputs:
@@ -153,7 +153,7 @@ Contains
         !   cbuff -- buffer containing r,theta,phi components of C on an r,theta,phi grid
 
         Real*8, Intent(InOut) :: abuff(1:,my_r%min:,my_theta%min:,1:)   
-        Real*8, Intent(InOut) :: bbuff(1:,my_r%min:,my_theta%min:)   
+        Real*8, Intent(InOut) :: bbuff(my_r%min:,my_theta%min:,1:)   
         Real*8, Intent(InOut) :: cbuff(1:,my_r%min:,my_theta%min:,1:)
         Integer, Intent(In), Optional :: aindices(1:), bindices(1:), cindices(1:)
 
@@ -257,7 +257,7 @@ Contains
         !             B and C are assumed to be functions of r,theta, and phi
         !
         !Inputs:
-        !   abuff -- 4-D array containing r,theta,phi components of A on r,theta grid
+        !   abuff -- 3-D array containing r,theta,phi components of A on r,theta grid
         !   bbuff -- 4-D array containing r,theta,phi, components of B and their derivatives
         !               on r,theta,phi grid
         !
@@ -271,7 +271,7 @@ Contains
         !Outputs
         !   cbuff -- buffer containing r,theta,phi components of C on an r,theta,phi grid
 
-        Real*8, Intent(InOut) :: abuff(1:,my_r%min:,my_theta%min:)   
+        Real*8, Intent(InOut) :: abuff(my_r%min:,my_theta%min:,1:)   
         Real*8, Intent(InOut) :: bbuff(1:,my_r%min:,my_theta%min:,1:)   
         Real*8, Intent(InOut) :: cbuff(1:,my_r%min:,my_theta%min:,1:)
         Integer, Intent(In), Optional :: aindices(1:), bindices(1:), cindices(1:)
@@ -390,8 +390,8 @@ Contains
         !Outputs
         !   cbuff -- buffer containing r,theta,phi components of C on an r,theta,phi grid
 
-        Real*8, Intent(InOut) :: abuff(1:,my_r%min:,my_theta%min:)   
-        Real*8, Intent(InOut) :: bbuff(1:,my_r%min:,my_theta%min:)   
+        Real*8, Intent(InOut) :: abuff(my_r%min:,my_theta%min:,1:)   
+        Real*8, Intent(InOut) :: bbuff(my_r%min:,my_theta%min:,1:)   
         Real*8, Intent(InOut) :: cbuff(1:,my_r%min:,my_theta%min:,1:)
         Integer, Intent(In), Optional :: aindices(1:), bindices(1:), cindices(1:)
 

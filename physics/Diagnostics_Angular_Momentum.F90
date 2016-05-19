@@ -78,17 +78,29 @@ Contains
 
         If (magnetism) Then
             If (compute_quantity(maxwell_stress_r)) Then
-                qty(PSI) = -radius(r)*sintheta(t)*fbuffer(PSI,br)*fbuffer(PSI,bphi)*Lorentz_Coefficient
+                DO_PSI
+                    qty(PSI) = -radius(r)*sintheta(t)*fbuffer(PSI,br)*fbuffer(PSI,bphi)*Lorentz_Coefficient
+                END_DO
+                Call Add_Quantity(qty)
             Endif
             If (compute_quantity(maxwell_stress_theta)) Then
-                qty(PSI) = -radius(r)*sintheta(t)*fbuffer(PSI,btheta)*fbuffer(PSI,bphi)*Lorentz_Coefficient
+                DO_PSI
+                    qty(PSI) = -radius(r)*sintheta(t)*fbuffer(PSI,btheta)*fbuffer(PSI,bphi)*Lorentz_Coefficient
+                END_DO
+                Call Add_Quantity(qty)
             Endif
 
             If (compute_quantity(magnetic_torque_r)) Then
-                qty(PSI) = -radius(r)*sintheta(t)*m0_values(PSI2,br)*m0_values(PSI2,bphi)*Lorentz_Coefficient
+                DO_PSI
+                    qty(PSI) = -radius(r)*sintheta(t)*m0_values(PSI2,br)*m0_values(PSI2,bphi)*Lorentz_Coefficient
+                END_DO
+                Call Add_Quantity(qty)
             Endif
             If (compute_quantity(magnetic_torque_theta)) Then
-                qty(PSI) = -radius(r)*sintheta(t)*m0_values(PSI2,btheta)*m0_values(PSI2,bphi)*Lorentz_Coefficient
+                DO_PSI
+                    qty(PSI) = -radius(r)*sintheta(t)*m0_values(PSI2,btheta)*m0_values(PSI2,bphi)*Lorentz_Coefficient
+                END_DO
+                Call Add_Quantity(qty)
             Endif
 
 

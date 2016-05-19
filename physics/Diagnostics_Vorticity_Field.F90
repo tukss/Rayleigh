@@ -134,7 +134,7 @@ Contains
                 qty(PSI) = One_Over_R(r)*( csctheta(t)*m0_values(PSI2,dvrdp) - &
                            m0_values(PSI2,vphi) )-m0_values(PSI2,dvpdr)
             END_DO
-            Call Add_Quantity(qty)
+
             If (compute_quantity(vortm_theta)) Then
                 Call Add_Quantity(qty)
             Endif

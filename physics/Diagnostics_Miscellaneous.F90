@@ -25,6 +25,7 @@ Contains
                 qty(PSI) = sin(k*2.0d0*mypi/n_phi) &
                     & *(sintheta(t)**2)*radius(r)
             END_DO
+            Write(6,*)'Diagnostic1!', my_rank
             Call Add_Quantity(qty)
         Endif
 

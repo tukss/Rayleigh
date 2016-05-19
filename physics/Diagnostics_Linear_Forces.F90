@@ -42,7 +42,7 @@ Contains
         Endif
 
         ! -- mean buoyancy
-        If (compute_quantity(buoyancy_pforce)) Then
+        If (compute_quantity(buoyancy_mforce)) Then
             DO_PSI
                 qty(PSI) = ref%gravity_term_s(r)*(m0_values(PSI2,tvar)-&
                            & ell0_values(r,tvar))
@@ -131,17 +131,7 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
-        Integer, Parameter :: viscous_Force_r       = force_offset+22
-        Integer, Parameter :: viscous_Force_theta   = force_offset+23
-        Integer, Parameter :: viscous_Force_phi     = force_offset+24
 
-        Integer, Parameter :: viscous_pForce_r      = force_offset+25
-        Integer, Parameter :: viscous_pForce_theta  = force_offset+26
-        Integer, Parameter :: viscous_pForce_phi    = force_offset+27
-
-        Integer, Parameter :: viscous_mForce_r      = force_offset+28
-        Integer, Parameter :: viscous_mForce_theta  = force_offset+29
-        Integer, Parameter :: viscous_mForce_phi    = force_offset+30
         ! Placeholder
         ! The radial force term can be grabbed easily enough following the solve.
         ! 
@@ -214,6 +204,7 @@ Contains
                 qty(PSI) = 0.0d0
             END_DO
             Call Add_Quantity(qty)
+
         Endif
 
     End Subroutine Compute_Viscous_Force
