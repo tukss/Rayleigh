@@ -140,16 +140,17 @@ Contains
 
         Call self%openmp_init()
 		If (self%gcomm%rank .eq. 0) Then
-			Write(6,*)"////////////////////////////////////////////////////////////////////////////"
-			Write(6,*)"//                                                                        //"
-			Write(6,*)"//            Rayleigh's Parallel framework is initialized.               //"
-			Write(6,*)"//                                                                        //"
-			Write(6,*)"//                                                                        //"
-			Write(6,*)"//  We are all our hands and holders beneath this bold and brilliant Sun! //"
-			Write(6,*)"//                                                                        //"
-			Write(6,*)"//                              - The Decemberists                        //"
-			Write(6,*)"//                                                                        //"
-			Write(6,*)"////////////////////////////////////////////////////////////////////////////"
+			Write(6,*)"/////////////////////////////////////////////////////////////////////"
+			Write(6,*)"//                                                                 //"
+			Write(6,*)"//            Rayleigh's Parallel framework is initialized.        //"
+			Write(6,*)"//                                                                 //"
+			Write(6,*)"//                                                                 //"
+			Write(6,*)"//       We are all our hands and holders                          //"
+			Write(6,*)"//                  beneath this bold and brilliant Sun!           //"
+			Write(6,*)"//                                                                 //"
+			Write(6,*)"//                              - The Decemberists                 //"
+			Write(6,*)"//                                                                 //"
+			Write(6,*)"/////////////////////////////////////////////////////////////////////"
 		Endif
 	End Subroutine Initialize_Parallel_Interface
     Subroutine Broadcast_Intarr(self,intarr,src,comm_option)
