@@ -231,7 +231,7 @@ class ShellAverage:
             self.vals  = np.zeros((nr,nq,nrec),dtype='float64')
         if (self.version > 1):
             self.vals  = np.zeros((nr,4,nq,nrec),dtype='float64')
-            print 'version is: ', self.version
+            #print 'version is: ', self.version
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
 

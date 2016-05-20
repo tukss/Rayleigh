@@ -8,7 +8,6 @@ Module Test_SHT
 	Use Legendre_Transforms, Only : Legendre_Transform 
 	Use SendReceive
 	Implicit None
-	Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0	!me oh my
 	Integer :: ntest_legendre =1
 Contains
 	

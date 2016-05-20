@@ -20,15 +20,83 @@ Contains
 
 Subroutine Init_Equation_Coefficients
     Implicit None
-    Integer :: i
-    Real*8 :: amp, grav_r_ref
-    Real*8 :: lum_top, lum_bottom
+    Integer :: i, r
+    Real*8 :: amp, grav_r_ref, dr, vhint, qadd2
+    Real*8 :: lum_top, lum_bottom, sfactor, diff, r2dr, qadd
+    Real*8, Allocatable :: tmp1d(:), tmp1d2(:)
 
     !might look into moving this somewhere else, but keepit here for now.
     If (heating_type .eq. 4) Then
         lum_top = -dtdr_top*kappa(1)*four_pi*(rmax**2)
+        lum_top = lum_top*ref%density(1)*ref%temperature(1)
         lum_bottom = -dtdr_bottom*kappa(N_R)*four_pi*(rmin**2)
+        lum_bottom = lum_bottom*ref%density(N_R)*ref%temperature(N_R)
         ref%heating = ref%heating*(lum_top-lum_bottom)
+        vhint = 0.0d0
+        Do r =1,N_R
+            qadd = ref%density(r)*ref%temperature(r)*ref%heating(r)
+            vhint = vhint+radial_integral_weights(r)*qadd*shell_volume
+        Enddo
+        If (my_rank .eq. 0) Then
+            write(6,*)'vhint1 : ', vhint
+        Endif
+
+        !Now we build s_conductive (already set to zero)
+        ! This needs to be reorganized, but do it here for now
+        ! First, we build the indefinite integral of ref%heating *r^2
+        Allocate(tmp1d(1:N_R),tmp1d2(1:N_R))
+        tmp1d(:) =0.0d0
+        tmp1d2(:) = r_squared*ref%density*ref%temperature*kappa
+        sfactor = shell_volume/(four_pi)  !I think the one_third needs to be left out here
+        !vhint = 0.0d0
+        !Do r = 1,N_R
+        !    qadd = ref%heating(r)*ref%density(r)*ref%temperature(r)
+        !    vhint = vhint+qadd*
+        !Enddo
+        qadd = ref%heating(N_R)*ref%density(N_R)*ref%temperature(N_R) ! the heat
+        r2dr = radial_integral_weights(N_R)*sfactor
+        tmp1d(N_R) = qadd*r2dr
+        Do r = N_R-1, 1,-1
+            qadd = ref%heating(r)*ref%density(r)*ref%temperature(r) ! the heat
+            r2dr = radial_integral_weights(r)*sfactor !r^2 dr
+            If (r .ne. 1) Then
+                tmp1d(r) = tmp1d(r+1)+qadd*Half*r2dr  !everything from before, plus half from this point
+            Else
+                tmp1d(r) = tmp1d(r+1)+qadd*r2dr
+            Endif
+
+            If (r .ne. N_R-1) Then
+                qadd = ref%heating(r+1)*ref%density(r+1)*ref%temperature(r+1) ! the heat
+                r2dr = radial_integral_weights(r+1)*sfactor*half !r^2 dr   !half of the last point
+                tmp1d(r) = tmp1d(r)+qadd*r2dr
+            Endif
+
+            !tmp1d(r) = tmp1d(r+1)+qadd !*r2dr
+            !vhint = vhint+qadd*four_pi
+        Enddo
+        vhint = tmp1d(1)*four_pi
+        tmp1d = -tmp1d      
+        !tmp1d is now r^2kappa rho T * dSdr_cond modulu an offset determined by the BCs
+        diff = tmp1d2(N_R)*dTdr_bottom- tmp1d(N_R)
+        tmp1d = tmp1d+diff
+        tmp1d = tmp1d/tmp1d2  ! tmp1d is now dSdr_cond
+        If (my_rank .eq. 0) Then
+            Write(6,*)'rmax, rmin: ', rmax, rmin
+            Write(6,*)'dsdr bottom is: ', tmp1d(N_R)
+            Write(6,*)'dsdr top is: ', tmp1d(1)
+            Write(6,*)'vhint is : ', vhint
+            Write(6,*)'shell_volume: ', shell_volume
+            Write(6,*)'lum_top: ', lum_top
+            Write(6,*)'lum_bottom: ', lum_bottom
+            Write(6,*)'ltop - lbottom = ', lum_top - lum_bottom
+        Endif
+        !Next, build s_conductive from dsdr_cond
+        Do r = N_R-1, 1,-1
+            dr = radial_integral_weights(r+1)*sfactor/r_squared(r+1)
+            s_conductive(r) = s_conductive(r+1)+tmp1d(r+1)*dr
+        Enddo
+        
+        DeAllocate(tmp1d,tmp1d2)
     Endif
 
 

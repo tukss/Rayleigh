@@ -26,7 +26,8 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8 :: dt_by_dp, dt_by_ds, tpert
-        Integer :: r,k, t, dr, qmean
+        Integer :: r,k, t  
+        Real*8 :: dr, qadd, fpr2dr
 
         !First, the radial viscous flux of energy
         If (compute_quantity(visc_flux_r)) Then
@@ -136,14 +137,15 @@ Contains
         !The "Flux" associated with the volume heating
         If (compute_quantity(vol_heat_flux)) Then
             tmp1d(N_R) = 0.0d0
-            If (allocated(ref%heating)) Then
+            If (heating_type .gt. 0) Then
+
+                ! Note that radial_integral_weights give int{f r^2}/int(r^2}
                 Do r = N_R-1, 1,-1
-                    qmean = 0.5d0*(ref%heating(r)+ref%heating(r+1))
-                    dr    = radius(r)-radius(r+1)
-                    tmp1d(r) = tmp1d(r+1)+r_squared(r)*four_pi* &
-                      &  dr*qmean*ref%density(r)*ref%temperature(r)
+                    qadd = ref%heating(r+1)*ref%density(r)*ref%temperature(r) ! the heat
+                    fpr2dr = radial_integral_weights(r+1)*shell_volume*3.0d0 !4 pi r^2 dr
+                    tmp1d(r) = tmp1d(r+1)+qadd*fpr2dr
                 Enddo
-                tmp1d = (tmp1d(1)-tmp1d)/four_pi/r_squared
+                tmp1d = tmp1d/four_pi/r_squared
             Endif
             DO_PSI
                 qty(PSI) = tmp1d(r)
