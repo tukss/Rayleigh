@@ -55,7 +55,7 @@ Contains
 		Call Initialize_Transport_Coefficients()
         Call Initialize_Boundary_Conditions()
 
-		Call NonDimensionalize()
+		!Call NonDimensionalize()
         Call Compute_Diffusion_Coefs()
         Call Init_Equation_Coefficients()
 		Call Write_Reference(ndrf)

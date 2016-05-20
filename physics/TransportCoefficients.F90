@@ -29,7 +29,7 @@ Module TransportCoefficients
 
 	Namelist /Transport_Namelist/ nu_type, kappa_type, eta_type, nu_power, kappa_power, eta_power, &
 			& nu_top, kappa_top, eta_top, custom_nu_file, custom_eta_file, custom_kappa_file, &
-              eta_amp
+              eta_amp, hyperdiffusion, hyperdiffusion_beta, hyperdiffusion_alpha
 
 
 Contains

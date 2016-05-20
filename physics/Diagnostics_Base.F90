@@ -351,15 +351,15 @@ Module Diagnostics_Base
 
 
     !//////////////////////////////////////////////////////////
-    !/////////// Magnetic Outputs.  Start at 300 to leave room 
-    !//////////                     for additional hydro
+    !    Magnetic Outputs.  
+    !    Start at 400 to leave ample room for additional hydro
 
 
     !//////////////////////////////////////////////////
     !               Magnetic field components.
     ! Fluctuations (denoted by "p") and azimuthal means
     ! (denoted by "m") may also be output.
-    Integer, Parameter :: boffset = 300
+    Integer, Parameter :: boffset = 400
 
     !------------ Field Components ----------!
     Integer, Parameter :: b_r      = boffset+1 ! Full 

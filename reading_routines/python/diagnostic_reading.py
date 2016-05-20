@@ -177,7 +177,7 @@ class GlobalAverage:
             self.vals[i,:] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 250
+        maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):
@@ -244,7 +244,7 @@ class ShellAverage:
                 self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 250
+        maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):
@@ -307,7 +307,7 @@ class AzAverage:
             self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 250
+        maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):
@@ -374,7 +374,7 @@ class ShellSlice:
             self.vals[:,:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 250
+        maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):
@@ -448,7 +448,7 @@ class ShellSpectra:
 
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 250
+        maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):

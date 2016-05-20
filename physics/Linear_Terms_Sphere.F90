@@ -366,11 +366,7 @@ Contains
 					Call Band_Arrange(ceq,lp)
                 Endif
             Endif
-        !if (l .eq. 0) Then 
-        !    write(6,*)'//////////////////////////////////////'
-        !    write(6,*)'final!'
-        !    Call write_matrix(lp,weq)
-        !Endif
+
 		Enddo
 		DeAllocate(amp)
 		DeAllocate(H_Laplacian)

@@ -8,6 +8,7 @@ Module Equation_Coefficients
     Use Controls
     Use Math_Constants
     Use NonDimensionalization
+    Use BoundaryConditions
     Implicit None
     Real*8 :: coriolis_term
     Real*8 :: Lorentz_Coefficient
@@ -21,6 +22,14 @@ Subroutine Init_Equation_Coefficients
     Implicit None
     Integer :: i
     Real*8 :: amp, grav_r_ref
+    Real*8 :: lum_top, lum_bottom
+
+    !might look into moving this somewhere else, but keepit here for now.
+    If (heating_type .eq. 4) Then
+        lum_top = -dtdr_top*kappa(1)*four_pi*(rmax**2)
+        lum_bottom = -dtdr_bottom*kappa(N_R)*four_pi*(rmin**2)
+        ref%heating = ref%heating*(lum_top-lum_bottom)
+    Endif
 
 
     Allocate(dpdr_w_term(1:N_R))

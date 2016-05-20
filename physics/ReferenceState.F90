@@ -120,6 +120,9 @@ Contains
         Implicit None
         Real*8 :: dtmp
         Real*8, Allocatable :: dtmparr(:)
+        nondimensional_anelastic = .true.
+        dimensional = .false.
+        Write(6,*)'Setting up non-dimensional anelastic reference state'
         If (aspect_ratio .lt. 0) Then
             aspect_ratio = rmax/rmin
         Endif
@@ -150,9 +153,10 @@ Contains
         DeAllocate(dtmparr)
 
         ref%entropy(:) = 0.0d0  ! Might need to adjust this later
-           ref%dsdr(:) = 0.0d0
-            ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
-        
+        ref%dsdr(:) = 0.0d0
+        ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
+        Call Initialize_Reference_Heating()
+        Write(6,*)'Reference State Initialized'
     End Subroutine Polytropic_Reference_DevelND
 
     Subroutine Polytropic_Reference()
@@ -274,6 +278,10 @@ Contains
             Call Bouss_Reference_Heating()
         Endif
 
+        If (heating_type .eq. 4) Then
+            Call  Flux_Reference_Heating()
+        Endif
+
         !///////////////////////////////////////////////////////////
         ! Next, compute a cooling function if desired and ADD it to 
         ! whatever's in reference heating.
@@ -287,6 +295,16 @@ Contains
         Endif
 
     End Subroutine Initialize_Reference_Heating
+
+    Subroutine Flux_Reference_Heating()
+        Implicit None
+        Real*8 :: shell_volume
+        shell_volume = (four_pi/3.0d0)*(rmax**3-rmin**3)
+        ref%heating(:) = 1.0d0/shell_volume
+        ref%heating = ref%heating/(ref%density*ref%temperature)
+        !The actual value of the reference heating is adjusted 
+        ! in Equation_Coefficients.F90
+    End Subroutine Flux_Reference_Heating
 
     Subroutine Constant_Reference_Heating()
         Implicit None
