@@ -149,7 +149,7 @@ Contains
 
         !///////////////////////////////////////////
         ! 3. terms involving phi vorticity
-        If (compute_quantity(vort_phi)) Then
+        If (compute_quantity(vort_phi) .or. compute_quantity(enstrophy)) Then
             DO_PSI
                 qty(PSI) = buffer(PSI,vtheta) + buffer(PSI,dvtdr)-One_Over_R(r)*buffer(PSI,dvrdt)
             END_DO
