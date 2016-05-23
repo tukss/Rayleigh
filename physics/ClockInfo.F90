@@ -12,5 +12,5 @@ Module ClockInfo
 
 	Integer :: iteration
 	Character*8 :: t_ofmt = '(ES12.5)'	! For formatted timestep output
-
+    Logical :: output_iteration = .false.
 End Module ClockInfo

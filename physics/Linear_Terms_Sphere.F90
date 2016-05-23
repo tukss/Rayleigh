@@ -165,15 +165,20 @@ Contains
 
 		Real*8, Allocatable :: H_Laplacian(:), amp(:)
 		Integer :: l, lp
+        Real*8 :: diff_factor,ell_term
 		!rmin_norm
-
+        diff_factor = 1.0d0 ! hyperdiffusion factor (if desired, 1.0d0 is equivalent to no hyperdiffusion)
 		Allocate(amp(1:N_R))
 		Allocate(H_Laplacian(1:N_R))
 		Do lp = 1, my_nl_lm
             If (bandsolve) Call DeAllocate_LHS(lp)
             Call Allocate_LHS(lp)
 			l = my_lm_lval(lp)		
-
+ 
+            If (hyperdiffusion) Then
+                ell_term = ((l-1.0d0)/(l_max-1.0d0))**hyperdiffusion_beta
+                diff_factor = 1.0d0+hyperdiffusion_alpha*ell_term
+            Endif
 			H_Laplacian = - l_l_plus1(l) * OneOverRSquared
 			If (l .eq. 0) Then
 				!====================================================
@@ -232,17 +237,17 @@ Contains
 				Call add_implicit_term(weq,wvar, 0, amp,lp,static = .true.)	! This term does not a get a dt factor
 
 				!amp = H_Laplacian		! Diffusion
-                amp = H_Laplacian*nu
+                amp = H_Laplacian*nu*diff_factor
 				Call add_implicit_term(weq,wvar, 0, amp,lp)
 				!amp = 1.0d0
-                amp = nu
+                amp = nu*diff_factor
 				Call add_implicit_term(weq,wvar, 2, amp,lp)
 
 				! These two diffusion bits are different 
 				! depending on variation of rho and nu
-				amp = W_Diffusion_Coefs_0		
+				amp = W_Diffusion_Coefs_0*diff_factor		
 				Call add_implicit_term(weq,wvar, 0, amp,lp)
-				amp = W_Diffusion_Coefs_1
+				amp = W_Diffusion_Coefs_1*diff_factor
 				Call add_implicit_term(weq,wvar, 1, amp,lp)
 
 				!==================================================
@@ -257,22 +262,24 @@ Contains
 				amp = 1.0d0
 				Call add_implicit_term(peq,wvar, 1, amp,lp, static = .true.)	! Time independent term
 				!amp =-H_Laplacian*2.0d0/radius	
-				amp =-nu*H_Laplacian*2.0d0/radius
+				amp =-nu*H_Laplacian*2.0d0/radius*diff_factor
 				Call add_implicit_term(peq,wvar, 0, amp,lp)
                 !amp = H_Laplacian
-				amp = H_Laplacian*nu
+				amp = H_Laplacian*nu*diff_factor
 				Call add_implicit_term(peq,wvar, 1, amp,lp)
 				!amp = 1.0d0
-                amp = nu
+                amp = nu*diff_factor
 				Call add_implicit_term(peq,wvar, 3, amp,lp)
 
 
-				! Again, these two bits depend on variation of rho and nu
-				amp = dW_Diffusion_Coefs_0*H_Laplacian
+				! Again, these two bits depend on radial variation of rho and nu
+				amp = dW_Diffusion_Coefs_0*H_Laplacian*diff_factor
 				Call add_implicit_term(peq,wvar, 0, amp,lp)
-				amp = dW_Diffusion_Coefs_1
+
+				amp = dW_Diffusion_Coefs_1*diff_factor
 				Call add_implicit_term(peq,wvar, 1, amp,lp)				
-				amp = dW_Diffusion_Coefs_2	
+
+				amp = dW_Diffusion_Coefs_2*diff_factor	
 				Call add_implicit_term(peq,wvar, 2, amp,lp)
 				!====================================================
 				!			Temperature Equation
@@ -282,18 +289,18 @@ Contains
 				Call add_implicit_term(teq,tvar, 0, amp,lp, static = .true.)		! Time independent term
 
 				!amp = H_Laplacian/Pr		! Diffusion
-                amp = H_Laplacian*kappa
+                amp = H_Laplacian*kappa*diff_factor
 				Call add_implicit_term(teq,tvar, 0, amp,lp)
 				!amp = 2.0d0/radius/Pr
-				amp = 2.0d0/radius*kappa
+				amp = 2.0d0/radius*kappa*diff_factor
 				Call add_implicit_term(teq,tvar, 1, amp,lp)
 
                 ! amp = 1.0d0/Pr
-				amp = kappa
+				amp = kappa*diff_factor
 				Call add_implicit_term(teq,tvar, 2, amp,lp)
 
 				! Kappa,rho, T variation in radius
-				amp = S_Diffusion_Coefs_1          !/Pr
+				amp = S_Diffusion_Coefs_1*diff_factor         
 				Call add_implicit_term(teq,tvar,1,amp,lp)
 
                 !Reference State Advection (only do this if reference state is non-adiabatic)
@@ -308,38 +315,42 @@ Contains
 				Call add_implicit_term(zeq,zvar, 0, amp,lp, static = .true.)	! Time-independent piece
 
 				!amp = H_Laplacian
-                amp = H_Laplacian*nu
+                amp = H_Laplacian*nu*diff_factor
 				Call add_implicit_term(zeq,zvar, 0, amp,lp)				
 				!amp = 1.0d0
                 amp = nu
 				Call add_implicit_term(zeq,zvar, 2, amp,lp)				
 
 				! Variation of rho and nu
-				amp = Z_Diffusion_Coefs_0
+				amp = Z_Diffusion_Coefs_0*diff_factor
 				Call add_implicit_term(zeq,zvar, 0, amp,lp)
-				amp = Z_Diffusion_Coefs_1
+				amp = Z_Diffusion_Coefs_1*diff_factor
 				Call add_implicit_term(zeq,zvar, 1, amp,lp)
 				If (magnetism) Then
 					!=========================================
 					!  Btor Equation
 					amp = 1.0d0
 					Call add_implicit_term(aeq,avar, 0, amp,lp, static = .true.)	! Time-independent piece
-					amp = H_Laplacian*eta
+
+					amp = H_Laplacian*eta*diff_factor
 					Call add_implicit_term(aeq,avar, 0, amp,lp)					
-					amp = 1.0d0*eta
+
+					amp = 1.0d0*eta*diff_factor
 					Call add_implicit_term(aeq,avar, 2, amp,lp)	
 
 					! Eta variation in radius
-					amp = A_Diffusion_Coefs_1
+					amp = A_Diffusion_Coefs_1*diff_factor
 					Call add_implicit_term(aeq,avar,1,amp,lp)
 
 					!=========================================
 					!  Bpol Equation
 					amp = 1.0d0
 					Call add_implicit_term(ceq,cvar, 0, amp,lp, static = .true.)	! Time-independent piece
-					amp = H_Laplacian*eta
+
+					amp = H_Laplacian*eta*diff_factor
 					Call add_implicit_term(ceq,cvar, 0, amp,lp)
-					amp = 1.0d0*eta
+
+					amp = 1.0d0*eta*diff_factor
 					Call add_implicit_term(ceq,cvar, 2, amp,lp)					
 				Endif
 			
@@ -355,11 +366,7 @@ Contains
 					Call Band_Arrange(ceq,lp)
                 Endif
             Endif
-        !if (l .eq. 0) Then 
-        !    write(6,*)'//////////////////////////////////////'
-        !    write(6,*)'final!'
-        !    Call write_matrix(lp,weq)
-        !Endif
+
 		Enddo
 		DeAllocate(amp)
 		DeAllocate(H_Laplacian)

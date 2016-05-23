@@ -81,6 +81,13 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
+        If (compute_quantity(dbm_r_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbrdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
         !-- -- {1/r d(b_r)/dtheta}
         If (compute_quantity(db_r_dtr)) Then
             DO_PSI
@@ -108,12 +115,20 @@ Contains
             END_DO
             Call Add_Quantity(qty)
         Endif		
+
         If (compute_quantity(dbp_r_dprs)) Then
             DO_PSI
                 qty(PSI) = fbuffer(PSI,dbrdp)*one_over_r(r)*csctheta(t)
             END_DO
             Call Add_Quantity(qty)
         Endif	
+
+        If (compute_quantity(dbm_r_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbrdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
 
 
         !/////////////////////////////////////////
@@ -174,6 +189,13 @@ Contains
             qty(1:n_phi,:,:) = fbuffer(1:n_phi,:,:,dbtdp)
             Call Add_Quantity(qty)
         Endif		
+        If (compute_quantity(dbm_theta_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbtdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
 
         !-- -- {1/r d(b_theta)/dtheta}
         If (compute_quantity(db_theta_dtr)) Then
@@ -209,7 +231,12 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
-
+        If (compute_quantity(dbm_theta_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbtdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
 
 
 
@@ -271,6 +298,12 @@ Contains
             qty(1:n_phi,:,:) = fbuffer(1:n_phi,:,:,dbpdp)
             Call Add_Quantity(qty)
         Endif		
+        If (compute_quantity(dbm_phi_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbpdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
 
         !-- -- {1/r d(b_phi)/dtheta}
         If (compute_quantity(db_phi_dtr)) Then
@@ -305,6 +338,12 @@ Contains
             END_DO
             Call Add_Quantity(qty)
         Endif		
+        If (compute_quantity(dbm_phi_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dbpdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
 
         
     End Subroutine Compute_BField_Components

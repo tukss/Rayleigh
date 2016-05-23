@@ -14,123 +14,214 @@ Module Diagnostics_Base
     Use Fields
     Use Math_Constants
     Use ReferenceState
+    Use Equation_Coefficients
     Use TransportCoefficients
 
     Implicit None
 
     !/////////////////////////////////////////////////////////
-    !  Quantity Codes (some care must be taken to
+    !  Diagnostic Quantity Codes 
+    !  Reynolds decompositions are often used in the outputs.
+    !  As a result, some shorthand is used as follows:
+    !   "m" and "< >" denote the azimuthal OR spherical mean.
+    !   "p" and " ' " denote perturbations about that mean
 
-    ! Velocity field components.
-    ! Fluctuations (denoted by "p") and azimuthal means
-    ! (denoted by "m") may also be output.
+    !////////////////////////////////////////////////////////
+    ! Velocity field components and it's derivatives
+
     Integer, Parameter :: voffset = 0
 
-    Integer, Parameter :: v_r  = voffset+1         ! Radial velocity
-    Integer, Parameter :: vp_r = voffset+2    
-    Integer, Parameter :: vm_r = voffset+3    
+    !------------ Field Components ----------!
+    Integer, Parameter :: v_r      = voffset+1 ! Full 
+    Integer, Parameter :: v_theta  = voffset+2     
+    Integer, Parameter :: v_phi    = voffset+3          
 
-    Integer, Parameter :: dv_r_dr    = voffset+4   ! d{v_r}/dr
-    Integer, Parameter :: dvp_r_dr   = voffset+5    
-    Integer, Parameter :: dvm_r_dr   = voffset+6    
-
-    Integer, Parameter :: dv_r_dt    = voffset+7   ! d{v_r}/dtheta
-    Integer, Parameter :: dvp_r_dt   = voffset+8    
-    Integer, Parameter :: dvm_r_dt   = voffset+9    
-
-    Integer, Parameter :: dv_r_dp    = voffset+10  ! d{v_r}/dphi
-    Integer, Parameter :: dvp_r_dp   = voffset+11    
-
-    Integer, Parameter :: dv_r_dtr   = voffset+12  ! (1/r)d{v_r}/dtheta
-    Integer, Parameter :: dvp_r_dtr  = voffset+13    
-    Integer, Parameter :: dvm_r_dtr  = voffset+14    
-
-    Integer, Parameter :: dv_r_dprs  = voffset+15  ! (1/r 1/sin(theta))d{v_r}/dphi
-    Integer, Parameter :: dvp_r_dprs = voffset+16   
-
-    Integer, Parameter :: v_theta  = voffset+17        ! Theta velocity
-    Integer, Parameter :: vp_theta = voffset+18    
-    Integer, Parameter :: vm_theta = voffset+19    
-
-    Integer, Parameter :: dv_theta_dr    = voffset+20  ! d{v_theta}/dr
-    Integer, Parameter :: dvp_theta_dr   = voffset+21    
-    Integer, Parameter :: dvm_theta_dr   = voffset+22    
-
-    Integer, Parameter :: dv_theta_dt    = voffset+23  ! d{v_theta}/dtheta
-    Integer, Parameter :: dvp_theta_dt   = voffset+24    
-    Integer, Parameter :: dvm_theta_dt   = voffset+25    
-
-    Integer, Parameter :: dv_theta_dp    = voffset+26  ! d{v_theta}/dphi
-    Integer, Parameter :: dvp_theta_dp   = voffset+27    
-
-    Integer, Parameter :: dv_theta_dtr   = voffset+28  ! (1/r)d{v_theta}/dtheta
-    Integer, Parameter :: dvp_theta_dtr  = voffset+29    
-    Integer, Parameter :: dvm_theta_dtr  = voffset+30    
-
-    Integer, Parameter :: dv_theta_dprs  = voffset+31  ! (1/r 1/sin(theta))d{v_theta}/dphi
-    Integer, Parameter :: dvp_theta_dprs = voffset+32   
+    Integer, Parameter :: vp_r     = voffset+4 ! Fluctuating 
+    Integer, Parameter :: vp_theta = voffset+5     
+    Integer, Parameter :: vp_phi   = voffset+6    
 
 
-    Integer, Parameter :: v_phi  = voffset+33        ! Phi velocity
-    Integer, Parameter :: vp_phi = voffset+34    
-    Integer, Parameter :: vm_phi = voffset+35    
+    Integer, Parameter :: vm_r     = voffset+7 ! Mean
+    Integer, Parameter :: vm_theta = voffset+8     
+    Integer, Parameter :: vm_phi   = voffset+9    
 
-    Integer, Parameter :: dv_phi_dr    = voffset+36  ! d{v_phi}/dr
-    Integer, Parameter :: dvp_phi_dr   = voffset+37    
-    Integer, Parameter :: dvm_phi_dr   = voffset+38    
+    !------------ Radial Derivatives -------------!
+    Integer, Parameter :: dv_r_dr      = voffset+10 ! Full 
+    Integer, Parameter :: dv_theta_dr  = voffset+11  
+    Integer, Parameter :: dv_phi_dr    = voffset+12   
 
-    Integer, Parameter :: dv_phi_dt    = voffset+39  ! d{v_phi}/dtheta
-    Integer, Parameter :: dvp_phi_dt   = voffset+40    
-    Integer, Parameter :: dvm_phi_dt   = voffset+41    
+    Integer, Parameter :: dvp_r_dr     = voffset+13 ! Fluctuating 
+    Integer, Parameter :: dvp_theta_dr = voffset+14  
+    Integer, Parameter :: dvp_phi_dr   = voffset+15    
+  
+    Integer, Parameter :: dvm_r_dr     = voffset+16 ! Mean    
+    Integer, Parameter :: dvm_theta_dr = voffset+17  
+    Integer, Parameter :: dvm_phi_dr   = voffset+18    
 
-    Integer, Parameter :: dv_phi_dp    = voffset+42  ! d{v_phi}/dphi
-    Integer, Parameter :: dvp_phi_dp   = voffset+43    
+    !------------ Theta Derivatives --------------!
+    Integer, Parameter :: dv_r_dt      = voffset+19 ! Full 
+    Integer, Parameter :: dv_theta_dt  = voffset+20  
+    Integer, Parameter :: dv_phi_dt    = voffset+21   
 
-    Integer, Parameter :: dv_phi_dtr   = voffset+44  ! (1/r)d{v_phi}/dtheta
-    Integer, Parameter :: dvp_phi_dtr  = voffset+45    
-    Integer, Parameter :: dvm_phi_dtr  = voffset+46    
+    Integer, Parameter :: dvp_r_dt     = voffset+22 ! Fluctuating 
+    Integer, Parameter :: dvp_theta_dt = voffset+23    
+    Integer, Parameter :: dvp_phi_dt   = voffset+24    
 
-    Integer, Parameter :: dv_phi_dprs  = voffset+47  ! (1/r 1/sin(theta))d{v_phi}/dphi
-    Integer, Parameter :: dvp_phi_dprs = voffset+48   
+    Integer, Parameter :: dvm_r_dt     = voffset+25 ! Mean 
+    Integer, Parameter :: dvm_theta_dt = voffset+26   
+    Integer, Parameter :: dvm_phi_dt   = voffset+27     
+
+    !------------ Phi Derivatives ----------------!
+    Integer, Parameter :: dv_r_dp      = voffset+28  ! Full
+    Integer, Parameter :: dv_theta_dp  = voffset+29
+    Integer, Parameter :: dv_phi_dp    = voffset+30
+
+    Integer, Parameter :: dvp_r_dp     = voffset+31 ! Fluctuating
+    Integer, Parameter :: dvp_theta_dp = voffset+32 ! (same as full if    
+    Integer, Parameter :: dvp_phi_dp   = voffset+33 !  mean is azimuthal)
+
+    Integer, Parameter :: dvm_r_dp     = voffset+34 ! We keep the phi derivatives of the mean    
+    Integer, Parameter :: dvm_theta_dp = voffset+35 ! here, even though they are zero.
+    Integer, Parameter :: dvm_phi_dp   = voffset+36 ! Somewhat useful placeholders...
+
+    !------------ (1/r) * Theta Derivatives -------!
+    Integer, Parameter :: dv_r_dtr      = voffset+37 ! Full 
+    Integer, Parameter :: dv_theta_dtr  = voffset+38 
+    Integer, Parameter :: dv_phi_dtr    = voffset+39   
+
+    Integer, Parameter :: dvp_r_dtr     = voffset+40 ! Fluctuating
+    Integer, Parameter :: dvp_theta_dtr = voffset+41
+    Integer, Parameter :: dvp_phi_dtr   = voffset+42
+
+    Integer, Parameter :: dvm_r_dtr     = voffset+43 ! Mean  
+    Integer, Parameter :: dvm_theta_dtr = voffset+44
+    Integer, Parameter :: dvm_phi_dtr   = voffset+45
 
 
-    Integer, Parameter :: rhov_r      = voffset+49
-    Integer, Parameter :: rhovp_r     = voffset+50
-    Integer, Parameter :: rhovm_r     = voffset+51
+    !------(1/{r sintheta})* Phi Derivatives ---!
 
-    Integer, Parameter :: rhov_theta  = voffset+52
-    Integer, Parameter :: rhovp_theta = voffset+53
-    Integer, Parameter :: rhovm_theta = voffset+54
+    Integer, Parameter :: dv_r_dprs      = voffset+46 ! Full
+    Integer, Parameter :: dv_theta_dprs  = voffset+47  
+    Integer, Parameter :: dv_phi_dprs    = voffset+48
 
-    Integer, Parameter :: rhov_phi    = voffset+55
-    Integer, Parameter :: rhovp_phi   = voffset+56
-    Integer, Parameter :: rhovm_phi   = voffset+57
+    Integer, Parameter :: dvp_r_dprs     = voffset+49 ! Fluctuating   
+    Integer, Parameter :: dvp_theta_dprs = voffset+50
+    Integer, Parameter :: dvp_phi_dprs   = voffset+51
+ 
+    Integer, Parameter :: dvm_r_dprs     = voffset+52 ! Mean   
+    Integer, Parameter :: dvm_theta_dprs = voffset+53
+    Integer, Parameter :: dvm_phi_dprs   = voffset+54  
+
+    !------------ Mass Flux ---------------------!
+    Integer, Parameter :: rhov_r      = voffset+55 ! Full 
+    Integer, Parameter :: rhov_theta  = voffset+56
+    Integer, Parameter :: rhov_phi    = voffset+57
+
+    Integer, Parameter :: rhovp_r     = voffset+58 ! Fluctuating 
+    Integer, Parameter :: rhovp_theta = voffset+59
+    Integer, Parameter :: rhovp_phi   = voffset+60
+
+    Integer, Parameter :: rhovm_r     = voffset+61 ! Mean
+    Integer, Parameter :: rhovm_theta = voffset+62
+    Integer, Parameter :: rhovm_phi   = voffset+63
+
+
+    !//////////////////////////////////////////////////////////////////
+    !  Pressure, Entropy or Temperature, and Their Derivatives
+    !  Note:  In Boussinesq Mode, Temperature is Output Instead of Entropy
+    Integer, Parameter :: pt_off = voffset+63 ! = 63
+
+    !------------ Fields ---------------------!    
+    Integer, Parameter :: entropy    = pt_off+1 ! Full
+    Integer, Parameter :: pressure   = pt_off+2
+
+    Integer, Parameter :: entropy_p  = pt_off+3 ! Fluctuating
+    Integer, Parameter :: pressure_p = pt_off+4
+
+    Integer, Parameter :: entropy_m  = pt_off+5 ! Mean
+    Integer, Parameter :: pressure_m = pt_off+6
+
+    !------------ Radial Derivatives --------------!
+    Integer, Parameter :: entropy_dr     = pt_off+7  ! Full
+    Integer, Parameter :: pressure_dr    = pt_off+8
+
+    Integer, Parameter :: entropy_p_dr   = pt_off+9  ! Fluctuating
+    Integer, Parameter :: pressure_p_dr  = pt_off+10
+
+    Integer, Parameter :: entropy_m_dr   = pt_off+11 ! Mean
+    Integer, Parameter :: pressure_m_dr = pt_off+12
+
+    !------------ Theta Derivatives ---------------!
+    Integer, Parameter :: entropy_dtheta     = pt_off+13 ! Full
+    Integer, Parameter :: pressure_dtheta    = pt_off+14
+
+    Integer, Parameter :: entropy_p_dtheta   = pt_off+15 ! Fluctuating
+    Integer, Parameter :: pressure_p_dtheta  = pt_off+16
+
+    Integer, Parameter :: entropy_m_dtheta   = pt_off+17 ! Mean
+    Integer, Parameter :: pressure_m_dtheta = pt_off+18
+
+    !------------ Phi Derivatives -----------------!
+    Integer, Parameter :: entropy_dphi     = pt_off+19 ! Full
+    Integer, Parameter :: pressure_dphi    = pt_off+20
+
+    Integer, Parameter :: entropy_p_dphi   = pt_off+21 ! Fluctuating
+    Integer, Parameter :: pressure_p_dphi  = pt_off+22
+
+    Integer, Parameter :: entropy_m_dphi   = pt_off+23 ! Mean
+    Integer, Parameter :: pressure_m_dphi = pt_off+24
+
+    !------------ (1/r) * Theta Derivatives --------!
+    Integer, Parameter :: entropy_dtr     = pt_off+25 ! Full
+    Integer, Parameter :: pressure_dtr    = pt_off+26
+
+    Integer, Parameter :: entropy_p_dtr   = pt_off+27 ! Fluctuating
+    Integer, Parameter :: pressure_p_dtr  = pt_off+28
+
+    Integer, Parameter :: entropy_m_dtr   = pt_off+29 ! Mean
+    Integer, Parameter :: pressure_m_dtr  = pt_off+30
+
+    !--- (1/{r sintheta}) * Phi Derivatives ---------!
+    Integer, Parameter :: entropy_dprs     = pt_off+31 ! Full
+    Integer, Parameter :: pressure_dprs    = pt_off+32
+
+    Integer, Parameter :: entropy_p_dprs   = pt_off+33 ! Fluctuating
+    Integer, Parameter :: pressure_p_dprs  = pt_off+34
+
+    Integer, Parameter :: entropy_m_dprs   = pt_off+35 ! Mean
+    Integer, Parameter :: pressure_m_dprs  = pt_off+36
+
+    !--------- Also compute terms of the form rho_bar d_by_dr(P/rho_bar)
+    Integer, Parameter :: rhopressure_dr  = pt_off+37
+    Integer, Parameter :: rhopressurep_dr = pt_off+38
+    Integer, Parameter :: rhopressurem_dr = pt_off+39
 
     !//////////////////////////////////////////////////////////////////////////
     !///////////////////////////////////////////////////
     !       Vorticity Outputs
-    Integer, Parameter :: vort_off = 57
+    Integer, Parameter :: vort_off = pt_off+39 ! = 102
 
-    Integer, Parameter :: vort_r  = vort_off+1      ! Radial
-    Integer, Parameter :: vortp_r = vort_off+2    
-    Integer, Parameter :: vortm_r = vort_off+3 
+    Integer, Parameter :: vort_r      = vort_off+1  ! Full
+    Integer, Parameter :: vort_theta  = vort_off+2
+    Integer, Parameter :: vort_phi    = vort_off+3
 
-    Integer, Parameter :: vort_theta  = vort_off+4  ! Theta Vorticity
-    Integer, Parameter :: vortp_theta = vort_off+5    
-    Integer, Parameter :: vortm_theta = vort_off+6 
+    Integer, Parameter :: vortp_r     = vort_off+4  ! Fluctuating   
+    Integer, Parameter :: vortp_theta = vort_off+5
+    Integer, Parameter :: vortp_phi   = vort_off+6
 
-    Integer, Parameter :: vort_phi  = vort_off+7    ! Phi Vorticity
-    Integer, Parameter :: vortp_phi = vort_off+8    
-    Integer, Parameter :: vortm_phi = vort_off+9 
+    Integer, Parameter :: vortm_r     = vort_off+7  ! Mean 
+    Integer, Parameter :: vortm_theta = vort_off+8
+    Integer, Parameter :: vortm_phi   = vort_off+9
 
-    Integer, Parameter :: enstrophy   = vort_off+10 ! Enstrophy
-    Integer, Parameter :: enstrophypm = vort_off+11
-    Integer, Parameter :: enstrophymm = vort_off+12
-    Integer, Parameter :: enstropypp  = vort_off+13
+    Integer, Parameter :: enstrophy    = vort_off+10 ! Enstrophy
+    Integer, Parameter :: enstrophy_pm = vort_off+11 ! (fluctuating-mean)
+    Integer, Parameter :: enstrophy_mm = vort_off+12 ! (mean-mean)
+    Integer, Parameter :: enstrophy_pp  = vort_off+13 ! (fluct-fluct)
+
 
     !//////////////////////////////////////////////////////////
     !               Radial Energy Fluxes
-    Integer, Parameter :: eoffset = 70
+    Integer, Parameter :: eoffset = vort_off+ 13 ! =115
     Integer, Parameter :: ecrossb_r            = eoffset+1 ! [ExB]_r (un-normalized Poynting flux)
     Integer, Parameter :: ke_flux_radial       = eoffset+2 ! vr*KE
     Integer, Parameter :: thermalE_flux_radial = eoffset+3 ! vr*rho_bar*T_bar*S OR vr*T
@@ -139,42 +230,65 @@ Module Diagnostics_Base
     Integer, Parameter :: vol_heat_flux        = eoffset+6 ! "Flux" associated with volumetric heating
     Integer, Parameter :: cond_flux_r          = eoffset+7 ! Thermal conductive flux
     Integer, Parameter :: vol_heating          = eoffset+8 ! Volumetric Heating Function
+    Integer, Parameter :: visc_heating         = eoffset+9 ! Viscous Heating
+
+
+    !///////////////////////////////////////////////////////////
+    !           Kinetic Energies
+    Integer, Parameter :: keoffset = eoffset+9 ! = 124
+    Integer, Parameter :: kinetic_energy = keoffset+1   ! 1/2 rho_bar v^2
+    Integer, Parameter :: radial_ke      = keoffset+2   ! 1/2 rho_bar {v_r}^2
+    Integer, Parameter :: theta_ke       = keoffset+3   ! 1/2 rho_bar {v_theta}^2
+    Integer, Parameter :: phi_ke         = keoffset+4   ! 1/2 rho_bar {v_phi}^2
+
+    Integer, Parameter :: mkinetic_energy = keoffset+5 ! 1/2 rho_bar <v>^2
+    Integer, Parameter :: radial_mke      = keoffset+6 ! 1/2 rho_bar <v_r>^2
+    Integer, Parameter :: theta_mke       = keoffset+7 ! 1/2 rho_bar <v_theta>^2
+    Integer, Parameter :: phi_mke         = keoffset+8 ! 1/2 rho_bar <v_phi>^2
+
+    Integer, Parameter :: pkinetic_energy = keoffset+9  ! 1/2 rho_bar {v'}^2
+    Integer, Parameter :: radial_pke      = keoffset+10 ! 1/2 rho_bar {v_r'}^2
+    Integer, Parameter :: theta_pke       = keoffset+11 ! 1/2 rho_bar {v_theta'}^2
+    Integer, Parameter :: phi_pke         = keoffset+12 ! 1/2 rho_bar {v_phi'}^2
+
+    !--- Since density varies with radius, it may be useful to output the 
+    !--- squared fields, sans density, as well.
+    Integer, Parameter :: vsq         = keoffset+13   ! v^2
+    Integer, Parameter :: radial_vsq  = keoffset+14   ! {v_r}^2
+    Integer, Parameter :: theta_vsq   = keoffset+15   ! {v_theta}^2
+    Integer, Parameter :: phi_vsq     = keoffset+16   ! {v_phi}^2
+
+    Integer, Parameter :: mvsq        = keoffset+17   ! <v>^2
+    Integer, Parameter :: radial_mvsq = keoffset+18   ! <v_r>^2
+    Integer, Parameter :: theta_mvsq  = keoffset+19   ! <v_theta>^2
+    Integer, Parameter :: phi_mvsq    = keoffset+20   ! <v_phi>^2
+
+    Integer, Parameter :: pvsq        = keoffset+21   ! {v'}^2
+    Integer, Parameter :: radial_pvsq = keoffset+22   ! {v_r'}^2
+    Integer, Parameter :: theta_pvsq  = keoffset+23   ! {v_theta'}^2
+    Integer, Parameter :: phi_pvsq    = keoffset+24   ! {v_phi'}^2
 
 
 
-    !/////////////////////////////////////////////////////////////
-    ! Temperature, Pressure, and their derivatives
-    Integer, Parameter :: tpoffset = 80
-    Integer, Parameter :: Temperature = tpoffset+1
-    Integer, Parameter :: Pressure = tpoffset+2
 
-    Integer, Parameter :: v_sq = tpoffset+3, kinetic_energy = tpoffset+4
-    Integer, Parameter :: gradt_r = tpoffset+5
-    Integer, Parameter :: zonal_ke = tpoffset+6, merid_ke = tpoffset+7
-
-
-
-    Integer, Parameter :: radial_ke = tpoffset+8
-
-    Integer, Parameter :: buoyancy_work = tpoffset+9
-
-
-
+    !///////////////////////////////////////////////////////////////////////////////////
     !Angular Momentum Transport Diagnostics
-    Integer, Parameter :: amoff = 90
-    Integer, Parameter :: amom_fluct_r = amoff+1, amom_fluct_theta = amoff+2, &
-         amom_dr_r = amoff+3, amom_dr_theta = amoff+4, amom_mean_r = amoff+5, &
-         amom_mean_theta = amoff+6
+    !  Reynolds decomposition of the azimuthally-averaged angular momentum fluxes.
+    Integer, Parameter :: amoff = keoffset+ 24        ! = 148
+    Integer, Parameter :: amom_fluct_r     = amoff+1 ! rho_bar * r * sintheta * {v_r'} * {v_phi'}
+    Integer, Parameter :: amom_fluct_theta = amoff+2 ! rho_bar * r * sintheta * {v_theta'} * {v_phi'}
+    Integer, Parameter :: amom_dr_r        = amoff+3 ! rho_bar * r * sintheta * <v_r> * <v_phi>
+    Integer, Parameter :: amom_dr_theta    = amoff+4 ! rho_bar * r * sintheta * <v_theta> * <v_phi>
+    Integer, Parameter :: amom_mean_r      = amoff+5 ! rho_bar * r^2 * sintheta^2 * <v_r> * Omega
+    Integer, Parameter :: amom_mean_theta  = amoff+6 ! rho_bar * r^2 * sintheta^2 * <v_theta> * Omega
 
-
+    ! Quantity codes for magnetic torques are defined with the Lorentz Forces
 
     !////////////////////////  Advection Terms ////////////////////
     ! Reynolds decomposition about the azimuthal mean may also be output
-    ! "m" and "< >" denote the azimuthal mean.
-    ! "p" and " ' " denote perturbations about the azimuthal mean 
     ! NOTE:  ADVECTION TERMS ARE SCALED BY DENSITY (so that they represent a force density)
 
-    Integer, Parameter :: vgv = 100  ! Output offset for advection terms  
+    Integer, Parameter :: vgv = amoff+6 ! = 154    ! Output offset for advection terms  
     Integer, Parameter :: v_grad_v_r       = vgv+1 ! radial component of v dot grad v
     Integer, Parameter :: v_grad_v_theta   = vgv+2 !  theta component of v dot grad v
     Integer, Parameter :: v_grad_v_phi     = vgv+3 !    phi component of v dot grad v
@@ -194,93 +308,145 @@ Module Diagnostics_Base
     Integer, Parameter :: vm_grad_vm_r     = vgv+13 ! radial component of <v> dot grad <v>
     Integer, Parameter :: vm_grad_vm_theta = vgv+14 !  theta component of <v> dot grad <v>
     Integer, Parameter :: vm_grad_vm_phi   = vgv+15 !    phi component of <v> dot grad <v>
+
+    !/////////////////////////////////////////////////////////////
+    !  Linear Forces 
+    !  Note:  the pressure gradient diagnostic codes are  above
+    Integer, Parameter :: force_offset = vgv+15 ! 169
+
+    Integer, Parameter :: buoyancy_force  =  force_offset+1
+    Integer, Parameter :: buoyancy_pforce =  force_offset+2
+    Integer, Parameter :: buoyancy_mforce =  force_offset+3
+
+    Integer, Parameter :: Coriolis_Force_r      = force_offset+4
+    Integer, Parameter :: Coriolis_Force_theta  = force_offset+5
+    Integer, Parameter :: Coriolis_Force_phi    = force_offset+6
+
+    Integer, Parameter :: Coriolis_pForce_r     = force_offset+7
+    Integer, Parameter :: Coriolis_pForce_theta = force_offset+8
+    Integer, Parameter :: Coriolis_pForce_phi   = force_offset+9
+
+    Integer, Parameter :: Coriolis_mForce_r     = force_offset+10
+    Integer, Parameter :: Coriolis_mForce_theta = force_offset+11
+    Integer, Parameter :: Coriolis_mForce_phi   = force_offset+12
+
+    ! Viscous forces - in development    
+    Integer, Parameter :: viscous_Force_r       = force_offset+13
+    Integer, Parameter :: viscous_Force_theta   = force_offset+14
+    Integer, Parameter :: viscous_Force_phi     = force_offset+15
+
+    Integer, Parameter :: viscous_pForce_r      = force_offset+16
+    Integer, Parameter :: viscous_pForce_theta  = force_offset+17
+    Integer, Parameter :: viscous_pForce_phi    = force_offset+18
+
+    Integer, Parameter :: viscous_mForce_r      = force_offset+19
+    Integer, Parameter :: viscous_mForce_theta  = force_offset+20
+    Integer, Parameter :: viscous_mForce_phi    = force_offset+21
          
     ! We have some "known" outputs as well that allow us to verify that
     ! the spherical_io interface is functional
-    Integer, Parameter :: diagnostic1 = 129, diagnostic2 = 130
-    ! We also have some comparison outputs for checking the moments
-    Integer, Parameter :: vr2 = 131, vt2 = 132, vp2 = 133
-    Integer, Parameter :: vr3 = 134, vt3 = 135, vp3 = 136
+    Integer, Parameter :: dcheck_off = force_offset+ 21 ! = 190
+    Integer, Parameter :: diagnostic1 = dcheck_off+1
+    Integer, Parameter :: diagnostic2 = dcheck_off+2
 
-    !/////////// Magnetic Outputs.  Start at 200 to organization room for hydro
+
+    !//////////////////////////////////////////////////////////
+    !    Magnetic Outputs.  
+    !    Start at 400 to leave ample room for additional hydro
 
 
     !//////////////////////////////////////////////////
     !               Magnetic field components.
     ! Fluctuations (denoted by "p") and azimuthal means
     ! (denoted by "m") may also be output.
-    Integer, Parameter :: boffset = 200
+    Integer, Parameter :: boffset = 400
 
-    Integer, Parameter :: b_r  = boffset+1             ! Radial Bfield
-    Integer, Parameter :: bp_r = boffset+2    
-    Integer, Parameter :: bm_r = boffset+3    
+    !------------ Field Components ----------!
+    Integer, Parameter :: b_r      = boffset+1 ! Full 
+    Integer, Parameter :: b_theta  = boffset+2     
+    Integer, Parameter :: b_phi    = boffset+3          
 
-    Integer, Parameter :: db_r_dr    = boffset+4       ! d{b_r}/dr
-    Integer, Parameter :: dbp_r_dr   = boffset+5    
-    Integer, Parameter :: dbm_r_dr   = boffset+6    
+    Integer, Parameter :: bp_r     = boffset+4 ! Fluctuating 
+    Integer, Parameter :: bp_theta = boffset+5     
+    Integer, Parameter :: bp_phi   = boffset+6    
 
-    Integer, Parameter :: db_r_dt    = boffset+7       ! d{b_r}/dtheta
-    Integer, Parameter :: dbp_r_dt   = boffset+8    
-    Integer, Parameter :: dbm_r_dt   = boffset+9    
 
-    Integer, Parameter :: db_r_dp    = boffset+10      ! d{b_r}/dphi
-    Integer, Parameter :: dbp_r_dp   = boffset+11    
+    Integer, Parameter :: bm_r     = boffset+7 ! Mean
+    Integer, Parameter :: bm_theta = boffset+8     
+    Integer, Parameter :: bm_phi   = boffset+9    
 
-    Integer, Parameter :: db_r_dtr   = boffset+12      ! (1/r)d{b_r}/dtheta
-    Integer, Parameter :: dbp_r_dtr  = boffset+13    
-    Integer, Parameter :: dbm_r_dtr  = boffset+14    
+    !------------ Radial Derivatives -------------!
+    Integer, Parameter :: db_r_dr      = boffset+10 ! Full 
+    Integer, Parameter :: db_theta_dr  = boffset+11  
+    Integer, Parameter :: db_phi_dr    = boffset+12   
 
-    Integer, Parameter :: db_r_dprs  = boffset+15      ! (1/r 1/sin(theta))d{b_r}/dphi
-    Integer, Parameter :: dbp_r_dprs = boffset+16   
+    Integer, Parameter :: dbp_r_dr     = boffset+13 ! Fluctuating 
+    Integer, Parameter :: dbp_theta_dr = boffset+14  
+    Integer, Parameter :: dbp_phi_dr   = boffset+15    
+  
+    Integer, Parameter :: dbm_r_dr     = boffset+16 ! Mean    
+    Integer, Parameter :: dbm_theta_dr = boffset+17  
+    Integer, Parameter :: dbm_phi_dr   = boffset+18    
 
-    Integer, Parameter :: b_theta  = boffset+17        ! Theta Bfield
-    Integer, Parameter :: bp_theta = boffset+18    
-    Integer, Parameter :: bm_theta = boffset+19    
+    !------------ Theta Derivatives --------------!
+    Integer, Parameter :: db_r_dt      = boffset+19 ! Full 
+    Integer, Parameter :: db_theta_dt  = boffset+20  
+    Integer, Parameter :: db_phi_dt    = boffset+21   
 
-    Integer, Parameter :: db_theta_dr    = boffset+20  ! d{b_theta}/dr
-    Integer, Parameter :: dbp_theta_dr   = boffset+21    
-    Integer, Parameter :: dbm_theta_dr   = boffset+22    
+    Integer, Parameter :: dbp_r_dt     = boffset+22 ! Fluctuating 
+    Integer, Parameter :: dbp_theta_dt = boffset+23    
+    Integer, Parameter :: dbp_phi_dt   = boffset+24    
 
-    Integer, Parameter :: db_theta_dt    = boffset+23  ! d{b_theta}/dtheta
-    Integer, Parameter :: dbp_theta_dt   = boffset+24    
-    Integer, Parameter :: dbm_theta_dt   = boffset+25    
+    Integer, Parameter :: dbm_r_dt     = boffset+25 ! Mean 
+    Integer, Parameter :: dbm_theta_dt = boffset+26   
+    Integer, Parameter :: dbm_phi_dt   = boffset+27     
 
-    Integer, Parameter :: db_theta_dp    = boffset+26  ! d{b_theta}/dphi
-    Integer, Parameter :: dbp_theta_dp   = boffset+27    
+    !------------ Phi Derivatives ----------------!
+    Integer, Parameter :: db_r_dp      = boffset+28  ! Full
+    Integer, Parameter :: db_theta_dp  = boffset+29
+    Integer, Parameter :: db_phi_dp    = boffset+30
 
-    Integer, Parameter :: db_theta_dtr   = boffset+28  ! (1/r)d{b_theta}/dtheta
-    Integer, Parameter :: dbp_theta_dtr  = boffset+29    
-    Integer, Parameter :: dbm_theta_dtr  = boffset+30    
+    Integer, Parameter :: dbp_r_dp     = boffset+31 ! Fluctuating
+    Integer, Parameter :: dbp_theta_dp = boffset+32 ! (same as full if    
+    Integer, Parameter :: dbp_phi_dp   = boffset+33 !  mean is azimuthal)
 
-    Integer, Parameter :: db_theta_dprs  = boffset+31  ! (1/r 1/sin(theta))d{b_theta}/dphi
-    Integer, Parameter :: dbp_theta_dprs = boffset+32   
+    Integer, Parameter :: dbm_r_dp     = boffset+34 ! Mean    
+    Integer, Parameter :: dbm_theta_dp = boffset+35 ! (nonzero only when mean is 
+    Integer, Parameter :: dbm_phi_dp   = boffset+36 !  spherical, not azimuthal)
 
-    Integer, Parameter :: b_phi  = boffset+33          ! Phi Bfield
-    Integer, Parameter :: bp_phi = boffset+34    
-    Integer, Parameter :: bm_phi = boffset+35    
+    !------------ (1/r) * Theta Derivatives -------!
+    Integer, Parameter :: db_r_dtr      = boffset+37 ! Full 
+    Integer, Parameter :: db_theta_dtr  = boffset+38 
+    Integer, Parameter :: db_phi_dtr    = boffset+39   
 
-    Integer, Parameter :: db_phi_dr    = boffset+36    ! d{b_phi}/dr
-    Integer, Parameter :: dbp_phi_dr   = boffset+37    
-    Integer, Parameter :: dbm_phi_dr   = boffset+38    
+    Integer, Parameter :: dbp_r_dtr     = boffset+40 ! Fluctuating
+    Integer, Parameter :: dbp_theta_dtr = boffset+41
+    Integer, Parameter :: dbp_phi_dtr   = boffset+42
 
-    Integer, Parameter :: db_phi_dt    = boffset+39    ! d{b_phi}/dtheta
-    Integer, Parameter :: dbp_phi_dt   = boffset+40    
-    Integer, Parameter :: dbm_phi_dt   = boffset+41    
+    Integer, Parameter :: dbm_r_dtr     = boffset+43 ! Mean  
+    Integer, Parameter :: dbm_theta_dtr = boffset+44
+    Integer, Parameter :: dbm_phi_dtr   = boffset+45
 
-    Integer, Parameter :: db_phi_dp    = boffset+42    ! d{b_phi}/dphi
-    Integer, Parameter :: dbp_phi_dp   = boffset+43    
 
-    Integer, Parameter :: db_phi_dtr   = boffset+44    ! (1/r)d{b_phi}/dtheta
-    Integer, Parameter :: dbp_phi_dtr  = boffset+45    
-    Integer, Parameter :: dbm_phi_dtr  = boffset+46    
+    !------(1/{r sintheta})* Phi Derivatives ---!
 
-    Integer, Parameter :: db_phi_dprs  = boffset+47    ! (1/r 1/sin(theta))d{b_phi}/dphi
-    Integer, Parameter :: dbp_phi_dprs = boffset+48   
+    Integer, Parameter :: db_r_dprs      = boffset+46 ! Full
+    Integer, Parameter :: db_theta_dprs  = boffset+47  
+    Integer, Parameter :: db_phi_dprs    = boffset+48
+
+    Integer, Parameter :: dbp_r_dprs     = boffset+49 ! Fluctuating   
+    Integer, Parameter :: dbp_theta_dprs = boffset+50
+    Integer, Parameter :: dbp_phi_dprs   = boffset+51
+ 
+    Integer, Parameter :: dbm_r_dprs     = boffset+52 ! Mean   
+    Integer, Parameter :: dbm_theta_dprs = boffset+53
+    Integer, Parameter :: dbm_phi_dprs   = boffset+54  
 
 
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
-    Integer, Parameter :: joffset = 250
+    !       This is Curl B -- rename accordingly
+    Integer, Parameter :: joffset = boffset+54 ! = 350
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
     Integer, Parameter :: jp_r = joffset+2    
@@ -306,14 +472,32 @@ Module Diagnostics_Base
     Integer, Parameter :: ohmic_heat_pp = joffset+19 ! eta{  j' dot  j'}
     Integer, Parameter :: ohmic_heat_mm = joffset+20 ! eta{ <j> dot <j>}
 
+    !///////////////////////////////////////////////////////////
+    !           Magnetic Energies
+    Integer, Parameter :: meoffset = joffset+20 ! = 374
 
-    Integer, Parameter :: B_sq = 207, magnetic_energy=208, zonal_me = 209
-    Integer, Parameter :: merid_me = 210, b_r2 = 211, b_theta2 = 212, b_phi2 = 213
+    Integer, Parameter :: magnetic_energy = meoffset+1 ! B^2
+    Integer, Parameter :: radial_me       = meoffset+2 ! {B_r}^2
+    Integer, Parameter :: theta_me        = meoffset+3 ! {B_theta}^2
+    Integer, Parameter :: phi_me        = meoffset+4 ! {B_phi}^2
+
+    Integer, Parameter :: mmagnetic_energy = meoffset+5 ! <B>^2
+    Integer, Parameter :: radial_mme       = meoffset+6 ! <B_r>^2
+    Integer, Parameter :: theta_mme        = meoffset+7 ! <B_theta>^2
+    Integer, Parameter :: phi_mme        = meoffset+8 ! <B_phi>^2
+
+    Integer, Parameter :: pmagnetic_energy = meoffset+9  ! {B'}^2
+    Integer, Parameter :: radial_pme       = meoffset+10 ! {B_r'}^2
+    Integer, Parameter :: theta_pme        = meoffset+11 ! {B_theta'}^2
+    Integer, Parameter :: phi_pme        = meoffset+12 ! {B_phi'}^2
+
+
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
-    ! "m" and "< >" denote the azimuthal mean.
-    ! "p" and " ' " denote perturbations about the azimuthal mean 
-    Integer, Parameter :: loff = 220
+    !  lorentz_coefficient * (del x B) x B 
+    !  lorentz_coefficient = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
+    !  j (below) is shorthand for lorentz_coefficient*delxB  (not quite the current density)
+    Integer, Parameter :: loff = meoffset+12 ! =386
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -335,11 +519,15 @@ Module Diagnostics_Base
     Integer, Parameter :: jp_cross_bp_phi   = loff+15 !    phi component of j' x B'
 
 
+    Integer, Parameter :: maxwell_stress_r     = loff+16 ! -rsintheta {B_r'}{B_phi'}*Lorentz_Coeff
+    Integer, Parameter :: maxwell_stress_theta = loff+17 ! -rsintheta {B_theta'}{B_phi'}*Lorentz_Coeff
+
+    Integer, Parameter :: magnetic_torque_r     = loff+18 ! -rsintheta <B_r><B_phi>*Lorentz_Coeff
+    Integer, Parameter :: magnetic_torque_theta = loff+19 ! -rsintheta <B_theta><B_phi>*Lorentz_Coeff
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    ! "m," "< >", "  '  ", and "p" retain the same meaning as above
+    Integer, Parameter :: indoff = loff + 19 ! = 405
 
-    Integer, Parameter :: indoff = 250
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
     Integer, Parameter :: induction_comp_r           = indoff+2  ! radial component of -{div dot v}B
@@ -429,6 +617,14 @@ Module Diagnostics_Base
     Integer, Parameter :: induction_advec_vpbp_phi   = indoff+68 ! phi component of -{v' dot grad B'}
     Integer, Parameter :: induction_vpbp_phi         = indoff+69 ! phi component of del cros {v' x B'}
 
+
+
+    !///////////////////////////////////////////////////////////////////////////////////////////////
+    ! Magnetic Diffusion Terms -- To Be Implemented
+
+    !/////////////////////////////////////////////////////////////////////////////////////////////
+
+
     !///////////////////////////////////
     Real*8, Allocatable :: qty(:,:,:)   ! This variable holds each quantity that we output
     Real*8, Allocatable :: tmp1(:,:,:)  ! A work array
@@ -439,32 +635,9 @@ Module Diagnostics_Base
 
     ! This array will hold fluctuating quantities from the buffer { q - <q>}      
     Real*8, Allocatable :: fbuffer(:,:,:,:)	
-    Integer :: vindex(1:12), bindex(1:12)  ! the indices within fbuffer corresponding to v,B, and their derivatives
 
-    ! These indices are used for references fluctuations in vfluct and bfluct
-    ! "p" denotes "prime" as in v'
-    Integer :: vr_p     = 1, dvrdr_p = 4 ,dvrdt_p = 5 , dvrdp_p = 6
-    Integer :: vtheta_p = 2, dvtdr_p = 7 ,dvtdt_p = 8 , dvtdp_p = 9
-    Integer :: vphi_p   = 3, dvpdr_p = 10,dvpdt_p = 11, dvpdp_p = 12
+    Logical :: azimuthal_mean = .true. ! when false, the m0_values are overwritten with the ell0_values
 
-    Integer :: br_p     = 1, dbrdr_p = 4 ,dbrdt_p = 5 , dbrdp_p = 6
-    Integer :: btheta_p = 2, dbtdr_p = 7 ,dbtdt_p = 8 , dbtdp_p = 9
-    Integer :: bphi_p   = 3, dbpdr_p = 10,dbpdt_p = 11, dbpdp_p = 12
-
-    Real*8, Allocatable :: bvars(:,:,:,:)  ! Holds the components of b and their derivatives
-    ! These indices are used to reference the values held in bvars
-    Integer :: br_i     = 1, dbrdr_i = 4 ,dbrdt_i = 5  , dbrdp_i = 6
-    Integer :: btheta_i = 2, dbtdr_i = 7 ,dbtdt_i = 8  , dbtdp_i = 9
-    Integer :: bphi_i   = 3, dbpdr_i = 10,dbpdt_i = 11 , dbpdp_i = 12
-
-    ! These indices are used to reference the values held in add_fields%p3a
-    ! That buffer contains the derivatives of each component of b
-    Integer :: dbrdr = 1 , dbrdt = 2  , dbrdp = 7
-    Integer :: dbtdr = 3 , dbtdt = 4  , dbtdp = 8
-    Integer :: dbpdr = 5 , dbpdt = 6 ,  dbpdp = 9    
-
-    Type(SphericalBuffer), public :: add_fields
-    !Integer :: dbrdt, dbrdr, dbtdr, dbpdr
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
@@ -475,23 +648,20 @@ Contains
         !Call Load_Label(v_phi, 'V_phi')
     End Subroutine Generate_Diagnostic_Labels
 
+    Subroutine Initialize_Diagnostics_Buffer()
+        Logical :: dbtrans, dbconfig
+        Logical :: test_reduce
+
+        dbtrans = .false.
+        dbconfig = .false.
+        test_reduce = .false.
+
+        Call cobuffer%init(field_count = cbfcount, config = 'p1a', &
+            dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
+            hold_cargo = test_reduce, padding = pad_alltoall)        
+    End Subroutine Initialize_Diagnostics_Buffer
 
 
-    Subroutine Adjust_Bfield(buffer)
-        Implicit None
-        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
-        Integer :: r,k, t, j
-        !This routine will handle the sintheta divisions for the magnetic components
-        
-
-		!Call sintheta_divd(add_fieldss%p3a,dbtdr_ai)
-		!Call sintheta_divd(add_fields%p3a,dbpdr_ai)
-		!Call sintheta_divd(add_fields%p3a,dbtdt_ai)
-		!Call sintheta_divd(add_fields%p3a,dbrdt_ai)
-		!Call sintheta_divd(add_fields%p3a,dbpdp_ai)
-		!Call sintheta_divd(add_fields%p3a,dbtdp_ai)
-        
-    End Subroutine Adjust_Bfield
 
 
 
@@ -516,33 +686,5 @@ Contains
         DeAllocate(fbuffer)
     End Subroutine DeAllocate_Fluctuations
 
-    Subroutine Initialize_VBIndices()
-        Implicit None
-        vindex(1)  = vr
-        vindex(2)  = vtheta
-        vindex(3)  = vphi
-        vindex(4)  = dvrdr
-        vindex(5)  = dvrdt
-        vindex(6)  = dvrdp
-        vindex(7)  = dvtdr
-        vindex(8)  = dvtdt
-        vindex(9)  = dvtdp
-        vindex(10) = dvpdr
-        vindex(11) = dvpdt
-        vindex(12) = dvpdp
-
-        bindex(1)  = br
-        bindex(2)  = btheta
-        bindex(3)  = bphi
-        bindex(4)  = dbrdr
-        bindex(5)  = dbrdt
-        bindex(6)  = dbrdp
-        bindex(7)  = dbtdr
-        bindex(8)  = dbtdt
-        bindex(9)  = dbtdp
-        bindex(10) = dbpdr
-        bindex(11) = dbpdt
-        bindex(12) = dbpdp
-    End Subroutine Initialize_VBindices
 
 End Module Diagnostics_Base

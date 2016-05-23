@@ -44,7 +44,7 @@ Module ReferenceState
     Type(ReferenceInfo) :: ref
 
     Real*8 :: pressure_specific_heat  = 0.0d0 ! CP (not CV)
-    Real*8 :: poly_n = 0.0d0
+    Real*8 :: poly_n = 0.0d0    !polytropic index
     Real*8 :: poly_Nrho = 0.0d0
     Real*8 :: poly_mass = 0.0d0
     Real*8 :: poly_rho_i =0.0d0
@@ -60,14 +60,18 @@ Module ReferenceState
     Real*8 :: Prandtl_Number          = 1.0d0
     Real*8 :: Magnetic_Prandtl_Number = 1.0d0
     Real*8 :: gravity_power           = 0.0d0
+    Real*8 :: Dissipation_Number      = 0.0d0
+    Real*8 :: Modified_Rayleigh_Number = 0.0d0
     Logical :: Dimensional = .true.  ! By Default code is dimensional
+    Logical :: NonDimensional_Anelastic = .False. !
     Character*120 :: custom_reference_file ='nothing'
     Integer :: custom_reference_type = 1
     Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
             & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file, &
-            & custom_reference_type, cooling_type, cooling_r0, cooling_factor
+            & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
+            & Dissipation_Number, Modified_Rayleigh_Number
 Contains
 
     Subroutine Initialize_Reference()
@@ -79,6 +83,7 @@ Contains
 
         If (reference_type .eq. 2) Then
             Call Polytropic_Reference()
+
         Endif
 
         If (reference_type .eq. 3) Then
@@ -88,6 +93,10 @@ Contains
             If (custom_reference_type .eq. 2) Then
                 Call Get_Custom_Reference2()
             Endif
+        Endif
+
+        If (reference_type .eq. 4) Then
+            Call Polytropic_Reference_DevelND()
         Endif
 
         Call Write_Reference()
@@ -106,6 +115,54 @@ Contains
         Allocate(ref%dsdr(1:N_R))
         Allocate(ref%gravity_term_s(1:N_R))
     End Subroutine Allocate_Reference_State
+
+    Subroutine Polytropic_Reference_DevelND()
+        Implicit None
+        Real*8 :: dtmp
+        Real*8, Allocatable :: dtmparr(:)
+        nondimensional_anelastic = .true.
+        dimensional = .false.
+
+        If (aspect_ratio .lt. 0) Then
+            aspect_ratio = rmax/rmin
+        Endif
+        Allocate(dtmparr(1:N_R))
+        dtmparr(:) = 0.0d0
+
+        Dissipation_Number = aspect_ratio*(exp(poly_Nrho/poly_n)-1.0D0)
+        dtmp = 1.0D0/(1.0D0-aspect_ratio)
+        ref%temperature(:) = dtmp*Dissipation_Number*(dtmp*One_Over_R(:)-1.0D0)+1.0D0
+        ref%density(:) = ref%temperature(:)**poly_n
+        ref%gravity = (rmax**2)*OneOverRSquared(:)
+        ref%gravity_term_s = ref%gravity*Modified_Rayleigh_Number*ref%density
+
+        !Compute the background temperature gradient : dTdr = -Dg,  d2Tdr2 = 2*D*g/r (for g ~1/r^2)
+        dtmparr = -Dissipation_Number*ref%gravity
+        !Now, the logarithmic derivative of temperature
+        ref%dlnt = dtmparr/ref%temperature
+        
+        !And then logarithmic derivative of rho : dlnrho = n dlnT
+        ref%dlnrho = poly_n*ref%dlnt
+
+        !Now, the second logarithmic derivative of rho :  d2lnrho = (n/T)*d2Tdr2 - n*(dlnT^2)
+        ref%d2lnrho = -poly_n*(ref%dlnT**2)  
+
+        dtmparr = (poly_n/ref%temperature)*(2.0d0*Dissipation_Number*ref%gravity/radius) ! (n/T)*d2Tdr2
+        ref%d2lnrho = ref%d2lnrho+dtmparr
+
+        DeAllocate(dtmparr)
+
+        ref%entropy(:) = 0.0d0  ! Might need to adjust this later
+        ref%dsdr(:) = 0.0d0
+        ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
+        Call Initialize_Reference_Heating()
+
+
+        Allocate(s_conductive(1:N_R))
+        s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!
+
+
+    End Subroutine Polytropic_Reference_DevelND
 
     Subroutine Polytropic_Reference()
         Real*8 :: zeta_0,  c0, c1, d
@@ -226,6 +283,10 @@ Contains
             Call Bouss_Reference_Heating()
         Endif
 
+        If (heating_type .eq. 4) Then
+            Call  Flux_Reference_Heating()
+        Endif
+
         !///////////////////////////////////////////////////////////
         ! Next, compute a cooling function if desired and ADD it to 
         ! whatever's in reference heating.
@@ -239,6 +300,14 @@ Contains
         Endif
 
     End Subroutine Initialize_Reference_Heating
+
+    Subroutine Flux_Reference_Heating()
+        Implicit None
+        ref%heating(:) = 1.0d0/shell_volume
+        ref%heating = ref%heating/(ref%density*ref%temperature)
+        !The actual value of the reference heating is adjusted 
+        ! in Equation_Coefficients.F90
+    End Subroutine Flux_Reference_Heating
 
     Subroutine Constant_Reference_Heating()
         Implicit None

@@ -10,13 +10,25 @@ Module Diagnostics_Interface
     Use Diagnostics_Base
 
     Use Diagnostics_Velocity_Field
+    Use Diagnostics_Magnetic_Field
+    Use Diagnostics_Energies
+
+    Use Diagnostics_Thermodynamic_Gradients
+
+    Use Diagnostics_Vorticity_Field
+    Use Diagnostics_Current_Density
+
+    Use Diagnostics_Linear_Forces
     Use Diagnostics_Inertial_Forces
+    Use Diagnostics_Angular_Momentum
     Use Diagnostics_Lorentz_Forces
+
     Use Diagnostics_Energy_Flux
 
-    Use Diagnostics_Magnetic_Field
-    Use Diagnostics_Current_Density
+
     Use Diagnostics_Induction
+
+    Use Diagnostics_Miscellaneous
     Implicit None
 
 
@@ -46,7 +58,7 @@ Contains
     !   vr      -- radial velocity
     !   vtheta  -- theta velocity
     !   vphi    -- phi velocity
-    !   tout    -- temperature or entropy (note that this is NOT tvar -- that is T/radius)
+    !   tvar    -- temperature or entropy 
     !   pvar    -- pressure
     !   zvar    -- l(l+1)*Z/r^2  where Z is the toroidal streamfunction
 
@@ -108,7 +120,7 @@ Contains
         Integer, Intent(In) :: iteration
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8, Intent(In) :: current_time
-        Real*8 :: mypi, over_n_phi, tmp, tmp2, tmp3
+        Real*8 :: over_n_phi, tmp, tmp2, tmp3
 
         Integer :: p,t,r, nfields, bdims(1:4), pass_num
 
@@ -126,7 +138,6 @@ Contains
             Allocate(m0_values(my_r%min:my_r%max,my_theta%min:my_theta%max,1:nfields))
             Call ComputeEll0(buffer,ell0_values)
             Call ComputeM0(buffer,m0_values)
-            Call Adjust_Bfield(buffer)!<-------------- Check on induction flag
             Call Compute_Fluctuations(buffer)
         
 
@@ -136,8 +147,7 @@ Contains
             Allocate(tmp1d(1:N_R))
             over_n_phi = 1.0d0/dble(n_phi)
 
-            Do pass_num = 1, 2
-            !////////////////////////
+
             ! All requested Shell_Average quantities are computed twice
             ! During the first pass, ell = 0 and m = 0 averages are computed
             !   (for the shell_average quantities)
@@ -145,428 +155,35 @@ Contains
             !   file output is conducted, and the previously
             !   computed averages are used for moments in the shell_average output
             ! Compute_quantity returns false on the first pass for everything but shell_averages
-            Call Set_Avg_Flag(pass_num)  ! This sets the averaging flag, so that all quantities or only shell averages are computed
-            Call Compute_Velocity_Components(buffer)
-            !Call Compute_Vorticity_Components(buffer)
-            !Call Compute_Kinetic_Energies(buffer)
-            Call Compute_Energy_Flux(buffer)
-            !Call Compute_TandP_Terms(buffer)
-            Call Compute_Inertial_Terms(buffer)
-
-
-
-            If (compute_quantity(vr2)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vt2)) Then	
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**2
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vp2)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                Call Add_Quantity(qty)
-            Endif	
-
-            If (compute_quantity(vr3)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**3
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vt3)) Then	
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vtheta)**3
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(vp3)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**3
-                Call Add_Quantity(qty)
-            Endif	
-
-
-
-
-            If (compute_quantity(temperature)) Then
-                ! This is really d_by_dphi temperature/r with the current logic in Physics.F90
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,tout)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(pressure)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,pvar)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-            If (compute_quantity(gradt_r)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,dtdr)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif		
-
-
-
-            If (compute_quantity(zonal_ke)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        ! compute mean v_phi here
-                        tmp = 0.0d0
-                        Do p = 1, n_phi
-                            tmp = tmp+buffer(p,r,t,vphi)
-                        Enddo
-                        tmp = tmp*over_n_phi
-                        tmp = 0.5d0*ref%density(r)*tmp**2
-                        qty(:,r,t) = tmp
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
-
-
-            If (compute_quantity(merid_ke)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        ! compute mean v_phi here
-                        tmp = 0.0d0
-                        tmp2 = 0.0d0
-                        Do p = 1, n_phi
-                            tmp = tmp+buffer(p,r,t,vr)
-                            tmp2 = tmp2+buffer(p,r,t,vtheta)
-                        Enddo
-                        tmp = tmp*over_n_phi
-                        tmp2 = tmp2*over_n_phi
-                        tmp = 0.5d0*ref%density(r)*(tmp**2+tmp2**2)                       
-                        qty(:,r,t) = tmp
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif	
-
-            If (compute_quantity(v_sq)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-                Call Add_Quantity(qty)
-            Endif	
-            If (compute_quantity(radial_ke)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vr)**2
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
-                        Enddo
-                    Enddo
-                Enddo  
-                Call Add_Quantity(qty)
-            Endif	
-            If (compute_quantity(kinetic_energy)) Then
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,vphi)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vr)**2
-                qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,vtheta)**2
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%density(r)*0.5d0
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
-
-
-
-            If (compute_quantity(buoyancy_work)) Then
-
-                qty(1:n_phi,:,:) = -buffer(1:n_phi,:,:,vr) &
-                 & *buffer(1:n_phi,:,:,tout)   
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = qty(p,r,t)*ref%gravity_term_s(r)
-                        Enddo
-                    Enddo
-                Enddo                
-                Call Add_Quantity(qty)
-            Endif	
-
-
-            If (compute_quantity(vol_heating)) Then
-                If (allocated(ref%heating)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            Do p = 1, n_phi
-                                qty(p,r,t) = ref%heating(r) &
-                                 & *ref%density(r)*ref%temperature(r)
-                            Enddo
-                        Enddo
-                    Enddo                
-                Else
-                    qty(:,:,:) = 0.0d0
-                Endif
-                Call Add_Quantity(qty)
-            Endif	
-
-            If (compute_quantity(enstrophy)) Then
-                Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
-            Endif
-
-            If (compute_quantity(vort_r) .or. compute_quantity(enstrophy)) Then
-
-                qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,zvar)
-
-                If (compute_quantity(vort_r)) Call Add_Quantity(qty)
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = qty**2
-                Endif
-            Endif
-
-            If (compute_quantity(vort_theta) .or. compute_quantity(enstrophy)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,dvrdp)*csctheta(t) &
-                             & - buffer(p,r,t,dvpdr) &
-                             & - buffer(p,r,t,vphi)*one_over_r(r)
-
-                        Enddo
-                    Enddo
-                Enddo
-
-                If (compute_quantity(vort_theta)) Call Add_Quantity(qty)
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = tmp1+qty**2
-                Endif
-
-            Endif
-
-		
-            If (compute_quantity(vort_phi) .or. compute_quantity(enstrophy)) Then
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = buffer(p,r,t,vtheta)*one_over_r(r) &
-                             & + buffer(p,r,t,dvtdr) &
-                             & - buffer(p,r,t,dvrdt)*one_over_r(r)
-
-                        Enddo
-                    Enddo
-                Enddo
-
-                If (compute_quantity(vort_phi)) Call Add_Quantity(qty)
-
-                If (compute_quantity(enstrophy)) Then
-                    tmp1 = tmp1+qty**2
-                Endif
-
-            Endif
-
-            If (compute_quantity(enstrophy)) Then
-                Call Add_Quantity(tmp1)
-                DeAllocate(tmp1)
-            Endif
-            
-            If (compute_quantity(amom_fluct_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *((buffer(:,r,t,vr)-m0_values(r,t,vr))*(buffer(:,r,t,vphi) &
-                            & -m0_values(r,t,vphi)))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_fluct_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *((buffer(:,r,t,vtheta)-m0_values(r,t,vtheta)) & 
-                            & *(buffer(:,r,t,vphi)-m0_values(r,t,vphi)))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-
-            If (compute_quantity(amom_dr_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *(m0_values(r,t,vr)*m0_values(r,t,vphi))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_dr_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*radius(r)*sintheta(t) &
-                            & *(m0_values(r,t,vtheta)*m0_values(r,t,vphi))
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_mean_r)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
-                            & *(m0_values(r,t,vr)*Angular_Velocity)
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif 
-
-            If (compute_quantity(amom_mean_theta)) Then
-
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        qty(:,r,t) = ref%density(r)*((radius(r)*sintheta(t))**2) &
-                            & *(m0_values(r,t,vtheta)*Angular_Velocity)
-                    EndDo
-                EndDo
-
-                Call Add_Quantity(qty)
-            Endif              
-               
-
-
-            !////////////////////////////////////////////////////////
-            ! Diagnostics for verifying output is working
-            If (compute_quantity(diagnostic1)) Then
-                mypi = acos(-1.0d0)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = sin(p*2.0d0*mypi/n_phi) &
-                             & *(sintheta(t)**2)*radius(r)
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif
-
-            If (compute_quantity(diagnostic2)) Then
-                mypi = acos(-1.0d0)
-                Do t = my_theta%min, my_theta%max
-                    Do r = my_r%min, my_r%max
-                        Do p = 1, n_phi
-                            qty(p,r,t) = sin(p*4.0d0*mypi/n_phi) &
-                             & *(sintheta(t)*costheta(t))*radius(r)**2
-                        Enddo
-                    Enddo
-                Enddo
-                Call Add_Quantity(qty)
-            Endif
-
-            !//////////////////// Magnetic Quantities
-            If (magnetism) Then
-                Call Compute_BField_Components(buffer)
-                Call Compute_Lorentz_Forces(buffer)
-                Call Compute_J_Components(buffer)
-                Call Compute_Induction_Terms(buffer)
-                !Call Compute_Magnetic_Energies(buffer)
-
-
-                If (compute_quantity(B_r2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,br)**2
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(B_theta2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,btheta)**2
-                    Call Add_Quantity(qty)
-                Endif		
-
-                If (compute_quantity(b_phi2)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    Call Add_Quantity(qty)
-                Endif	
-
-
-
-                If (compute_quantity(b_sq)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,btheta)**2
-                    Call Add_Quantity(qty)
-                Endif	
-
-                If (compute_quantity(magnetic_energy)) Then
-                    qty(1:n_phi,:,:) = buffer(1:n_phi,:,:,bphi)**2
-                    qty(1:n_phi,:,:) = qty(1:n_phi,:,:)+buffer(1:n_phi,:,:,br)**2
-                    qty(1:n_phi,:,:) = (qty(1:n_phi,:,:) &
-                     & +buffer(1:n_phi,:,:,btheta)**2)*over_eight_pi
-                    Call Add_Quantity(qty)
-                Endif	
-
-                If (compute_quantity(zonal_me)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            ! compute mean b_phi here
-                            tmp = 0.0d0
-                            Do p = 1, n_phi
-                                tmp = tmp+buffer(p,r,t,bphi)
-                            Enddo
-                            tmp = tmp*over_n_phi
-                            tmp = over_eight_pi*tmp**2
-                            qty(:,r,t) = tmp
-                        Enddo
-                    Enddo
-                    Call Add_Quantity(qty)
-                Endif	
-
-
-                If (compute_quantity(merid_me)) Then
-                    Do t = my_theta%min, my_theta%max
-                        Do r = my_r%min, my_r%max
-                            tmp = 0.0d0
-                            tmp2 = 0.0d0
-                            Do p = 1, n_phi
-                                tmp = tmp+buffer(p,r,t,br)
-                                tmp2 = tmp2+buffer(p,r,t,btheta)
-                            Enddo
-                            tmp = tmp*over_n_phi
-                            tmp2 = tmp2*over_n_phi
-                            tmp = over_eight_pi*(tmp**2+tmp2**2)                       
-                            qty(:,r,t) = tmp
-                        Enddo
-                    Enddo
-                    Call Add_Quantity(qty)
-                Endif	
-
-			Endif !Magnetism
-            If (pass_num .eq. 1) Call Finalize_Averages()
-            Enddo !Pass_num
+            !////////////////////////
+            Do pass_num = 1, 2
+                ! Set the averaging flag, so that all quantities or only shell averages are computed
+                Call Set_Avg_Flag(pass_num)  
+
+                Call Compute_Velocity_Components(buffer)
+                Call Compute_Thermodynamic_Gradients(buffer)
+                Call Compute_Vorticity_Field(buffer)
+                Call Compute_Energy_Flux(buffer)
+                Call Compute_Kinetic_Energy(buffer)
+                Call Compute_Angular_Momentum_Balance(buffer)
+                Call Compute_Inertial_Terms(buffer)
+                Call Compute_Linear_Forces(buffer)
+
+
+
+                Call Compute_Misc_Diagnostics(buffer)
+
+                !////// Magnetic Quantities
+                If (magnetism) Then
+                    Call Compute_BField_Components(buffer)
+                    Call Compute_Lorentz_Forces(buffer)
+                    Call Compute_J_Components(buffer)
+                    Call Compute_Induction_Terms(buffer)
+                    Call Compute_Magnetic_Diffusion(buffer)
+                    Call Compute_Magnetic_Energy(buffer)
+			    Endif 
+                If (pass_num .eq. 1) Call Finalize_Averages()
+            Enddo
 
 			DeAllocate(qty,tmp1,tmp1d)
 			Call Complete_Output(iteration, current_time)
@@ -590,7 +207,7 @@ Contains
 
     Subroutine Initialize_Diagnostics()
         Implicit None
-        Integer :: i
+        Integer :: i, isize
         Real*8 :: delr
         
         Allocate(tweights(1:n_theta))
@@ -619,11 +236,14 @@ Contains
 
         Call Initialize_Spherical_IO(radius,sintheta,rweights,tweights,costheta,my_path)	
 
-        Call Initialize_VBIndices()
+        Call Initialize_Diagnostic_Indices()
         !DeAllocate(tweights)  !<---- Used to deallocate these.  We now use these for the computing the ell0 components
         !DeAllocate(rweights)
         
         !Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
+
+        Call Initialize_Diagnostics_Buffer()
+
     End Subroutine Initialize_Diagnostics
 
 

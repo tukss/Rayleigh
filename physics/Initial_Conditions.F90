@@ -10,7 +10,7 @@ Module Initial_Conditions
     Use Controls
     Use Timers
     Use General_MPI, Only : BCAST2D
-    Use ReferenceState, Only : s_conductive
+    Use ReferenceState, Only : s_conductive, heating_type
     Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom,&
          fix_dtdr_top, fix_dtdr_bottom, C10_bottom, C11_bottom, C1m1_bottom
     Use ClockInfo, Only : Euler_Step
@@ -21,7 +21,6 @@ Module Initial_Conditions
     Integer :: magnetic_init_type = 1
     Integer :: init_tag = 8989
     Integer :: restart_iter = 0
-    Real*8 :: pi = 3.1415926535897932384626433832795028841972d+0
     Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0, mag_amp = 1.0d0
     Logical :: conductive_profile = .false.
     Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, restart_iter, &
@@ -342,7 +341,11 @@ Contains
             Allocate(profile0(1:N_R))
             profile0(:) = 0.0d0
             If (allocated(s_conductive)) Then
-                profile0(:) = t_bottom*s_conductive(:)
+                If (heating_type .eq. 0) Then
+                    profile0(:) = t_bottom*s_conductive(:)
+                Else
+                    profile0(:) = s_conductive(:)
+                Endif
             Else
                 If (my_rank .eq. 0) Then 
                     Write(6,*)'No conductive profile found.'

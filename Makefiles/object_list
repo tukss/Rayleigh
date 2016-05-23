@@ -7,10 +7,12 @@ POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o Reference
         Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o \
         Diagnostics_Base.o Diagnostics_ADotGradB.o \
         Diagnostics_Velocity_Field.o Diagnostics_Magnetic_Field.o \
-        Diagnostics_Current_Density.o \
-        Diagnostics_Energy_Flux.o \
-        Diagnostics_Lorentz_Forces.o Diagnostics_Induction.o Diagnostics_Inertial_Forces.o \
-        Diagnostics_Interface.o \
+        Diagnostics_Current_Density.o Diagnostics_Vorticity_Field.o \
+        Diagnostics_Thermodynamic_Gradients.o Diagnostics_Linear_Forces.o \
+        Diagnostics_Energies.o Diagnostics_Energy_Flux.o \
+        Diagnostics_Lorentz_Forces.o Diagnostics_Induction.o \
+        Diagnostics_Inertial_Forces.o Diagnostics_Angular_Momentum.o \
+        Diagnostics_Miscellaneous.o Diagnostics_Interface.o \
         Benchmarking.o Linear_Terms_Sphere.o \
         Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o

@@ -7,7 +7,7 @@
 
 !///////////////////////////////////////////////////////////////////
 !               DIAGNOSTICS_CURRENT_DENSITY
-!               This module computes the components of the current density. 
+!               This module computes the components of del x B. 
 !               Zonal means and fluctuations about those means are 
 !               also computed (if desired).
 !///////////////////////////////////////////////////////////////////
@@ -140,26 +140,42 @@ Contains
         !///////////////////////////////////////////
         !  Also handle ohmic heating here.
         If (compute_quantity(ohmic_heat)) Then
-            DO_PSI
-                qty(PSI) = eta(r)*(buffer(PSI,jr)**2 + &
-                           &   buffer(PSI,jtheta)**2 + &
-                           &   buffer(PSI,jphi)**2)
-            END_DO
+            If (ohmic_heating) Then
+                DO_PSI
+                    qty(PSI) = ohmic_heating_coeff(r)*(buffer(PSI,jr)**2 + &
+                               &   buffer(PSI,jtheta)**2 + &
+                               &   buffer(PSI,jphi)**2)
+                END_DO
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
+            Call Add_Quantity(qty)
         Endif
         If (compute_quantity(ohmic_heat_pp)) Then
-            DO_PSI
-                qty(PSI) = eta(r)*(fbuffer(PSI,jr)**2 + &
-                           &   fbuffer(PSI,jtheta)**2 + &
-                           &   fbuffer(PSI,jphi)**2)
-            END_DO
+            If (ohmic_heating) Then
+                DO_PSI
+                    qty(PSI) = ohmic_heating_coeff(r)*(fbuffer(PSI,jr)**2 + &
+                               &   fbuffer(PSI,jtheta)**2 + &
+                               &   fbuffer(PSI,jphi)**2)
+                END_DO
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
+            Call Add_Quantity(qty)
         Endif        
 
         If (compute_quantity(ohmic_heat_mm)) Then
-            DO_PSI
-                qty(PSI) = eta(r)*(m0_values(PSI2,jr)**2 + &
-                           &   m0_values(PSI2,jtheta)**2 + &
-                           &   m0_values(PSI2,jphi)**2)
-            END_DO
+            If (ohmic_heating) Then
+                DO_PSI
+                    qty(PSI) = ohmic_heating_coeff(r)*(m0_values(PSI2,jr)**2 + &
+                               &   m0_values(PSI2,jtheta)**2 + &
+                               &   m0_values(PSI2,jphi)**2)
+                END_DO
+
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
+            Call Add_Quantity(qty)
         Endif   
 
     End Subroutine Compute_J_Components

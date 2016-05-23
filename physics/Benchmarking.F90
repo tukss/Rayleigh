@@ -571,7 +571,7 @@ Contains
         Integer, Intent(In) :: iteration
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,:)
         Real*8, Intent(In) :: current_time
-        Real*8 :: tmp, tmp2, tmp3, time_passed, over_n_phi, shell_volume
+        Real*8 :: tmp, tmp2, tmp3, time_passed, over_n_phi
         Real*8 :: rel_diff, mean_value, sdev_value
 
         Integer :: i,p,t,r, funit, iter_start, iter_end
@@ -750,9 +750,6 @@ Contains
                     iter_end   = MAXVAL(iter_saves(1:global_count))
 
 
-                    shell_volume = four_pi*one_third*(radius(1)**3-radius(N_R)**3)
-
-
                     Write(iter_string,'(i8.8)')iteration
                     funit = 88
                     report_file = Trim(my_path)//'Benchmark_Reports/'//TRIM(iter_string)
@@ -902,7 +899,7 @@ Contains
         Allocate(obs_inds(1:nobs))
         obs_inds(1) = vr
         obs_inds(2) = vphi
-        obs_inds(3) = tout 
+        obs_inds(3) = tvar 
         if (magnetism) obs_inds(4) = btheta
 
         indst(:) = 1

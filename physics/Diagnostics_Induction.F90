@@ -553,11 +553,32 @@ Contains
             Endif
         Endif
 
+
         If (    allocated(ind_r)) DeAllocate(ind_r)
         If (allocated(ind_theta)) DeAllocate(ind_theta)
         If (  allocated(ind_phi)) DeAllocate(ind_phi)
         DeAllocate(cbuffer)
     End Subroutine Compute_Induction_Terms
+
+    Subroutine Compute_Magnetic_Diffusion(buffer)
+        Implicit None
+        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
+        !Diffusion terms will be added in the near-ish future
+        qty(:,:,:) = 0.0d0
+
+        If (compute_quantity(induction_diff_r))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_theta))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_phi))  Call Add_Quantity(qty)
+
+        If (compute_quantity(induction_diff_bm_r))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_bm_theta))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_bm_phi))  Call Add_Quantity(qty)
+
+        If (compute_quantity(induction_diff_bp_r))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_bp_theta))  Call Add_Quantity(qty)
+        If (compute_quantity(induction_diff_bp_phi))  Call Add_Quantity(qty)
+
+    End Subroutine Compute_Magnetic_Diffusion
 
     Subroutine Reset_Induction_Flags()
         Implicit None

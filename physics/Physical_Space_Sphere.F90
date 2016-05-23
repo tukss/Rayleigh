@@ -25,11 +25,17 @@ Module Physical_Space_Sphere
 Contains
 	Subroutine physical_space()
 		Implicit None
+		Integer :: t, r,k
 		! We aren't quite in physical space yet.
 		! 1st, get the phi derivatives
 		Call StopWatch(dphi_time)%startclock()
 		Call Phi_Derivatives()
+        If (output_iteration) Then
+            Call Diagnostics_Copy_and_Derivs()
+        Endif
 		Call StopWatch(dphi_time)%increment()
+
+
 
 		! Next perform the FFT
 		Call StopWatch(fft_time)%startclock()
@@ -49,8 +55,18 @@ Contains
 		Call sintheta_div(dvpdp)
 		Call sintheta_div(dvtdp)
 
+        ! This feels a little out-of place here, but it needs to be done
+        ! both for output purposes AND for benchmarking purposes.
+		DO_IDX
+			FIELDSP(IDX,tvar) = FIELDSP(IDX,tvar)*radius(r)  ! t was really t/r 
+		END_DO
+
 		Call Compute_dvtheta_by_dtheta()
 		Call Compute_dvphi_by_dtheta()
+
+        If (output_iteration) Then
+            Call Diagnostics_Prep()
+        Endif
 
 		If (magnetism) Then
 			Call rsintheta_div(jtheta)
@@ -65,6 +81,7 @@ Contains
 		!This is a good spot to do some simple diagnostic output while we debug the code
 		!since velocity components, Pressure, and Temperature are all 
 		!in memory and in physical space at this point in time.
+
 		Call ps_output(wsp%p3a, iteration,simulation_time)
         Call Benchmark_Checkup(wsp%p3a, iteration,simulation_time)
 		!////////////////////////////////////////////////////////////////////////
@@ -139,7 +156,6 @@ Contains
 
 	Subroutine Temperature_Advection()
 		Integer :: t,r,k
-
 		!$OMP PARALLEL DO PRIVATE(t,r,k)
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
@@ -529,10 +545,6 @@ Contains
 		Implicit None
 		Integer :: r,t,k
 		
-		DO_IDX
-			FIELDSP(IDX,tout) = FIELDSP(IDX,tvar)*radius(r)  ! hang on to t
-		END_DO
-
 
 		Call d_by_dphi(wsp%p3a,vr,dvrdp)
 		Call d_by_dphi(wsp%p3a,vtheta,dvtdp)
@@ -581,9 +593,9 @@ Contains
 			! Check on alfven speed as well
 			Do r = my_r%min, my_r%max
 				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
-								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*alf_const ! horizontal
+								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*lorentz_coefficient ! horizontal
 				ovt2  = Max(ovt2, ovht2)
-				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*alf_const	! radial
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*lorentz_coefficient	! radial
 				ovt2  = Max(ovt2,ovrt2)
 			Enddo
 		Endif
@@ -593,5 +605,95 @@ Contains
 
 		Call StopWatch(ts_time)%increment()
 	End Subroutine Find_MyMinDT
+
+
+    !/////////////////////////////////////////////////////
+    ! Support routines for getting additional diagnostic fields sorted out
+
+
+    Subroutine Diagnostics_Copy_and_Derivs()
+        Implicit None
+        Integer :: t,r,k
+        !Copy everything from out auxiliary output buffer into the main buffer
+
+        wsp%p3a(:,:,:,dpdr) = cobuffer%p3a(:,:,:,dpdr_cb)
+        wsp%p3a(:,:,:,dpdt) = cobuffer%p3a(:,:,:,dpdt_cb)
+
+        If (magnetism) Then
+            wsp%p3a(:,:,:,dbrdr) = cobuffer%p3a(:,:,:,dbrdr_cb)
+            wsp%p3a(:,:,:,dbtdr) = cobuffer%p3a(:,:,:,dbtdr_cb)
+            wsp%p3a(:,:,:,dbpdr) = cobuffer%p3a(:,:,:,dbpdr_cb)
+            wsp%p3a(:,:,:,dbpdt) = cobuffer%p3a(:,:,:, avar_cb)
+            wsp%p3a(:,:,:,dbrdt) = cobuffer%p3a(:,:,:,dbrdt_cb)
+        Endif
+
+        !Everything we need is in main buffer - reset the auxiliary buffer
+        Call cobuffer%deconstruct('p3a')
+        cobuffer%config = 'p1a'
+
+        !Take phi derivatives
+        Call d_by_dphi(wsp%p3a,pvar,dpdp)
+        If (magnetism) Then
+            Call d_by_dphi(wsp%p3a,br,dbrdp)
+    		Call d_by_dphi(wsp%p3a,btheta,dbtdp)
+    		Call d_by_dphi(wsp%p3a,bphi,dbpdp)            
+        Endif
+
+
+    End Subroutine Diagnostics_Copy_and_Derivs
+
+    Subroutine Diagnostics_Prep()
+        Implicit None
+        Integer :: t,r,k
+        Call sintheta_div(dpdt)
+        !convert d/dr(p/rho) to dpdr
+        DO_IDX
+            wsp%p3a(IDX,dpdr) = wsp%p3a(IDX,dpdr)*ref%density(r)+ &
+                                & wsp%p3a(IDX,pvar)*ref%dlnrho(r)
+        END_DO
+
+        If (magnetism) Then
+
+            Call rsintheta_div(dbtdp)
+            Call rsintheta_div(dbpdp)
+
+            Call sintheta_div(dbrdt) !these do not have the one over r factor
+            Call sintheta_div(dbpdr)
+            Call sintheta_div(dbtdr)
+
+            Call Compute_dbtheta_by_dtheta()
+            Call Compute_dbphi_by_dtheta()
+
+        Endif
+
+
+        
+    End Subroutine Diagnostics_Prep
+
+	Subroutine Compute_dbtheta_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+
+		DO_IDX
+			wsp%p3a(IDX,dbtdt) = - wsp%p3a(IDX,br)*2.0d0 &
+								 - radius(r)*cobuffer%p3a(IDX,dvrdr) &
+								 - wsp%p3a(IDX,btheta)*cottheta(t) &
+								 - wsp%p3a(IDX,dbpdp)*csctheta(t)
+		END_DO
+
+	End Subroutine Compute_dbtheta_by_dtheta
+
+	Subroutine Compute_dbphi_by_dtheta()
+		Implicit None
+		Integer :: t, r,k
+        !Note: the A streamfunction was stored in dbpdt earlier.  We overwrite it with actual d B_phi d_theta now
+		!$OMP PARALLEL DO PRIVATE(t,r,k)
+		DO_IDX
+			wsp%p3a(IDX,dbpdt) = radius(r)*wsp%p3a(IDX,dbpdt)+wsp%p3a(IDX,dbtdp)*csctheta(t) &
+            -wsp%p3a(IDX,bphi)*cottheta(t)
+		END_DO
+		!$OMP END PARALLEL DO
+	End Subroutine Compute_dbphi_by_dtheta
+
 
 End Module Physical_Space_Sphere

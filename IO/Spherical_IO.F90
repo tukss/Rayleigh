@@ -17,7 +17,7 @@ Module Spherical_IO
     ! 7. PDFs taken on slices of the sphere
 
 	!////////////////////////////////////////////
-    Integer, Parameter :: nqmax=400, nshellmax=100
+    Integer, Parameter :: nqmax=800, nshellmax=100
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
 
     !Each diagnostic type has an associated version number that is written to the file
@@ -907,6 +907,7 @@ Contains
         Else
             ! Otherwise, check everything - normal output
             If (compute_q(qval) .eq. 1) Then
+
                 ! We check all diagnostic types and their respective frequencies
                 ! While doing so, we modify the averaging level
                 Call Full_3D%getq_now(yesno)
@@ -915,6 +916,7 @@ Contains
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
                 Call Global_Averages%getq_now(yesno)
+
             Endif
         Endif
     End function Compute_quantity

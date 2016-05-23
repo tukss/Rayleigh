@@ -153,7 +153,8 @@ Contains
         integration_weights(1:n_max) = 0.0d0
 
 
-
+        !these weights evaluated the spherical radial average - i.e.
+        ! sum{integration_weights * f } = int{f*r^2 dr}/int{r^2 dr}
 
         !Because we're using the zeros, x(1)-x(n_max) is not quite 2
 		tmp = (3*Pi * (grid(1)-grid(N_max)) )/ &

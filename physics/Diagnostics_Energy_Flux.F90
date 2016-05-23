@@ -26,19 +26,20 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Real*8 :: dt_by_dp, dt_by_ds, tpert
-        Integer :: r,k, t, dr, qmean
+        Integer :: r,k, t  
+        Real*8 :: dr, qadd, fpr2dr
 
         !First, the radial viscous flux of energy
         If (compute_quantity(visc_flux_r)) Then
 
             !Radial contribution (mod rho*nu)
-            DO_PSI		
+            DO_PSI        
                 qty(PSI) = buffer(PSI,vr)*ref%dlnrho(r)/3.0d0+buffer(PSI,dvrdr)
                 qty(PSI) = qty(PSI)*buffer(PSI,vr)*2.0d0
             END_DO
 
             !Theta contribution (mod rho*nu)
-            DO_PSI		
+            DO_PSI        
                 tmp1(PSI) = (2.0d0/3.0d0)*buffer(PSI,vr)*ref%dlnrho(r)
                 tmp1(PSI) = tmp1(PSI)+buffer(PSI,dvtdr)-buffer(PSI,vtheta)/radius(r)
                 tmp1(PSI) = tmp1(PSI)+buffer(PSI,dvrdt)/radius(r)
@@ -46,24 +47,24 @@ Contains
             END_DO            
 
 
-            DO_PSI		
+            DO_PSI        
                 qty(PSI) = qty(PSI)+tmp1(PSI)
             END_DO
 
             !phi contribution (mod rho*nu)
-            DO_PSI			
+            DO_PSI            
                 tmp1(PSI) = (2.0d0/3.0d0)*buffer(PSI,vr)*ref%dlnrho(r)
                 tmp1(PSI) = tmp1(PSI)+buffer(PSI,dvpdr)-buffer(PSI,vphi)/radius(r)
                 tmp1(PSI) = tmp1(PSI)+buffer(PSI,dvrdp)/radius(r)/sintheta(t)
                 tmp1(PSI) = tmp1(PSI)*buffer(PSI,vphi)
             END_DO             
 
-            DO_PSI		
+            DO_PSI        
                 qty(PSI) = qty(PSI)+tmp1(PSI)
             END_DO
 
             !Multiply by rho and nu
-            DO_PSI			
+            DO_PSI            
                 qty(PSI) = qty(PSI)*nu(r)*ref%density(r)                            
             END_DO
             Call Add_Quantity(qty)
@@ -76,7 +77,7 @@ Contains
                   & *ref%temperature(r)*kappa(r)*buffer(PSI,dtdr)
             END_DO
             Call Add_Quantity(qty)
-        Endif	
+        Endif    
         
         !Radial KE Flux
         If (compute_quantity(ke_flux_radial)) Then
@@ -89,7 +90,7 @@ Contains
                 qty(PSI) = qty(PSI)*ref%density(r)*0.5d0
             END_DO               
             Call Add_Quantity(qty)
-        Endif	
+        Endif    
 
         !Enthalpy Flux 
         If (compute_quantity(Enth_flux_radial)) Then
@@ -97,9 +98,9 @@ Contains
             Do t = my_theta%min, my_theta%max
                 Do r = my_r%min, my_r%max
                     dt_by_ds = ref%temperature(r)/pressure_specific_heat
-                    dt_by_dp = 1.0d0/pressure_specific_heat
+                    dt_by_dp = 1.0d0/pressure_specific_heat/ref%density(r)
                     Do k = 1, n_phi
-                        tpert = dt_by_ds*buffer(PSI,tout) &
+                        tpert = dt_by_ds*buffer(PSI,tvar) &
                          & + dt_by_dp*buffer(PSI,pvar)
                         tpert = tpert*ref%density(r) ! This is now T'*rho_bar
                         qty(PSI) = tpert*buffer(PSI,vr)*pressure_specific_heat
@@ -113,11 +114,11 @@ Contains
         !Thermal Energy Flux (vr {rho_bar T_bar S}  OR vr T)
         If (compute_quantity(thermalE_flux_radial)) Then  
             DO_PSI
-                qty(PSI) = buffer(PSI,vr)*buffer(PSI,tout)* &   
+                qty(PSI) = buffer(PSI,vr)*buffer(PSI,tvar)* &   
                            & ref%density(r)*ref%temperature(r)
             END_DO              
             Call Add_Quantity(qty)
-        Endif	
+        Endif    
 
 
         ! Volume Heating
@@ -131,19 +132,23 @@ Contains
                 qty(:,:,:) = 0.0d0
             Endif
             Call Add_Quantity(qty)
-        Endif	
+        Endif    
 
         !The "Flux" associated with the volume heating
         If (compute_quantity(vol_heat_flux)) Then
             tmp1d(N_R) = 0.0d0
-            If (allocated(ref%heating)) Then
+            If (heating_type .gt. 0) Then
+
+                ! Note that radial_integral_weights give int{f r^2}/int(r^2}
                 Do r = N_R-1, 1,-1
-                    qmean = 0.5d0*(ref%heating(r)+ref%heating(r+1))
-                    dr    = radius(r)-radius(r+1)
-                    tmp1d(r) = tmp1d(r+1)+r_squared(r)*four_pi* &
-                      &  dr*qmean*ref%density(r)*ref%temperature(r)
+                    qadd = ref%heating(r)*ref%density(r)*ref%temperature(r) ! the heat
+                    qadd = qadd+ ref%heating(r+1)*ref%density(r+1)*ref%temperature(r+1)
+                    qadd = qadd*half
+                    fpr2dr = (r_squared(r) + r_squared(r+1))*Half*four_pi
+                    fpr2dr = fpr2dr*(radius(r)-radius(r+1))
+                    tmp1d(r) = tmp1d(r+1)+qadd*fpr2dr
                 Enddo
-                tmp1d = (tmp1d(1)-tmp1d)/four_pi/r_squared
+                tmp1d = tmp1d/four_pi/r_squared
             Endif
             DO_PSI
                 qty(PSI) = tmp1d(r)
@@ -181,8 +186,76 @@ Contains
             Endif
         Endif
 
-        
+        If (compute_quantity(visc_heating)) Then
+            If (viscous_heating) Then
+                Call Viscous_Heating_Diagnostics(buffer)
+            Else
+                qty(:,:,:) = 0.0d0
+            Endif
+            Call Add_Quantity(qty)
+        Endif 
 
     End Subroutine Compute_Energy_Flux
+
+    Subroutine Viscous_Heating_Diagnostics(buffer)
+        Implicit None
+        Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
+        Integer :: t,r,k
+        Real*8 :: tmp, tmp2
+        ! Computes the viscous heating term that appears in the 
+        ! thermal energy equation
+
+        !Contributions from E_rr, E_theta_theta     & E_phi_phi
+
+        DO_PSI
+            tmp = (buffer(PSI,dvpdp)*csctheta(t) +buffer(PSI,vr) &
+                    +buffer(PSI,vtheta)*cottheta(t))*one_over_r(r)    !e_phi_phi
+            tmp2 = (buffer(PSI,dvtdt)+buffer(PSI,vr))*one_over_r(r) ! e_theta_theta
+            qty(PSI) = buffer(PSI,dvrdr)*buffer(PSI,dvrdr)+tmp*tmp +tmp2*tmp2    
+        END_DO
+
+
+        !E_r_phi
+        DO_PSI
+            tmp = (buffer(PSI,dvrdp)*csctheta(t)- buffer(PSI,vphi))*one_over_r(r) &
+                    +buffer(PSI,dvpdr) ! 2*e_r_phi
+            qty(PSI) = qty(PSI)+tmp*tmp*Half  ! +2 e_r_phi**2
+        END_DO        
+
+
+
+        !E_r_theta
+
+        DO_PSI
+            tmp = (buffer(PSI,dvrdt)-buffer(PSI,vtheta))*one_over_r(r) &
+                    +buffer(PSI,dvtdr) ! 2*e_r_theta
+
+            qty(PSI) = qty(PSI)+tmp*tmp*Half   ! + 2+e_r_theta**2
+                    
+        END_DO
+
+
+        !E_phi_theta
+        DO_PSI
+            tmp = (buffer(PSI,dvpdt) &
+                +buffer(PSI,dvtdp)*csctheta(t) &
+                -buffer(PSI,vphi)*cottheta(t) )*one_over_r(r)        ! 2*e_phi_theta
+
+            qty(PSI) = qty(PSI)+tmp*tmp*Half   ! + 2*e_phi_theta**2    
+        END_DO    
+
+
+
+        ! -1/3 (div dot v )**2
+        DO_PSI
+            tmp = -buffer(PSI,vr)*ref%dlnrho(r)
+            qty(PSI) = qty(PSI)-tmp*tmp*one_third   ! + 2*e_phi_theta**2
+        END_DO
+        DO_PSI
+            qty(PSI) = viscous_heating_coeff(r)*qty(PSI)
+        END_DO            
+
+
+    End Subroutine Viscous_Heating_Diagnostics
 
 End Module Diagnostics_Energy_Flux

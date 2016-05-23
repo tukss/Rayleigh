@@ -50,6 +50,12 @@ Contains
         Implicit None
         Real*8 :: tilt_angle_radians,a,b
         Real*8 :: fsun
+
+
+        fix_tvar_top = .not. fix_dtdr_top
+        fix_tvar_bottom = .not. fix_dtdr_bottom
+
+
         If (no_slip_boundaries) Then
             no_slip_top = .true.
             no_slip_bottom = .true.

@@ -5,6 +5,7 @@ Module ProblemSize
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
+    Use Math_Constants
 	Use Timers
 
 	Implicit None
@@ -37,6 +38,7 @@ Module ProblemSize
     Real*8              :: aspect_ratio = -1.0d0
     Real*8              :: shell_depth = -1.0d0
     Real*8              :: stretch_factor = 0.0d0
+    Real*8              :: shell_volume
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
 	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
@@ -79,7 +81,7 @@ Contains
             n_r =fensub*fencheby 
             finite_element = .true.
         Endif
-
+        shell_volume = four_pi*one_third*(rmax**3-rmin**3)
         If (l_max .le. 0) Then
 
 

@@ -3,7 +3,7 @@
 #define IDX2 m:l_max,r,imi
 #define SBUFFA wsp%s2a(mp)%data
 #define SBUFFB wsp%s2b(mp)%data
-#define ASBUFFA add_fields%s2a(mp)%data
+#define ASBUFFA cobuffer%s2a(mp)%data
 Module Hybrid_Space_Sphere
 
     ! NOTE: WE NEED a 1/density variable
@@ -19,19 +19,14 @@ Module Hybrid_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
     Use Equation_Coefficients
-    Use Diagnostics_Interface, Only : add_fields
+
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
 
 	Type(rmcontainer3D), Allocatable :: ftemp1(:), ftemp2(:),ftemp3(:)
 Contains
-!///// TODO
-!		change /rho_rep to *one_over_rhorep
 
-!/////////////////////////////
-	!  This routine calculates terms that involve
-	!      theta derivatives and loads them into
-	!		 the buffer.
+
 	Subroutine Hybrid_Init()
         Integer :: r1, r2
         !Allocate a few useful arrays that prevent extra mult/adds
@@ -51,7 +46,7 @@ Contains
 		Integer :: mp,r,imi,m,l, ind_top
 		Call StopWatch(rlma_time)%startclock()
 
-				! Zero out l_max mode
+		! Zero out l_max mode
 		Do mp = my_mp%min, my_mp%max
 			SBUFFA(l_max,:,:,:) = 0.0d0
 		Enddo
@@ -61,27 +56,18 @@ Contains
 		Call Allocate_rlm_Field(ftemp1)
 		Call Allocate_rlm_Field(ftemp2)
 
-        !//////DEBUG ---- UNCOMMENT THESE THREE LINES!
+        If (output_iteration) Call Hybrid_Output_Initial()
+
 		Call Velocity_Components()	
 		Call Velocity_Derivatives()
 		Call d_by_dtheta(wsp%s2a,tvar,dtdt)
         
-        !delete below when done
-        !ind_top = wsp%nf2a ! UBOUND(wsp%s2a(1)%data,4)
-        !DO_IDX2
-            !Do l = m, l_max
-            !SBUFFA(IDX2,vr) = l_l_plus1(m:l_max)* &
-            !    & SBUFFA(IDX2,vr)*Over_RhoRSQ(r)
-            !SBUFFA(IDX2,vr) = SBUFFA(IDX2,tvar)
-            !SBUFFA(IDX2,2:ind_top) = 0.0d0
-            !SBUFFA(l,r,imi,vr) = l_l_plus1(l)* &
-            !    & SBUFFA(l,r,imi,vr)/radius(r)
-            !Enddo
-        !END_DO
 
-        !/////////// END_DEBUG
+		If (magnetism) Call compute_BandCurlB()
 
-		If (magnetism) Call compute_BandJ()
+        If (output_iteration) Call Hybrid_Output_Final()
+
+
 
 		Call DeAllocate_rlm_Field(ftemp1)
 		Call DeAllocate_rlm_Field(ftemp2)
@@ -102,7 +88,13 @@ Contains
 		wsp%config = 'p2a'	
 
 		Call StopWatch(rtranspose_time)%startclock()
-		Call wsp%reform()	! We are now in p3a
+
+        If (output_iteration) Then
+            Call wsp%reform(nextra_recv = output_nextra)
+        Else
+    		Call wsp%reform()	! We are now in p3a
+        Endif      
+
 		Call StopWatch(rtranspose_time)%increment()		
 	End Subroutine rlm_spacea
 
@@ -202,6 +194,17 @@ Contains
 
 
 	End Subroutine rlm_spaceb
+
+    Subroutine Hydro_Output_Derivatives()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+        !Compute sin(theta) dP/dtheta and 
+        !place it in the cobuffer
+        Call d_by_dtheta(wsp%s2a,pvar,ftemp1)
+        DO_IDX2
+            ASBUFFA(IDX2,dpdt_cb) = ftemp1(mp)%data(IDX2)
+        END_DO
+    End Subroutine Hydro_Output_Derivatives
 
 	Subroutine Velocity_Components()
 		Implicit None
@@ -316,9 +319,12 @@ Contains
         END_DO
 	End Subroutine Velocity_Derivatives
 
-	Subroutine Compute_BandJ()
+	Subroutine Compute_BandCurlB()
 		Implicit None
 		Integer :: imi, m, mp, r 
+
+        ! This routine computes B and Del X B
+        ! The shorthand for Del X B in the buffer is "j"
        
 		!/////////////// BR /////////////////////		
 		!First convert C to Br  !! Br overwrites C
@@ -326,10 +332,10 @@ Contains
 			SBUFFA(IDX2,Br) = l_l_plus1(m:l_max)*SBUFFA(IDX2,Br)*OneOverRSquared(r)
         END_DO     
 
-		!////////////////// JR ///////////////////////////
+		!////////////////// [Del x B]_r ///////////////////////////
 		!Compute Jr (Jr does not overwrite any existing fields)
         DO_IDX2
-			SBUFFA(IDX2,Jr) = alf_const*l_l_plus1(m:l_max) &
+			SBUFFA(IDX2,Jr) = l_l_plus1(m:l_max) &
                *SBUFFA(IDX2,Avar)*OneOverRSquared(r)
         END_DO  
 
@@ -342,7 +348,7 @@ Contains
 		Call d_by_dtheta(wsp%s2a,dadr,ftemp1)	 
 		Call d_by_dphi(  wsp%s2a,dadr,ftemp2)
 
-        !////////// J _PHI //////////////////////////
+        !////////// [Del x B]_phi //////////////////////////
         ! overwrite d_a_dr with d_d_phi(d_a_dr)
         DO_IDX2
             SBUFFA(IDX2,dadr) = ftemp2(mp)%data(IDX2)
@@ -353,15 +359,15 @@ Contains
         ! Add this term to d_d_phi(d_a_dr) to build rsintheta J_phi (overwrite dadr)
         DO_IDX2
             SBUFFA(IDX2,jphi) = SBUFFA(IDX2,jphi)+ftemp2(mp)%data(IDX2)
-            SBUFFA(IDX2,jphi) = alf_const*SBUFFA(IDX2,jphi)
+            SBUFFA(IDX2,jphi) = SBUFFA(IDX2,jphi)
         END_DO
 
-        !/////////////J Theta ///////////////////////
+        !/////////////[Del x B]_theta ///////////////////////
         Call d_by_dphi(  wsp%s2a,d2cdr2,ftemp2)       !get phi derivative of d2cdr2-Br
 
-        ! Combine with ftemp1 to build J_theta (overwrites d2cdr2)
+        ! Combine with ftemp1 to build rsintheta J_theta (overwrites d2cdr2)
         DO_IDX2
-            SBUFFA(IDX2,jtheta) = alf_const*(ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
+            SBUFFA(IDX2,jtheta) = (ftemp1(mp)%data(IDX2)-ftemp2(mp)%data(IDX2))
         END_DO
 
 
@@ -391,17 +397,15 @@ Contains
         DO_IDX2
             SBUFFA(IDX2,dcdr) = ftemp2(mp)%data(IDX2)-ftemp1(mp)%data(IDX2)
         END_DO
-
-
-
-	End Subroutine Compute_BandJ
+	End Subroutine Compute_BandCurlB
 
 	Subroutine Bfield_Derivatives()
 		Implicit None
 		Integer :: r, l, m, mp, imi
-        Integer :: dbrdr, dbtdr, dbpdr, dbrdt
+
         !These terms are only needed if we want to output 
         !inductions terms in the diagnostics
+
 
 		!/////////////////////////////////
 		!sintheta dB theta dr
@@ -414,16 +418,16 @@ Contains
         END_DO
 
         DO_IDX2			
-            ASBUFFA(IDX2,dbtdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbtdr_cb) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbtdr) = SBUFFA(IDX2,dbtdr)- &
-                & SBUFFA(IDX2,btheta)*one_over_r(r)
-        END_DO	
+            ASBUFFA(IDX2,dbtdr_cb) = ASBUFFA(IDX2,dbtdr_cb)- &
+                & SBUFFA(IDX2,btheta)*OneOverRSquared(r)  !(take care) btheta is really rsintheta btheta
+        END_DO	                                          !hence 1/r^2 instead of 1/r
 
 		!/////////////////////////////////
-		!sinphi dB phi dr 
+		!sintheta dB phi dr 
 		Call d_by_dphi(wsp%s2a,d2cdr2,ftemp1)	
 		Call d_by_dtheta(wsp%s2a,dadr,	ftemp2)	   		
 
@@ -432,37 +436,69 @@ Contains
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr) = ftemp1(mp)%data(IDX2)*one_over_r(r)
+            ASBUFFA(IDX2,dbpdr_cb) = ftemp1(mp)%data(IDX2)*one_over_r(r)
         END_DO
 
         DO_IDX2		
-            ASBUFFA(IDX2,dbpdr) = ASBUFFA(IDX2,dbpdr)- &
-                &  SBUFFA(IDX2,bphi)*one_over_r(r)
+            ASBUFFA(IDX2,dbpdr_cb) = ASBUFFA(IDX2,dbpdr_cb)- &
+                &  SBUFFA(IDX2,bphi)*OneOverRSquared(r) !(take care) bphi is really rsinthetabphi
         END_DO	
 
 		!/////////////////////////////////////////  
 		!dB r dr	
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr) = l_l_plus1(m:l_max)* & 
+            ASBUFFA(IDX2,dbrdr_cb) = l_l_plus1(m:l_max)* & 
                 & SBUFFA(IDX2,dcdr)*OneOverRSquared(r)
         END_DO
 
 
         DO_IDX2
-            ASBUFFA(IDX2,dbrdr) = ASBUFFA(IDX2,dbrdr)- &
+            ASBUFFA(IDX2,dbrdr_cb) = ASBUFFA(IDX2,dbrdr_cb)- &
                 & SBUFFA(IDX2,br)*Two_Over_R(r)
         END_DO
 
-		Call d_by_dtheta(wsp%s2a,br,dbrdt)  
-
-		
-		! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
+        !sintheta dbrdr
+		Call d_by_dtheta(wsp%s2a,br,ftemp1)  
         DO_IDX2
-            ASBUFFA(IDX2,avar) = l_l_plus1(m:l_max)*SBUFFA(IDX2,avar)*one_over_r(r)
+            ASBUFFA(IDX2,dbrdt_cb) = ftemp1(mp)%data(IDX2)
         END_DO
+		
+
 	End Subroutine BField_Derivatives
 
+    Subroutine Hybrid_Output_Initial()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+        If (magnetism) Then
+            ! We need to grab avar before it's overwritten by b_theta
+		    ! Convert A to ell(ell+1) A/r^2  (i.e. [curl B]_r)		
+            DO_IDX2
+                ASBUFFA(IDX2,avar_cb) = l_l_plus1(m:l_max)* &
+                                        SBUFFA(IDX2,avar)*one_over_r(r)
+            END_DO
+        Endif
+    End Subroutine Hybrid_Output_Initial
+
+    Subroutine Hybrid_Output_Final()
+        Implicit None
+		Integer :: r, l, m, mp, imi
+	    Do mp = my_mp%min, my_mp%max
+		    ASBUFFA(l_max,:,:,:) = 0.0d0
+	    Enddo
+        Call Hydro_Output_Derivatives()
+        If (magnetism) Then
+            ! We compute some derivatives of B as well
+            Call BField_Derivatives()
+        Endif
+        Call cobuffer%construct('p2a')
+        cobuffer%config = 'p2a'
+        Call Legendre_Transform(cobuffer%s2a,cobuffer%p2a)
+        Call cobuffer%deconstruct('s2a')
+
+        Call cobuffer%reform()
+           
+    End Subroutine Hybrid_Output_Final
 
 	Subroutine Adjust_Emf()
 		Implicit None

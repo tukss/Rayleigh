@@ -32,7 +32,7 @@ Module Controls
     Logical :: magnetism = .false.          ! Turn magnetism on or off
     Logical :: nonlinear = .true.           ! Nonlinear terms can be turned off (calculated but zeroed out - for debugging)
     Logical :: Rotation = .false.           ! Rotate or not
-    Logical :: lorentz_forces = .true.     ! Turn Lorentz forces on or off
+    Logical :: lorentz_forces = .true.      ! Turn Lorentz forces on or off
     Logical :: viscous_heating = .true.     ! Turns viscous heating on/off
     Logical :: ohmic_heating = .true.
     Logical :: advect_reference_state = .false.  ! Set to true to advect the reference state
@@ -89,6 +89,8 @@ Module Controls
     Real*8 :: kill_signal = 0.0d0  ! Signal will be passed in Real*8 buffer, but should be integer-like
     Integer :: nglobal_msgs = 3  ! timestep, elapsed since checkpoint, kill_signal/global message
 
+
+    Integer :: nicknum = 5   ! DO NOT LEAVE THIS HERE -- TEMPORARY LOCATION (AND NAME)
 
 Contains
     Subroutine Initialize_Controls()

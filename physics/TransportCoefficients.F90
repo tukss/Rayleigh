@@ -22,9 +22,14 @@ Module TransportCoefficients
     Character*120 :: custom_nu_file = 'nothing'
     Character*120 :: custom_kappa_file = 'nothing'
 
+    Logical :: hyperdiffusion = .false.
+    Real*8  :: hyperdiffusion_beta = 0.0d0
+    Real*8  :: hyperdiffusion_alpha = 1.0d0
+    
+
 	Namelist /Transport_Namelist/ nu_type, kappa_type, eta_type, nu_power, kappa_power, eta_power, &
 			& nu_top, kappa_top, eta_top, custom_nu_file, custom_eta_file, custom_kappa_file, &
-              eta_amp
+              eta_amp, hyperdiffusion, hyperdiffusion_beta, hyperdiffusion_alpha
 
 
 Contains
@@ -85,6 +90,11 @@ Contains
             nu_top = Prandtl_Number
             kappa_top = 1.0d0
             eta_top = Prandtl_Number/Magnetic_Prandtl_Number
+        Endif
+        If (Nondimensional_Anelastic) Then
+            nu_top = Ekman_Number
+            kappa_top = nu_top/Prandtl_Number
+            eta_top = nu_top/Magnetic_Prandtl_Number
         Endif
 		Call Initialize_Nu()							! Viscosity
 		Call Initialize_Kappa()						! Thermal Diffusivity

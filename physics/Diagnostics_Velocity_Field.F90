@@ -81,6 +81,13 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
+        If (compute_quantity(dvm_r_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvrdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
+
         !-- -- {1/r d(v_r)/dtheta}
         If (compute_quantity(dv_r_dtr)) Then
             DO_PSI
@@ -115,6 +122,12 @@ Contains
             Call Add_Quantity(qty)
         Endif	
 
+        If (compute_quantity(dvm_r_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvrdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif		
 
         !/////////////////////////////////////////
         ! 2. terms involving theta velocity
@@ -175,6 +188,13 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
+        If (compute_quantity(dvm_theta_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvtdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
         !-- -- {1/r d(v_theta)/dtheta}
         If (compute_quantity(dv_theta_dtr)) Then
             DO_PSI
@@ -209,7 +229,12 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
-
+        If (compute_quantity(dvm_theta_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvtdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
 
 
 
@@ -272,6 +297,13 @@ Contains
             Call Add_Quantity(qty)
         Endif		
 
+        If (compute_quantity(dvm_phi_dp)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvpdp)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
+
         !-- -- {1/r d(v_phi)/dtheta}
         If (compute_quantity(dv_phi_dtr)) Then
             DO_PSI
@@ -305,7 +337,12 @@ Contains
             END_DO
             Call Add_Quantity(qty)
         Endif		
-
+        If (compute_quantity(dvm_phi_dprs)) Then
+            DO_PSI
+                qty(PSI) = m0_values(PSI2,dvpdp)*one_over_r(r)*csctheta(t)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif	
 
         !/////////////////////////////////////////////////////////////
         ! Finally, if desired, we compute the mass flux.
