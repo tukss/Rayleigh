@@ -156,7 +156,7 @@ Contains
         ref%dsdr(:) = 0.0d0
         ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
         Call Initialize_Reference_Heating()
-        Write(6,*)'Reference State Initialized'
+
 
         Allocate(s_conductive(1:N_R))
         s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!

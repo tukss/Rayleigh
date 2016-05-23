@@ -258,7 +258,7 @@ Contains
 			wsfcount(2,2) = 7
 			wsfcount(3,2) = 7
 		endif
-		Write(6,*)'Fields initialized'
+		!Write(6,*)'Fields initialized'
 		!Write(6,*)'c1a_counter is: ', wsp_indices%c1a_counter
 		!Write(6,*)'c2a_counter is: ', wsp_indices%c2a_counter
 		!Write(6,*)'c3a_counter is: ', wsp_indices%c3a_counter

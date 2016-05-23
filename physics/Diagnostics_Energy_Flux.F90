@@ -141,8 +141,11 @@ Contains
 
                 ! Note that radial_integral_weights give int{f r^2}/int(r^2}
                 Do r = N_R-1, 1,-1
-                    qadd = ref%heating(r+1)*ref%density(r)*ref%temperature(r) ! the heat
-                    fpr2dr = radial_integral_weights(r+1)*shell_volume*3.0d0 !4 pi r^2 dr
+                    qadd = ref%heating(r)*ref%density(r)*ref%temperature(r) ! the heat
+                    qadd = qadd+ ref%heating(r+1)*ref%density(r+1)*ref%temperature(r+1)
+                    qadd = qadd*half
+                    fpr2dr = (r_squared(r) + r_squared(r+1))*Half*four_pi
+                    fpr2dr = fpr2dr*(radius(r)-radius(r+1))
                     tmp1d(r) = tmp1d(r+1)+qadd*fpr2dr
                 Enddo
                 tmp1d = tmp1d/four_pi/r_squared
