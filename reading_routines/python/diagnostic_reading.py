@@ -454,7 +454,118 @@ class ShellSpectra:
         for i,q in enumerate(self.qv):
             self.lut[q] = i
         fd.close()
+class PowerSpectrum():
+    #Power Spectrum Class - generated using shell spectra files
+    def __init__(self,infile, dims=[],power_file = False):
+        if (power_file):
+            self.power_file_init(infile) 
+        elif (infile == 'Blank' or infile =='blank'):
+            self.blank_init(dims)      
+        else:
+            self.spectra_file_init(infile)
 
+    def blank_init(self,dims):
+        print 'blank init'
+        self.lmax = dims[0]
+        self.nr = dims[1]
+        self.niter = dims[2]
+        self.power = np.zeros((self.lmax+1,self.nr,self.niter,3),dtype='float64')
+    def set_pars(self,iters,time,inds,radius):
+        self.iters = np.zeros(self.niter,dtype='int32')
+        self.time = np.zeros(self.niter,dtype='float64')
+
+        self.inds = np.zeros(self.nr,dtype='int32')
+        self.radius = np.zeros(self.nr,dtype='float64')
+    
+        self.iters[:]  = iters[:]
+        self.time[:]   = time[:]
+        self.inds[:]   = inds[:]
+        self.radius[:] = radius[:]
+    def power_file_init(self,pfile):
+        fd = open(pfile,'rb')  
+        bs = check_endian(fd,314,'int32')
+        lmax  = swapread(fd,dtype='int32',count=1,swap=bs)
+        nr    = swapread(fd,dtype='int32',count=1,swap=bs)
+        niter = swapread(fd,dtype='int32',count=1,swap=bs)
+        self.iters = np.reshape(swapread(fd,dtype='int32',count=niter,swap=bs),(niter), order = 'F')
+        self.time = np.reshape(swapread(fd,dtype='float64',count=niter,swap=bs),(niter), order = 'F')
+        self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
+        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        pcount = (lmax+1)*nr*niter*3
+        pdim = (lmax+1,nr,niter,3)
+        self.power = np.reshape(swapread(fd,dtype='float64',count=pcount,swap=bs),pdim, order = 'F')
+
+        self.niter = niter
+        self.nr = nr
+        self.lmax = lmax
+        
+        fd.close()
+    def write_power(self,ofile):
+        fd = open(ofile,'wb') #w = write, b = binary
+        dims = np.zeros(4,dtype='int32')
+        dims[0] = 314
+        dims[1] = self.lmax
+        dims[2] = self.nr
+        dims[3] = self.niter
+        dims.tofile(fd)
+        self.iters.tofile(fd)
+        self.time.tofile(fd)
+        self.inds.tofile(fd)
+        self.radius.tofile(fd)
+        tmp = np.transpose(self.power)
+        tmp.tofile(fd)
+        fd.close()
+
+    def spectra_file_init(self,sfile):
+
+        a = ShellSpectra(filename=sfile,path='./')
+        lmax = a.lmax
+        nr = a.nr
+        nt = a.niter
+
+        self.lmax = lmax
+        self.nr = nr
+        self.niter = nt
+        self.radius = a.radius
+        self.inds = a.inds
+        self.iters = a.iters
+        self.time = a.time
+
+        # We use the lookup table to find where vr, vtheta, and vphi are stored
+        vr_index = a.lut[1]
+        vt_index = a.lut[2]
+        vp_index = a.lut[3]
+        #the last index indicates 0:full power, 1:m0 power, 2:full-m0
+        power = np.zeros((lmax+1,nr,nt,3),dtype='float64')
+        
+        # Next we grab one radial index and one time instance of each variable
+        dims = (a.nell,a.nm,nr,nt)
+        vrc = np.reshape(a.vals[:,:,:, vr_index, :],dims)
+        vtc = np.reshape(a.vals[:,:,:, vt_index, :],dims)
+        vpc = np.reshape(a.vals[:,:,:, vp_index, :],dims)
+
+        #print 'first index: '
+        #for i in range(0,lmax+1,10):
+        #    print a.vals[i:i+10,0,0,0,0]   
+
+
+        #print 'second index: '
+        #for i in range(0,lmax+1,10):
+        #    print a.vals[0,i:i+10,0,0,0]   
+
+
+        for k in range(nt):
+            for j in range(nr):
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vrc[:,0,j,k])**2 +np.imag(vrc[:,0,j,k])**2
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vtc[:,0,j,k])**2 +np.imag(vtc[:,0,j,k])**2
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vpc[:,0,j,k])**2 +np.imag(vpc[:,0,j,k])**2
+                for m in range(a.nm):
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
+                    power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
+
+        self.power = power
 
 def swapread(fd,dtype='float64',count=1,swap=False):
         #simple wrapper to numpy.fromfile that allows byteswapping based on Boolean swap
