@@ -50,7 +50,7 @@ PRO READ_GAVG, file, res
 	CLOSE, 13
 
 	; Build a lookup table for the quantity codes
-	qmax = 400L
+	qmax = 901L
 	lut = LONARR(qmax+1)
 	lut[*] = qmax*2
 	FOR i = 0, nq -1 DO BEGIN

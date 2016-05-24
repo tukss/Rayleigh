@@ -41,7 +41,7 @@ PRO READ_SHELLAVG, file, res
 		vals = DBLARR(nr,nq,nrec)
 		nmom = 1
 	ENDIF
-	IF (version eq 2) THEN BEGIN
+	IF (version ge 2) THEN BEGIN
 		vals = DBLARR(nr,4,nq,nrec)
 		nmom = 4
 	ENDIF
@@ -80,7 +80,7 @@ PRO READ_SHELLAVG, file, res
 	CLOSE, 13
 
 	; Build a lookup table for the quantity codes
-	qmax = 400L
+	qmax = 901L
 	lut = LONARR(qmax+1)
 	lut[*] = qmax*2
 	FOR i = 0, nq -1 DO BEGIN
