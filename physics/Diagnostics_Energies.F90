@@ -64,7 +64,7 @@ Contains
         ! Energies associated with the mean velocity field
         If (compute_quantity(mkinetic_energy)) Then
             DO_PSI
-                qty(PSI) = qty(PSI)+m0_values(PSI2,vr    )**2
+                qty(PSI) = m0_values(PSI2,vr    )**2
                 qty(PSI) = qty(PSI)+m0_values(PSI2,vtheta)**2
                 qty(PSI) = qty(PSI)+m0_values(PSI2,vphi  )**2
                 qty(PSI) = qty(PSI)*dfact(r)
