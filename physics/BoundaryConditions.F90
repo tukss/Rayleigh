@@ -60,16 +60,10 @@ Contains
             no_slip_top = .true.
             no_slip_bottom = .true.
         Endif
-        If (no_slip_top) Then
-            stress_free_top = .false.
-        Else
-            stress_free_top = .true.
-        Endif
-        If (no_slip_bottom) Then
-            stress_free_bottom = .false.
-        Else
-            stress_free_bottom = .true.
-        Endif
+        stress_free_top = .not. no_slip_top
+        stress_free_bottom = .not. no_slip_bottom
+
+
         If (impose_dipole_field) Then
             fix_poloidalfield_top = .true.
             fix_poloidalfield_bottom = .true.
