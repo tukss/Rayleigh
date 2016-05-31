@@ -139,7 +139,7 @@ Contains
 		Call self%Init_Geometry()	
 
         Call self%openmp_init()
-		If (self%gcomm%rank .eq. 0) Then
+		If (self%gcomm%rank .eq. -1) Then
 			Write(6,*)"/////////////////////////////////////////////////////////////////////"
 			Write(6,*)"//                                                                 //"
 			Write(6,*)"//            Rayleigh's Parallel framework is initialized.        //"
