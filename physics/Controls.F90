@@ -15,7 +15,7 @@ Module Controls
     ! Numerical Controls
     ! Flats that control details of the parallelization/data layout and 
     ! how the equations are solved (not what equations are solved).
-    Logical :: chebyshev = .false.          ! Set to true to use chebyshev polynomials in radius (default is finite-difference)
+    Logical :: chebyshev = .true.           ! Set to false to use finite-differences (chebyshev polynomials are used by default)
     Logical :: bandsolve = .false.          ! Set to true to use band solves with the finite-differences
     Logical :: static_transpose = .false.   ! When true, transpose buffers for sending/receiving are never de-allocated for spherical buffer objects
     Logical :: static_config = .false.      ! When true, configuration buffers (p3a, s1b, etc.) ar enever de-allocated for spherical buffer objects
@@ -29,14 +29,14 @@ Module Controls
     !////////////////////////////////////////////////////////////////////////////////
     ! Physical Controls
     ! Flags that control various fundamental aspects of the physics employed
-    Logical :: magnetism = .false.          ! Turn magnetism on or off
+    Logical :: magnetism = .false.          ! Turn magnetism on or off (default is off)
     Logical :: nonlinear = .true.           ! Nonlinear terms can be turned off (calculated but zeroed out - for debugging)
     Logical :: Rotation = .false.           ! Rotate or not
-    Logical :: lorentz_forces = .true.      ! Turn Lorentz forces on or off
+    Logical :: lorentz_forces = .true.      ! Turn Lorentz forces on or off (default is on - as long as magnetism is on)
     Logical :: viscous_heating = .true.     ! Turns viscous heating on/off
     Logical :: ohmic_heating = .true.
     Logical :: advect_reference_state = .false.  ! Set to true to advect the reference state
-                                                ! Generally only do this if reference state is not adiabatic
+                                                ! Generally only do this if reference state is nonadiabatic
 
     ! --- This flag determines if the code is run in benchmark mode
     !     0 (default) is no benchmarking.  1-5 are various accuracy benchmarks (see documentation)
