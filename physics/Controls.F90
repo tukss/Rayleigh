@@ -51,7 +51,7 @@ Module Controls
     !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls
     !   Flags that control details of the time-stepping (some relate to the numerics, but we keep the time-related things together).
-    Real*8  :: alpha_implicit = 0.51d0            ! Crank Nicolson Implict/Explicit weighting factor (1.0 is fully implicit)
+    Real*8  :: alpha_implicit = 0.50001d0            ! Crank Nicolson Implict/Explicit weighting factor (1.0 is fully implicit)
     Integer :: max_iterations = 1000000         ! The maximum number of iterations to be run in a given session
     Real*8  :: max_time_minutes = 1d8            ! Maximum walltime to run the code (this should be ample...)
 
@@ -60,7 +60,7 @@ Module Controls
     Integer :: checkpoint_interval = 1000000    ! Same as check_frequency (check_frequency will be deprecated soon)
     Integer :: quicksave_interval =  -1        ! Number of iterations between quicksave dumps
     Integer :: num_quicksaves = 3              ! Number of quick-save checkpoints to write before rolling back to #1
-    Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves
+    Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves (overrides quicksave interval)
 
     Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
     Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
