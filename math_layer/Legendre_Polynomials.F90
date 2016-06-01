@@ -11,7 +11,7 @@ Module Legendre_Polynomials
 	Integer :: m_mod = 1	! Only calculate p_lms for every m_mod'th m
 	Integer, Allocatable :: m_values(:),n_l(:),n_l_even(:),n_l_odd(:)
 	Logical :: parity = .true.
-	Real*16 ::	Pi  = 3.1415926535897932384626433832795028841972q+0
+	Real*16 ::	PiQuad  = 3.1415926535897932384626433832795028841972q+0
 	Type, Public :: even_odd_sep
 		Real*8, Allocatable :: even(:)
 		Real*8, Allocatable :: odd(:)
@@ -174,7 +174,7 @@ Subroutine Compute_Plms()
 
 		mv = m_values(m)
 		Call compute_factorial_ratio(mv,factorial_ratio)
-		amp = ((mv+0.5q0)/(2.0q0*pi))**0.5q0		
+		amp = ((mv+0.5q0)/(2.0q0*PiQuad))**0.5q0		
 		amp = amp*factorial_ratio
 		Do i = 1, ntmax
 			x = coloc(i)
@@ -219,7 +219,7 @@ Subroutine Compute_Plms()
 			    Do i = 1, ntmax
 				    
 				    p_lm(m)%data(l,i)  = p_lmq(m)%data(i,l)
-                    renorm = 2.0q0*pi*gl_weights(i)
+                    renorm = 2.0q0*PiQuad*gl_weights(i)
                     tmp = p_lmq(m)%data(i,l)*renorm
 				    ip_lm(m)%data(i,l) = tmp
 			    Enddo
@@ -278,7 +278,7 @@ Subroutine Parity_Resort(m)
 				 lvals(m)%odd(indodd) = l
 				lvalsi(m)%odd(indodd) = l
                 Do i = 1, n_theta/2
-                    renorm = 2.0q0*pi*gl_weights(i)
+                    renorm = 2.0q0*PiQuad*gl_weights(i)
                     tmp = p_lmq(m)%data(i,l)*renorm
 				    ip_lm_odd(m)%data(i,indodd) = tmp
 				    p_lm_odd(m)%data(indodd,i) = p_lmq(m)%data(i,l)
@@ -289,7 +289,7 @@ Subroutine Parity_Resort(m)
 				 lvals(m)%even(indeven) = l
 				lvalsi(m)%even(indeven) = l
                 Do i = 1, n_theta/2
-                    renorm = 2.0q0*pi*gl_weights(i)
+                    renorm = 2.0q0*PiQuad*gl_weights(i)
                     tmp = p_lmq(m)%data(i,l)*renorm
     				ip_lm_even(m)%data(i,indeven) = tmp
     				p_lm_even(m)%data(indeven,i) =   p_lmq(m)%data(i,l)
@@ -325,7 +325,7 @@ Subroutine Find_Colocation(x1,x2,abscissas, weights, order_n)
 
 
 	Do i = 1, n_roots
-		ith_root = cos(pi*(i-0.25q0)/(order_n+0.5q0))
+		ith_root = cos(PiQuad*(i-0.25q0)/(order_n+0.5q0))
 		converged = .false.
 		Do While (.not. converged)			
 			Call nth_legendre(ith_root,order_n,pn,deriv_pn)

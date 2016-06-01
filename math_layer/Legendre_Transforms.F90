@@ -51,12 +51,12 @@ Subroutine Test_Legendre
 		theta(i) = acos(coloc(i))
 		ct = cos(theta(i))
 		st = sin(theta(i))
-		ylm(i,1) = (0.25d0/pi)**0.5d0	!00
-		ylm(i,2) = -st*(3.0d0/8.0d0/pi)**0.5d0 !11
-		ylm(i,3) = ct*(3.0d0/4.0/pi)**0.5d0 ! 10
-		ylm(i,4) = st*st*0.25d0*(15.0d0/2.0d0/pi)**0.5d0 !22
-		ylm(i,5) = -st*ct*(15.0d0/8.0d0/pi)**0.5d0 !21
-		ylm(i,6) = (1.5d0*ct*ct-0.5d0)*(5.0d0/4.0/pi)**0.5d0	!20
+		ylm(i,1) = (0.25d0/PiQuad)**0.5d0	!00
+		ylm(i,2) = -st*(3.0d0/8.0d0/PiQuad)**0.5d0 !11
+		ylm(i,3) = ct*(3.0d0/4.0/PiQuad)**0.5d0 ! 10
+		ylm(i,4) = st*st*0.25d0*(15.0d0/2.0d0/PiQuad)**0.5d0 !22
+		ylm(i,5) = -st*ct*(15.0d0/8.0d0/PiQuad)**0.5d0 !21
+		ylm(i,6) = (1.5d0*ct*ct-0.5d0)*(5.0d0/4.0/PiQuad)**0.5d0	!20
 		tmp(i) = 1.0d0/(1-coloc(i)*coloc(i))
 	Enddo
 	l_test(1) = 0
