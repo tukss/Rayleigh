@@ -17,7 +17,6 @@ Module Physical_Space_Sphere
 	Use ClockInfo
 	Use ReferenceState
 	Use TransportCoefficients
-	Use NonDimensionalization
     Use Math_Constants
     Use Benchmarking, Only : benchmark_checkup
 	Implicit None

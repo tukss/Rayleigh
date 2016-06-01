@@ -10,7 +10,6 @@ Module Linear_Terms_Sphere
 	!Use Legendre_Polynomials, Only : pi
 	Use ReferenceState
 	Use TransportCoefficients
-	Use NonDimensionalization
     Use Equation_Coefficients
     !Use Math_Constants, Only : pi
     Implicit None

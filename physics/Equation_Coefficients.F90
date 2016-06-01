@@ -7,7 +7,6 @@ Module Equation_Coefficients
     Use ProblemSize
     Use Controls
     Use Math_Constants
-    Use NonDimensionalization
     Use BoundaryConditions
     Implicit None
     Real*8 :: coriolis_term

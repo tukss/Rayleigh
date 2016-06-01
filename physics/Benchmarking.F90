@@ -19,7 +19,6 @@ Module Benchmarking
     Use BoundaryConditions
     Use Initial_Conditions
     Use TransportCoefficients
-    use NonDimensionalization
     Implicit None
 
     Integer, Private :: nobs, msymm
@@ -113,8 +112,7 @@ Contains
             gravity_power = 1.0d0
             dimensional = .false.
 
-            !Nodimensionalization Namelist
-            use_dimensional_inputs = .false.
+
         Endif
 
         If (benchmark_mode .eq. 2) Then
@@ -165,8 +163,7 @@ Contains
             gravity_power = 1.0d0
             dimensional = .false.
 
-            !Nodimensionalization Namelist
-            use_dimensional_inputs = .false.
+
 
         Endif
 

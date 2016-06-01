@@ -9,7 +9,6 @@ Module Drive_Sphere
 	Use Controls
 	Use Timers
 	Use Fields
-	Use NonDimensionalization
     !This is another comment for git - testing merge
 Contains
 
