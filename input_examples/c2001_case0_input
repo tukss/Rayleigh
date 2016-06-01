@@ -83,10 +83,5 @@ heating_type = 0
 gravity_power = 1.0d0
 dimensional = .false.
 /
-&NonDimensionalization_Namelist
-use_dimensional_inputs = .false.
-nd_index = 1
-entropy_bottom = 1.0d0
-/
 &Transport_Namelist
 /

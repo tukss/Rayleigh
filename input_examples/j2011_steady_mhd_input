@@ -79,8 +79,6 @@ pressure_specific_heat = 1.0509d8
 dimensional = .true.
 angular_velocity = 1.76d-4
 /
-&NonDimensionalization_Namelist
-/
 &Transport_Namelist
 nu_top    = 7.28728d12
 kappa_top = 7.28728d12

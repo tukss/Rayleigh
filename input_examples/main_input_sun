@@ -82,10 +82,6 @@ pressure_specific_heat = 3.5d8  ! cp
 angular_velocity = 2.6d-6       ! inverse seconds
 dimensional = .true.            ! set to false if running boussinesq
 /
-&NonDimensionalization_Namelist
-nd_index = 64   !Don't mess with these
-entropy_bottom = 851225.7d0
-/
 &Transport_Namelist
 nu_top    = 4.d12   ! Value of nu at the outer boundary
 kappa_top = 1.2d13  ! Value of kappa -- can also set eta_top for B-runs

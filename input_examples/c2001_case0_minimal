@@ -29,7 +29,5 @@
 /
 &Reference_Namelist
 /
-&NonDimensionalization_Namelist
-/
 &Transport_Namelist
 /
