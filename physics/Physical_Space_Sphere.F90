@@ -340,7 +340,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX			
 				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
-					& coriolis_term*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
+					& ref%Coriolis_Coeff*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -449,7 +449,7 @@ Contains
 
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,pvar) = RHSP(IDX,pvar)- coriolis_term*costheta(t)*FIELDSP(IDX,vphi)
+				RHSP(IDX,pvar) = RHSP(IDX,pvar)- ref%Coriolis_Coeff*costheta(t)*FIELDSP(IDX,vphi)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -506,8 +506,8 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
-					 + coriolis_term*costheta(t)*FIELDSP(IDX,vtheta) &
-					 + coriolis_term*sintheta(t)*FIELDSP(IDX,vr)
+					 + ref%Coriolis_Coeff*costheta(t)*FIELDSP(IDX,vtheta) &
+					 + ref%Coriolis_Coeff*sintheta(t)*FIELDSP(IDX,vr)
 			END_DO
 			!OMP END PARALLEL DO
 		Endif

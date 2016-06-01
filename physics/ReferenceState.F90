@@ -31,7 +31,9 @@ Module ReferenceState
         Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
         Real*8 :: gamma
         Real*8, Allocatable :: heating(:)
-        Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
+
+        Real*8 :: Coriolis_Coeff
+
     End Type ReferenceInfo
     Real*8, Allocatable :: s_conductive(:)
 
@@ -49,7 +51,7 @@ Module ReferenceState
     Real*8 :: poly_mass = 0.0d0
     Real*8 :: poly_rho_i =0.0d0
     Real*8 :: Gravitational_Constant = 6.67d-8
-    Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle, length_twiddle ! also in ref structure..
+
 
     Real*8 :: Angular_Velocity = 1.0d0
 
@@ -115,7 +117,39 @@ Contains
         Allocate(ref%dsdr(1:N_R))
         Allocate(ref%Buoyancy_Coeff(1:N_R))
     End Subroutine Allocate_Reference_State
+    Subroutine Constant_Reference()
+            Implicit None
+            Integer :: i
+            Real*8 :: r_outer, r_inner, prefactor, amp
+            ref%density = 1.0d0
+            ref%dlnrho = 0.0d0
+            ref%d2lnrho = 0.0d0
+            ref%pressure = 1.0d0
+            ref%temperature = 1.0d0
+            ref%dlnT = 0.0d0
+            ref%dsdr = 0.0d0
+            ref%pressure = 1.0d0
+            ref%gravity = 0.0d0 ! Not used with constant reference right now
 
+            amp = Rayleigh_Number/Prandtl_Number
+
+            Do i = 1, N_R
+                ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
+            Enddo
+
+            pressure_specific_heat = 1.0d0
+            Call initialize_reference_heating()
+            Allocate(s_conductive(1:N_R))
+            r_outer = radius(1)
+            r_inner = radius(N_R)
+            prefactor = r_outer*r_inner/(r_inner-r_outer)
+            Do i = 1, N_R
+                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
+            Enddo
+
+			ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+    
+    End Subroutine Constant_Reference
     Subroutine Polytropic_Reference_DevelND()
         Implicit None
         Real*8 :: dtmp
@@ -161,6 +195,7 @@ Contains
         Allocate(s_conductive(1:N_R))
         s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!
 
+        ref%Coriolis_Coeff = 2.0d0
 
     End Subroutine Polytropic_Reference_DevelND
 
@@ -254,6 +289,8 @@ Contains
         Deallocate(zeta)
 
         Call Initialize_Reference_Heating()
+
+        ref%Coriolis_Coeff = 2.0d0*Angular_velocity
 
     End Subroutine Polytropic_Reference
 
@@ -716,36 +753,7 @@ Contains
 
     
 
-    Subroutine Constant_Reference()
-            Implicit None
-            Integer :: i
-            Real*8 :: r_outer, r_inner, prefactor, amp
-            ref%density = 1.0d0
-            ref%dlnrho = 0.0d0
-            ref%d2lnrho = 0.0d0
-            ref%pressure = 1.0d0
-            ref%temperature = 1.0d0
-            ref%dlnT = 0.0d0
-            ref%dsdr = 0.0d0
-            ref%pressure = 1.0d0
-            ref%gravity = 0.0d0 ! Not used with constant reference right now
 
-            amp = Rayleigh_Number/Prandtl_Number
-
-            Do i = 1, N_R
-                ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
-            Enddo
-
-            pressure_specific_heat = 1.0d0
-            Call initialize_reference_heating()
-            Allocate(s_conductive(1:N_R))
-            r_outer = radius(1)
-            r_inner = radius(N_R)
-            prefactor = r_outer*r_inner/(r_inner-r_outer)
-            Do i = 1, N_R
-                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
-            Enddo
-    End Subroutine Constant_Reference
 
     Subroutine Read_Profile_File(filename,arr)
     Character*120, Intent(In) :: filename

@@ -56,6 +56,9 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
+        Real*8 :: coriolis_term
+        coriolis_term = ref%Coriolis_Coeff
+
         If(compute_quantity(Coriolis_Force_r)) Then
             DO_PSI
                 qty(PSI) = -ref%density(r)*coriolis_term*sintheta(t)*buffer(PSI,vphi)

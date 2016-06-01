@@ -9,7 +9,7 @@ Module Equation_Coefficients
     Use Math_Constants
     Use BoundaryConditions
     Implicit None
-    Real*8 :: coriolis_term
+    !Real*8 :: coriolis_term
     Real*8 :: Lorentz_Coefficient
 
     Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
@@ -84,17 +84,17 @@ Subroutine Init_Equation_Coefficients
 
     !////// Non-Magnetic Terms
     !CORIOLIS FORCE TERM (for Omega x v)
-	If (rotation) Then
-        If (dimensional) Then
-            coriolis_term = 2.0d0*Angular_velocity
-        Else
-			coriolis_term = 2.0d0/Ekman_Number*Prandtl_Number
-        Endif
-        If (NonDimensional_Anelastic) Then
-            coriolis_term = 2.0d0
-        Endif
-
-	Endif
+	!If (rotation) Then
+    !    If (dimensional) Then
+    !        coriolis_term = 2.0d0*Angular_velocity
+    !    Else
+	!		coriolis_term = 2.0d0/Ekman_Number*Prandtl_Number
+    !    Endif
+    !    If (NonDimensional_Anelastic) Then
+    !        coriolis_term = 2.0d0
+    !    Endif
+    !
+	!Endif
 
     ! Viscous Heating Coefficient
     ! Heating coeff is 2*nu/T_bar

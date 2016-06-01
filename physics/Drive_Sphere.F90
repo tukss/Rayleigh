@@ -1,7 +1,7 @@
 Module Drive_Sphere
 	Use ClockInfo
 	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
-	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
+	Use Physical_Space_Sphere, Only : physical_space, ohmic_heating_coeff
 	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
     Use Diagnostics_Interface, Only : Reboot_Diagnostics
     Use Spherical_IO, Only : time_to_output
