@@ -719,7 +719,7 @@ Contains
     Subroutine Constant_Reference()
             Implicit None
             Integer :: i
-            Real*8 :: r_outer, r_inner, prefactor
+            Real*8 :: r_outer, r_inner, prefactor, amp
             ref%density = 1.0d0
             ref%dlnrho = 0.0d0
             ref%d2lnrho = 0.0d0
@@ -729,7 +729,13 @@ Contains
             ref%dsdr = 0.0d0
             ref%pressure = 1.0d0
             ref%gravity = 0.0d0 ! Not used with constant reference right now
-            ref%gravity_term_s = 0.0d0 ! Set to Ra later in equation_coefficients
+
+            amp = Rayleigh_Number/Prandtl_Number
+
+            Do i = 1, N_R
+                ref%gravity_term_s(i) = amp*(radius(i)/radius(1))**gravity_power
+            Enddo
+
             pressure_specific_heat = 1.0d0
             Call initialize_reference_heating()
             Allocate(s_conductive(1:N_R))

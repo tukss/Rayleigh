@@ -81,16 +81,7 @@ Subroutine Init_Equation_Coefficients
     pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
     !pressure_dwdr_term(1:N_R) = -1.0d0/Ekman_Number*ref%density
 
-    !The buoyancy term
-    !    ---- Normally set as part of the reference state, but if we're nondimensional,
-    !    we set it to Ra times (r/r_ref)^n
-    If ( (.not. dimensional) .and. (.not. NonDimensional_Anelastic) ) Then
-        amp = Rayleigh_Number/Prandtl_Number
-        grav_r_ref = radius(1)
-        Do i = 1, N_R
-            ref%gravity_term_s(i) = amp*(radius(i)/grav_r_ref)**gravity_power
-        Enddo
-    Endif
+
 
     !////// Non-Magnetic Terms
     !CORIOLIS FORCE TERM (for Omega x v)
