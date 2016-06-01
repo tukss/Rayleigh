@@ -27,7 +27,7 @@ Contains
         ! -- full buoyancy 
         If (compute_quantity(buoyancy_force)) Then
             DO_PSI
-                qty(PSI) = ref%gravity_term_s(r)*(buffer(PSI,tvar)-&
+                qty(PSI) = ref%Buoyancy_Coeff(r)*(buffer(PSI,tvar)-&
                            & ell0_values(r,tvar))
             END_DO
             Call Add_Quantity(qty)
@@ -36,7 +36,7 @@ Contains
         ! -- fluctuating buoyancy (ell = 0, m =0 already subtracted)
         If (compute_quantity(buoyancy_pforce)) Then
             DO_PSI
-                qty(PSI) = ref%gravity_term_s(r)*fbuffer(PSI,tvar)
+                qty(PSI) = ref%Buoyancy_Coeff(r)*fbuffer(PSI,tvar)
             END_DO
             Call Add_Quantity(qty)
         Endif
@@ -44,7 +44,7 @@ Contains
         ! -- mean buoyancy
         If (compute_quantity(buoyancy_mforce)) Then
             DO_PSI
-                qty(PSI) = ref%gravity_term_s(r)*(m0_values(PSI2,tvar)-&
+                qty(PSI) = ref%Buoyancy_Coeff(r)*(m0_values(PSI2,tvar)-&
                            & ell0_values(r,tvar))
             END_DO
             Call Add_Quantity(qty)

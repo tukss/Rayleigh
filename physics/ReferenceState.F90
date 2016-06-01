@@ -28,7 +28,7 @@ Module ReferenceState
         Real*8, Allocatable :: dsdr(:)
 
         Real*8, Allocatable :: Gravity(:)
-        Real*8, Allocatable :: Gravity_term_s(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
+        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
         Real*8 :: gamma
         Real*8, Allocatable :: heating(:)
         Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
@@ -113,7 +113,7 @@ Contains
         Allocate(ref%d2lnrho(1:N_R))
         Allocate(ref%dlnt(1:N_R))
         Allocate(ref%dsdr(1:N_R))
-        Allocate(ref%gravity_term_s(1:N_R))
+        Allocate(ref%Buoyancy_Coeff(1:N_R))
     End Subroutine Allocate_Reference_State
 
     Subroutine Polytropic_Reference_DevelND()
@@ -134,7 +134,7 @@ Contains
         ref%temperature(:) = dtmp*Dissipation_Number*(dtmp*One_Over_R(:)-1.0D0)+1.0D0
         ref%density(:) = ref%temperature(:)**poly_n
         ref%gravity = (rmax**2)*OneOverRSquared(:)
-        ref%gravity_term_s = ref%gravity*Modified_Rayleigh_Number*ref%density
+        ref%Buoyancy_Coeff = ref%gravity*Modified_Rayleigh_Number*ref%density
 
         !Compute the background temperature gradient : dTdr = -Dg,  d2Tdr2 = 2*D*g/r (for g ~1/r^2)
         dtmparr = -Dissipation_Number*ref%gravity
@@ -240,7 +240,7 @@ Contains
 
         Ref%dsdr = 0.d0
 
-        Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat*ref%density
+        Ref%Buoyancy_Coeff = ref%gravity/Pressure_Specific_Heat*ref%density
 
         !We initialize s_conductive (modulo delta_s, specified by the boundary conditions)
         Allocate(s_conductive(1:N_R))
@@ -540,7 +540,7 @@ Contains
         ref%dsdr(:) = ref_arr(:,7)
         ref%entropy(:) = ref_arr(:,8)            
         ref%gravity(:) = ref_arr(:,9)
-        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        ref%Buoyancy_Coeff(:) = -ref%temperature*ref%dlnT
         DeAllocate(ref_arr)
 
         ! This conductive profile is based on the assumption that kappa is constant
@@ -580,7 +580,7 @@ Contains
         ref%entropy(:) = 0.0
         ref%gravity(:) = ref_arr(:,5)
         ref%dlnT(:) = ref_arr(:,6)   
-        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        ref%Buoyancy_Coeff(:) = -ref%temperature*ref%dlnT
              
 
         ref%dlnrho(:) = ref_arr(:,7)
@@ -733,7 +733,7 @@ Contains
             amp = Rayleigh_Number/Prandtl_Number
 
             Do i = 1, N_R
-                ref%gravity_term_s(i) = amp*(radius(i)/radius(1))**gravity_power
+                ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
             Enddo
 
             pressure_specific_heat = 1.0d0
@@ -896,7 +896,7 @@ Contains
         If (allocated(ref%Entropy)) DeAllocate(ref%Entropy)
         If (allocated(ref%dsdr)) DeAllocate(ref%dsdr)
         If (allocated(ref%Gravity)) DeAllocate(ref%Gravity)
-        If (allocated(ref%Gravity_term_s)) DeAllocate(ref%Gravity_term_s)
+        If (allocated(ref%Buoyancy_Coeff)) DeAllocate(ref%Buoyancy_Coeff)
         If (allocated(ref%Heating)) DeAllocate(ref%Heating)
 
   
