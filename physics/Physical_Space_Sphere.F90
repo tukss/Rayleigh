@@ -13,7 +13,6 @@ Module Physical_Space_Sphere
 	Use Diagnostics_Interface, Only : PS_Output
 	Use General_MPI, Only : global_max
 	Use Timers
-    Use Equation_Coefficients
 	Use ClockInfo
 	Use ReferenceState
 	Use TransportCoefficients

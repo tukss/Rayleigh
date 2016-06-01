@@ -10,7 +10,6 @@ Program Main
 	Use Diagnostics_Interface, Only : Initialize_Diagnostics
 	Use TestSuite
 	Use Checkpointing
-    Use Equation_Coefficients
 	Use Linear_Terms_Sphere
 	Use Drive_Sphere, Only : Main_Loop_Sphere
 	Use Timers
@@ -57,7 +56,6 @@ Contains
 
 
         Call Compute_Diffusion_Coefs()
-        Call Init_Equation_Coefficients()
 		Call Write_Reference(ndrf)
 		Call Initialize_Field_Structure()
 		Call Initialize_Diagnostics()

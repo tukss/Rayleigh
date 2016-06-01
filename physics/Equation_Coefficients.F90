@@ -12,8 +12,8 @@ Module Equation_Coefficients
     !Real*8 :: coriolis_term
     !Real*8 :: Lorentz_Coefficient
 
-    Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
-    Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
+    !Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
+    !Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
     !Real*8, Allocatable :: dpdr_w_term(:), pressure_dwdr_term(:) ! For nondimensionalizing pressure
 Contains
 
@@ -98,23 +98,23 @@ Subroutine Init_Equation_Coefficients
 
     ! Viscous Heating Coefficient
     ! Heating coeff is 2*nu/T_bar
-    If (viscous_heating) Then
-    	Allocate(viscous_heating_coeff(1:N_R))
-        If (.not. dimensional) Then
-        	viscous_heating_coeff(1:N_R) = 2.0d0 !<-------- Check
-        Else
-        	viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)
-        Endif
-        If (NonDimensional_Anelastic) Then
-            viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)* &
-                                           & Dissipation_Number/Modified_Rayleigh_Number
-        Endif
-
-    Endif
+    !If (viscous_heating) Then
+    ! 	Allocate(viscous_heating_coeff(1:N_R))
+    !    If (.not. dimensional) Then
+    !    	viscous_heating_coeff(1:N_R) = 2.0d0 !<-------- Check
+    !    Else
+    !    	viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)
+    !    Endif
+    !    If (NonDimensional_Anelastic) Then
+    !        viscous_heating_coeff(1:N_R) = nu(1:N_R)*2.0d0/ref%temperature(1:N_R)* &
+    !                                       & Dissipation_Number/Modified_Rayleigh_Number
+    !    Endif
+    !
+    !Endif
 
 
     !////// Magnetic Terms
-	If (magnetism) Then
+	!If (magnetism) Then
         !Lorentz Force Coefficient (for JXB)
         !If (.not. dimensional) Then
             ! DOUBLE CHECK THIS LATER -- This should be consistent, but CHECK
@@ -123,12 +123,12 @@ Subroutine Init_Equation_Coefficients
         !    Lorentz_Coefficient = 1.0d0/four_pi
         !Endif
         ! Ohmic heating coefficient (multiplies {DelxB}^2)
-        If (ohmic_heating) Then
-            Allocate(ohmic_heating_coeff(1:N_R))
-            ohmic_heating_coeff = ref%lorentz_coeff*eta/ref%density/ref%temperature
-        Endif
+        !If (ohmic_heating) Then
+        !    Allocate(ohmic_heating_coeff(1:N_R))
+        !    ohmic_heating_coeff = ref%lorentz_coeff*eta/ref%density/ref%temperature
+        !Endif
 
-	Endif
+	!Endif
 
 End Subroutine Init_Equation_Coefficients
 

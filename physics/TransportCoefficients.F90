@@ -6,6 +6,8 @@ Module TransportCoefficients
 	Real*8, Allocatable :: nu(:), kappa(:), eta(:)
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
 
+    Real*8, Allocatable :: ohmic_heating_coeff(:)   
+    Real*8, Allocatable :: viscous_heating_coeff(:) 
 	!//////////
 
 	Real*8, Allocatable :: W_Diffusion_Coefs_0(:), W_Diffusion_Coefs_1(:)
@@ -36,7 +38,7 @@ Contains
 
 	Subroutine Compute_Diffusion_Coefs()
         ! These coefficients are nonzero only when nu and/or rho vary in radius
-        ! The formulas here have been verified against the derivation in my notes
+        ! The formulas here have been verified against my notes
         ! and against those implemented in ASH (which are slightly different from Brun et al. 2004
         ! due to sign errors in that paper)
 		!////////////////////////////////////////+
@@ -79,27 +81,40 @@ Contains
 			A_Diffusion_Coefs_1 = eta*dlneta
 		Endif
 
-        !If (my_rank .eq. 0) Then
-        !    Write(6,*)'Checking...', kappa
-        !Endif
+
 	End Subroutine Compute_Diffusion_Coefs
 
 	Subroutine Initialize_Transport_Coefficients()
 		Call Allocate_Transport_Coefficients
-        If (.not. dimensional) Then
-            nu_top = Prandtl_Number
-            kappa_top = 1.0d0
-            eta_top = Prandtl_Number/Magnetic_Prandtl_Number
+        If (.not. Dimensional_Reference) Then
+            ! nu,kappa, and eta are based on the non-dimensionalization employed
+            ! and are not read from the main_input file.
+            nu_top    = ref%script_N_top
+            kappa_top = ref%script_K_top
         Endif
-        If (Nondimensional_Anelastic) Then
-            nu_top = Ekman_Number
-            kappa_top = nu_top/Prandtl_Number
-            eta_top = nu_top/Magnetic_Prandtl_Number
+
+		Call Initialize_Nu()    ! Viscosity
+		Call Initialize_Kappa() ! Thermal Diffusivity
+
+
+
+        If (viscous_heating) Then
+            Allocate(viscous_heating_coeff(1:N_R))
+            viscous_heating_coeff(1:N_R) = ref%viscous_amp(1:N_R)*nu(1:N_R)            
         Endif
-		Call Initialize_Nu()							! Viscosity
-		Call Initialize_Kappa()						! Thermal Diffusivity
-		If (magnetism) Call Initialize_Eta()	! Magnetic Diffusivity
+
+		If (magnetism) Then
+            eta_top   = ref%script_H_top
+            Call Initialize_Eta()	! Magnetic Diffusivity
+            If (ohmic_heating) Then
+                Allocate(ohmic_heating_coeff(1:N_R))
+                ohmic_heating_coeff(1:N_R) = ref%ohmic_amp(1:N_R)*eta(1:N_R)            
+            Endif
+        Endif
 		!Call Compute_Diffusion_Coefs
+
+
+
 	End Subroutine Initialize_Transport_Coefficients
 
 

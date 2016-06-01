@@ -32,11 +32,19 @@ Module ReferenceState
         Real*8 :: gamma
         Real*8, Allocatable :: heating(:)
 
-        Real*8 :: Coriolis_Coeff
-        Real*8 :: Lorentz_Coeff
-        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
-        Real*8, Allocatable :: dpdr_w_term(:)
-        Real*8, Allocatable :: pressure_dwdr_term(:)
+        Real*8 :: Coriolis_Coeff ! Multiplies z_hat x u in momentum eq.
+        Real*8 :: Lorentz_Coeff ! Multiplies (Del X B) X B in momentum eq.
+        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! Multiplies {S,T} in momentum eq. ..typically = gravity/cp
+        Real*8, Allocatable :: dpdr_w_term(:)  ! multiplies d_by_dr{P/rho} in momentum eq.
+        Real*8, Allocatable :: pressure_dwdr_term(:) !multiplies l(l+1)/r^2 (P/rho) in Div dot momentum eq.
+        
+        ! The following two terms are used to compute the ohmic and viscous heating
+        Real*8, Allocatable :: ohmic_amp(:) !multiplied by {eta(r),H(r)}J^2 in dSdt eq.
+        Real*8, Allocatable :: viscous_amp(:) !multiplied by {nu(r),N(r)}{e_ij terms) in dSdt eq.
+
+        Real*8 :: script_N_Top ! If a nondimensional reference state is employed,
+        Real*8 :: script_K_Top ! these are used in lieu of nu_top from the input file.
+        Real*8 :: script_H_Top ! {N:nu, K:kappa, H:eta} 
 
     End Type ReferenceInfo
     Real*8, Allocatable :: s_conductive(:)
@@ -55,8 +63,6 @@ Module ReferenceState
     Real*8 :: poly_mass = 0.0d0
     Real*8 :: poly_rho_i =0.0d0
     Real*8 :: Gravitational_Constant = 6.67d-8
-
-
     Real*8 :: Angular_Velocity = 1.0d0
 
     !/////////////////////////////////////////////////////////////////////////////////////
@@ -68,14 +74,13 @@ Module ReferenceState
     Real*8 :: gravity_power           = 0.0d0
     Real*8 :: Dissipation_Number      = 0.0d0
     Real*8 :: Modified_Rayleigh_Number = 0.0d0
-    Logical :: Dimensional = .true.  ! By Default code is dimensional
-    Logical :: NonDimensional_Anelastic = .False. !
+    Logical :: Dimensional_Reference = .true.  ! Changed depending on reference state specified
     Character*120 :: custom_reference_file ='nothing'
     Integer :: custom_reference_type = 1
     Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
-            & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file, &
+            & gravity_power, heating_factor, heating_r0, custom_reference_file, &
             & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
             & Dissipation_Number, Modified_Rayleigh_Number
 Contains
@@ -102,7 +107,7 @@ Contains
         Endif
 
         If (reference_type .eq. 4) Then
-            Call Polytropic_Reference_DevelND()
+            Call Polytropic_ReferenceND()
         Endif
 
         Call Write_Reference()
@@ -122,11 +127,14 @@ Contains
         Allocate(ref%Buoyancy_Coeff(1:N_R))
         Allocate(ref%dpdr_w_term(1:N_R))
         Allocate(ref%pressure_dwdr_term(1:N_R))
+        Allocate(ref%ohmic_amp(1:N_R))
+        Allocate(ref%viscous_amp(1:N_R))
     End Subroutine Allocate_Reference_State
     Subroutine Constant_Reference()
             Implicit None
             Integer :: i
             Real*8 :: r_outer, r_inner, prefactor, amp
+            Dimensional_Reference = .false.
             ref%density = 1.0d0
             ref%dlnrho = 0.0d0
             ref%d2lnrho = 0.0d0
@@ -157,19 +165,28 @@ Contains
             ref%pressure_dwdr_term(:) = -1.0d0*ref%density
 			ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
 
+
+            ref%script_N_top       = Prandtl_Number
+            ref%script_K_top       = 1.0d0
+            ref%viscous_amp(1:N_R) = 2.0d0
+
             If (magnetism) Then
-                ref%Lorentz_Coeff = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+                ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+                ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
+                ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
             Else
-                ref%Lorentz_Coeff = 0.0d0
-            Endif
+                ref%Lorentz_Coeff    = 0.0d0
+                ref%script_H_Top     = 0.0d0
+                ref%ohmic_amp(1:N_R) = 0.0d0
+            Endif            
     
     End Subroutine Constant_Reference
-    Subroutine Polytropic_Reference_DevelND()
+    Subroutine Polytropic_ReferenceND()
         Implicit None
         Real*8 :: dtmp
         Real*8, Allocatable :: dtmparr(:)
-        nondimensional_anelastic = .true.
-        dimensional = .false.
+        Dimensional_Reference = .false.
+
 
         If (aspect_ratio .lt. 0) Then
             aspect_ratio = rmax/rmin
@@ -204,20 +221,29 @@ Contains
         ref%dsdr(:) = 0.0d0
         ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
         Call Initialize_Reference_Heating()
-
-
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!
+        
 
         ref%Coriolis_Coeff = 2.0d0
         ref%dpdr_w_term(:) = ref%density
         ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+
+        ref%script_N_top   = Ekman_Number
+        ref%script_K_top   = Ekman_Number/Prandtl_Number
+        ref%viscous_amp(1:N_R) = 2.0d0/ref%temperature(1:N_R)* &
+                                 & Dissipation_Number/Modified_Rayleigh_Number
+
         If (magnetism) Then
-            ref%Lorentz_Coeff = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_top     = Ekman_Number/Magnetic_Prandtl_Number
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff/ref%density(1:N_R)/ref%temperature(1:N_R)
         Else
-            ref%Lorentz_Coeff = 0.0d0
+            ref%Lorentz_Coeff    = 0.0d0
+            ref%script_H_Top     = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
         Endif
-    End Subroutine Polytropic_Reference_DevelND
+
+
+    End Subroutine Polytropic_ReferenceND
 
     Subroutine Polytropic_Reference()
         Real*8 :: zeta_0,  c0, c1, d
@@ -227,7 +253,7 @@ Contains
         Real*8 :: One, ee
         Real*8 :: InnerRadius, OuterRadius
         Integer :: r
-
+        Dimensional_Reference = .true. ! This is actually the default
 
         If (my_rank .eq. 0) Call stdout%print('Initializing polytropic reference state.')
         ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
@@ -310,13 +336,16 @@ Contains
 
         Call Initialize_Reference_Heating()
 
-        ref%Coriolis_Coeff = 2.0d0*Angular_velocity
-        ref%dpdr_w_term(:) = ref%density
+        ref%Coriolis_Coeff        = 2.0d0*Angular_velocity
+        ref%dpdr_w_term(:)        = ref%density
         ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        ref%viscous_amp(1:N_R)    = 2.0d0/ref%temperature(1:N_R)
         If (magnetism) Then
             ref%Lorentz_Coeff = 1.0d0/four_pi
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff/ref%density(1:N_R)/ref%temperature(1:N_R)
         Else
             ref%Lorentz_Coeff = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
         Endif
     End Subroutine Polytropic_Reference
 
@@ -369,7 +398,7 @@ Contains
         ref%heating(:) = 1.0d0/shell_volume
         ref%heating = ref%heating/(ref%density*ref%temperature)
         !The actual value of the reference heating is adjusted 
-        ! in Equation_Coefficients.F90
+        ! in Later...  DO THIS IN BOUNDARY CONDITIONS?
     End Subroutine Flux_Reference_Heating
 
     Subroutine Constant_Reference_Heating()
@@ -916,7 +945,7 @@ Contains
         Prandtl_Number          = 1.0d0
         Magnetic_Prandtl_Number = 1.0d0
         gravity_power           = 0.0d0
-        Dimensional = .true.  
+        Dimensional_Reference = .true.  
         custom_reference_file ='nothing'
         custom_reference_type = 1
 

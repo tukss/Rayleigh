@@ -18,7 +18,6 @@ Module Hybrid_Space_Sphere
 	Use Timers
 	Use ClockInfo
 	Use ReferenceState
-    Use Equation_Coefficients
 
 	Implicit None
     Real*8, Allocatable :: over_rhor(:), over_rhorsq(:), drho_term(:)
