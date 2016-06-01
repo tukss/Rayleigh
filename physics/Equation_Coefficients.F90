@@ -14,7 +14,7 @@ Module Equation_Coefficients
 
     Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
     Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
-    Real*8, Allocatable :: dpdr_w_term(:), pressure_dwdr_term(:) ! For nondimensionalizing pressure
+    !Real*8, Allocatable :: dpdr_w_term(:), pressure_dwdr_term(:) ! For nondimensionalizing pressure
 Contains
 
 Subroutine Init_Equation_Coefficients
@@ -73,11 +73,11 @@ Subroutine Init_Equation_Coefficients
     Endif
 
 
-    Allocate(dpdr_w_term(1:N_R))
+    !Allocate(dpdr_w_term(1:N_R))
     !dpdr_w_term = ref%density/Ekman_Number
-    dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark
-    Allocate(pressure_dwdr_term(1:N_R))
-    pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
+    !dpdr_w_term(:) = ref%density  ! For now, I am nondimensionalizing differently than the benchmark
+    !Allocate(pressure_dwdr_term(1:N_R))
+    !pressure_dwdr_term = -1.0d0*ref%density  ! This keeps 1/ek out when omega = 0
     !pressure_dwdr_term(1:N_R) = -1.0d0/Ekman_Number*ref%density
 
 

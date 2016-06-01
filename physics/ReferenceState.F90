@@ -28,11 +28,14 @@ Module ReferenceState
         Real*8, Allocatable :: dsdr(:)
 
         Real*8, Allocatable :: Gravity(:)
-        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
+
         Real*8 :: gamma
         Real*8, Allocatable :: heating(:)
 
         Real*8 :: Coriolis_Coeff
+        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
+        Real*8, Allocatable :: dpdr_w_term(:)
+        Real*8, Allocatable :: pressure_dwdr_term(:)
 
     End Type ReferenceInfo
     Real*8, Allocatable :: s_conductive(:)
@@ -116,6 +119,8 @@ Contains
         Allocate(ref%dlnt(1:N_R))
         Allocate(ref%dsdr(1:N_R))
         Allocate(ref%Buoyancy_Coeff(1:N_R))
+        Allocate(ref%dpdr_w_term(1:N_R))
+        Allocate(ref%pressure_dwdr_term(1:N_R))
     End Subroutine Allocate_Reference_State
     Subroutine Constant_Reference()
             Implicit None
@@ -146,8 +151,11 @@ Contains
             Do i = 1, N_R
                 s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
             Enddo
-
+            !Define the various equation coefficients
+            ref%dpdr_w_term(:) = ref%density
+            ref%pressure_dwdr_term(:) = -1.0d0*ref%density
 			ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+
     
     End Subroutine Constant_Reference
     Subroutine Polytropic_Reference_DevelND()
@@ -196,7 +204,9 @@ Contains
         s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!
 
         ref%Coriolis_Coeff = 2.0d0
-
+        ref%dpdr_w_term(:) = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+   
     End Subroutine Polytropic_Reference_DevelND
 
     Subroutine Polytropic_Reference()
@@ -291,7 +301,8 @@ Contains
         Call Initialize_Reference_Heating()
 
         ref%Coriolis_Coeff = 2.0d0*Angular_velocity
-
+        ref%dpdr_w_term(:) = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
     End Subroutine Polytropic_Reference
 
 

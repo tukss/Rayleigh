@@ -20,12 +20,13 @@ Contains
 		Implicit None
         Real*8 :: amp, T,arg
         Integer :: n, r
+
 		Call Initialize_Benchmark_Equations()
+
 		If (strict_L_conservation) Then
             Allocate(Lconservation_weights(1:N_R))
             Lconservation_weights(1:N_R) = 0.0d0
-            If (chebyshev) Then
-                            
+            If (chebyshev) Then                           
                 amp = Pi / (N_R*1.0d0) 
                 do n = 1, N_R
                     do r = 1, N_R
@@ -41,6 +42,7 @@ Contains
                 Lconservation_weights(1:N_R) = radial_integral_weights(1:N_R)
             Endif
         Endif
+
 	End Subroutine Linear_Init
 
 	Subroutine Reset_Linear_Equations()
@@ -227,7 +229,7 @@ Contains
 
 				! Pressure
 				!amp = 1.0d0/(Ek*H_Laplacian)*ref%density		! dPdr
-                amp = dpdr_W_term/H_Laplacian
+                amp = ref%dpdr_W_term/H_Laplacian
 				Call add_implicit_term(weq,pvar, 1, amp,lp)
 
 
@@ -254,7 +256,7 @@ Contains
 				
 				! Pressure
 				!amp = -(1.0d0)/Ek*ref%density	
-                amp = pressure_dwdr_term
+                amp = ref%pressure_dwdr_term
 				Call add_implicit_term(peq,pvar, 0, amp,lp)
 
 				! W
