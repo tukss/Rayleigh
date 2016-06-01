@@ -1,9 +1,10 @@
 DSOBJ = Structures.o BufferedOutput.o cmkdir.o MakeDir.o
 PFOBJ = MPI_Base.o All_to_All.o SendReceive.o ISendReceive.o General_MPI.o MPI_LAYER.o Load_Balance.o Parallel_Framework.o Spherical_Buffer.o
-MOBJ  = Timing.o Finite_Difference.o Chebyshev_Polynomials.o Chebyshev_Polynomials_Alt.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o Math_Utility.o \
-        Fourier_Transform.o Spectral_Derivatives.o
+MOBJ  = Math_Constants.o Timing.o Finite_Difference.o Chebyshev_Polynomials.o \
+        Chebyshev_Polynomials_Alt.o Linear_Solve.o Legendre_Polynomials.o Legendre_Transforms.o \
+        Math_Utility.o Fourier_Transform.o Spectral_Derivatives.o
 IOOBJ = Spherical_IO.o  
-POBJ  = Math_Constants.o Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o \
+POBJ  = Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o TransportCoefficients.o BoundaryConditions.o \
         Equation_Coefficients.o Fields.o Checkpointing.o Initial_Conditions.o \
         Diagnostics_Base.o Diagnostics_ADotGradB.o \
         Diagnostics_Velocity_Field.o Diagnostics_Magnetic_Field.o \
