@@ -11,6 +11,8 @@
 /
 &physical_controls_namelist
  benchmark_mode = 2
+ benchmark_integration_interval = 100
+ benchmark_report_interval = 10000
  rotation  = .True.
  magnetism = .true.
  viscous_heating = .false.
