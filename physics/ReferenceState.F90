@@ -33,6 +33,7 @@ Module ReferenceState
         Real*8, Allocatable :: heating(:)
 
         Real*8 :: Coriolis_Coeff
+        Real*8 :: Lorentz_Coeff
         Real*8, Allocatable :: Buoyancy_Coeff(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
         Real*8, Allocatable :: dpdr_w_term(:)
         Real*8, Allocatable :: pressure_dwdr_term(:)
@@ -156,6 +157,11 @@ Contains
             ref%pressure_dwdr_term(:) = -1.0d0*ref%density
 			ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
 
+            If (magnetism) Then
+                ref%Lorentz_Coeff = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            Else
+                ref%Lorentz_Coeff = 0.0d0
+            Endif
     
     End Subroutine Constant_Reference
     Subroutine Polytropic_Reference_DevelND()
@@ -206,7 +212,11 @@ Contains
         ref%Coriolis_Coeff = 2.0d0
         ref%dpdr_w_term(:) = ref%density
         ref%pressure_dwdr_term(:) = -1.0d0*ref%density
-   
+        If (magnetism) Then
+            ref%Lorentz_Coeff = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+        Else
+            ref%Lorentz_Coeff = 0.0d0
+        Endif
     End Subroutine Polytropic_Reference_DevelND
 
     Subroutine Polytropic_Reference()
@@ -303,6 +313,11 @@ Contains
         ref%Coriolis_Coeff = 2.0d0*Angular_velocity
         ref%dpdr_w_term(:) = ref%density
         ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        If (magnetism) Then
+            ref%Lorentz_Coeff = 1.0d0/four_pi
+        Else
+            ref%Lorentz_Coeff = 0.0d0
+        Endif
     End Subroutine Polytropic_Reference
 
 

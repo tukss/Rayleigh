@@ -358,7 +358,7 @@ Contains
 			! Add r_squared [JxB]_r
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*Lorentz_Coefficient* &
+				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ref%Lorentz_Coeff* &
 					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
 			END_DO
 			!$OMP END PARALLEL DO
@@ -466,7 +466,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
-					- Lorentz_Coefficient*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
+					- ref%Lorentz_Coeff*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -524,7 +524,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar)= RHSP(IDX,zvar) - &
-					Lorentz_Coefficient*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
+					ref%Lorentz_Coeff*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -592,9 +592,9 @@ Contains
 			! Check on alfven speed as well
 			Do r = my_r%min, my_r%max
 				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
-								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*lorentz_coefficient ! horizontal
+								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*ref%Lorentz_Coeff ! horizontal
 				ovt2  = Max(ovt2, ovht2)
-				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*lorentz_coefficient	! radial
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*ref%Lorentz_Coeff	! radial
 				ovt2  = Max(ovt2,ovrt2)
 			Enddo
 		Endif

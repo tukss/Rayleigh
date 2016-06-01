@@ -10,7 +10,7 @@ Module Equation_Coefficients
     Use BoundaryConditions
     Implicit None
     !Real*8 :: coriolis_term
-    Real*8 :: Lorentz_Coefficient
+    !Real*8 :: Lorentz_Coefficient
 
     Real*8, Allocatable :: ohmic_heating_coeff(:)   ! Need to adjust for nondimensional
     Real*8, Allocatable :: viscous_heating_coeff(:) ! Need to adjust for nondimensional
@@ -116,16 +116,16 @@ Subroutine Init_Equation_Coefficients
     !////// Magnetic Terms
 	If (magnetism) Then
         !Lorentz Force Coefficient (for JXB)
-        If (.not. dimensional) Then
+        !If (.not. dimensional) Then
             ! DOUBLE CHECK THIS LATER -- This should be consistent, but CHECK
-            Lorentz_Coefficient = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
-        Else
-            Lorentz_Coefficient = 1.0d0/four_pi
-        Endif
+        !    Lorentz_Coefficient = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+        !Else
+        !    Lorentz_Coefficient = 1.0d0/four_pi
+        !Endif
         ! Ohmic heating coefficient (multiplies {DelxB}^2)
         If (ohmic_heating) Then
             Allocate(ohmic_heating_coeff(1:N_R))
-            ohmic_heating_coeff = lorentz_coefficient*eta/ref%density/ref%temperature
+            ohmic_heating_coeff = ref%lorentz_coeff*eta/ref%density/ref%temperature
         Endif
 
 	Endif

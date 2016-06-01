@@ -238,7 +238,7 @@ Contains
         Integer :: r,k, t
 
         !This changes depending on the non-dimensionalization (dimensionalization) employed
-        mfact = half*lorentz_coefficient
+        mfact = half*ref%Lorentz_Coeff
 
 
         ! Energies associated with the full (fluctuating + mean) magnetic field

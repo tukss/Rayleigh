@@ -446,7 +446,7 @@ Module Diagnostics_Base
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
     !       This is Curl B -- rename accordingly
-    Integer, Parameter :: joffset = boffset+54 ! = 350
+    Integer, Parameter :: joffset = boffset+54 ! = 454
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
     Integer, Parameter :: jp_r = joffset+2    
@@ -474,7 +474,7 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////////////
     !           Magnetic Energies
-    Integer, Parameter :: meoffset = joffset+20 ! = 374
+    Integer, Parameter :: meoffset = joffset+20 ! = 474
 
     Integer, Parameter :: magnetic_energy = meoffset+1 ! B^2
     Integer, Parameter :: radial_me       = meoffset+2 ! {B_r}^2
@@ -494,10 +494,10 @@ Module Diagnostics_Base
 
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
-    !  lorentz_coefficient * (del x B) x B 
-    !  lorentz_coefficient = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
-    !  j (below) is shorthand for lorentz_coefficient*delxB  (not quite the current density)
-    Integer, Parameter :: loff = meoffset+12 ! =386
+    !  ref%Lorentz_Coeff * (del x B) x B 
+    !  ref%Lorentz_Coeff = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
+    !  j (below) is shorthand for ref%Lorentz_Coeff*delxB  (not quite the current density)
+    Integer, Parameter :: loff = meoffset+12 ! =486
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -526,7 +526,7 @@ Module Diagnostics_Base
     Integer, Parameter :: magnetic_torque_theta = loff+19 ! -rsintheta <B_theta><B_phi>*Lorentz_Coeff
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    Integer, Parameter :: indoff = loff + 19 ! = 405
+    Integer, Parameter :: indoff = loff + 19 ! = 505
 
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
