@@ -14,8 +14,8 @@ POBJ  = Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o Transport
         Diagnostics_Lorentz_Forces.o Diagnostics_Induction.o \
         Diagnostics_Inertial_Forces.o Diagnostics_Angular_Momentum.o \
         Diagnostics_Miscellaneous.o Diagnostics_Interface.o \
-        Benchmarking.o Linear_Terms_Sphere.o \
-        Spectral_Space_Sphere.o Physical_Space_Sphere.o Hybrid_Space_Sphere.o Drive_Sphere.o
+        Benchmarking.o Sphere_Linear_Terms.o \
+        Sphere_Spectral_Space.o Sphere_Hybrid_Space.o Sphere_Physical_Space.o Sphere_Driver.o
 TOBJ  = Test_SHT.o Test_Cheby.o TestSuite.o
 MAINOBJ = Input.o Main.o
 

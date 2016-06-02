@@ -16,6 +16,7 @@ Module Initial_Conditions
          & C10_bottom, C11_bottom, C1m1_bottom
     Use ClockInfo, Only : Euler_Step
     Use TransportCoefficients, Only : kappa, dlnkappa
+    Use Linear_Solve
 
 
     Implicit None

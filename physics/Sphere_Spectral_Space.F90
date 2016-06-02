@@ -1,4 +1,4 @@
-Module Spectral_Space_Sphere
+Module Sphere_Spectral_Space
 	Use Load_Balance, Only : mp_lm_values, l_lm_values, my_num_lm, m_lm_values, my_lm_min, my_nl_lm, my_nm_lm, my_lm_lval, my_lm_max
 	Use Parallel_Framework
 	Use Controls
@@ -11,7 +11,7 @@ Module Spectral_Space_Sphere
             d_by_dr_cpFE, cheby_to_spectralFE
 	Use ClockInfo
 	Use Timers
-	Use Linear_Terms_Sphere
+	Use Sphere_Linear_Terms
 	Implicit None
 	Type(SphericalBuffer) :: ctemp ! workspace
 Contains
@@ -605,7 +605,7 @@ Contains
 			Call Finalize_EMF()
 		endif
 		Call Add_to_All_RHS(wsp%p1b,new_ab_factor)
-		Call Fix_Boundary_Conditions()
+		Call Enforce_Boundary_Conditions()
 		Call StopWatch(solve_time)%startclock()
 		Call Implicit_Solve()
 		Call StopWatch(solve_time)%increment()
@@ -683,4 +683,4 @@ Contains
 
 	End Subroutine Finalize_EMF
 
-End Module Spectral_Space_Sphere
+End Module Sphere_Spectral_Space

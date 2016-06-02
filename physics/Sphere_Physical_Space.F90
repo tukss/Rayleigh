@@ -3,7 +3,7 @@
 #define END_DO enddo; enddo; enddo
 #define IDX k,r,t
 #define FIELDSP wsp%p3a
-Module Physical_Space_Sphere
+Module Sphere_Physical_Space
 	Use Parallel_Framework
 	Use Controls
 	Use ProblemSize
@@ -694,4 +694,4 @@ Contains
 	End Subroutine Compute_dbphi_by_dtheta
 
 
-End Module Physical_Space_Sphere
+End Module Sphere_Physical_Space

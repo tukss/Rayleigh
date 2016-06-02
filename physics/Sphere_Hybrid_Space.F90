@@ -4,7 +4,7 @@
 #define SBUFFA wsp%s2a(mp)%data
 #define SBUFFB wsp%s2b(mp)%data
 #define ASBUFFA cobuffer%s2a(mp)%data
-Module Hybrid_Space_Sphere
+Module Sphere_Hybrid_Space
 
     ! NOTE: WE NEED a 1/density variable
 	Use Load_Balance, Only : mp_lm_values, l_lm_values, my_num_lm, m_lm_values, my_lm_min, my_nl_lm, my_nm_lm, my_lm_lval, my_lm_max
@@ -616,4 +616,4 @@ Contains
 		Enddo
 		DeAllocate(arr)
 	End Subroutine DeAllocate_rlm_Field
-End Module Hybrid_Space_Sphere
+End Module Sphere_Hybrid_Space
