@@ -52,7 +52,10 @@ Module ReferenceState
     Integer :: reference_type =1
     Integer :: heating_type = 0 ! 0 means no reference heating.  > 0 selects optional reference heating
     Integer :: cooling_type = 0 ! 0 means no reference cooling.  > 0 will ADD to any exisiting reference heating
-    Real*8  :: Luminosity = 0.0d0
+    Real*8  :: Luminosity = 0.0d0 ! specifies the integral of the heating function
+    Real*8  :: Heating_Integral = 0.0d0  !same as luminosity (for non-star watchers)
+    Real*8  :: Heating_EPS = 1.0D-12  !Small number to test whether luminosity specified
+    Logical :: adjust_reference_heating = .false.  ! Flag used to decide if luminosity determined via boundary conditions
     Real*8  :: heating_factor = 0.0d0, heating_r0 = 0.0d0  ! scaling and shifting factors for
     Real*8  :: cooling_factor = 0.0d0, cooling_r0 = 0.0d0  ! heating and cooling
     Type(ReferenceInfo) :: ref
@@ -74,7 +77,7 @@ Module ReferenceState
     Real*8 :: gravity_power           = 0.0d0
     Real*8 :: Dissipation_Number      = 0.0d0
     Real*8 :: Modified_Rayleigh_Number = 0.0d0
-    Logical :: Dimensional_Reference = .true.  ! Changed depending on reference state specified
+    Logical :: Dimensional_Reference = .false.  ! Changed depending on reference state specified
     Character*120 :: custom_reference_file ='nothing'
     Integer :: custom_reference_type = 1
     Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
@@ -82,7 +85,7 @@ Module ReferenceState
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
             & gravity_power, heating_factor, heating_r0, custom_reference_file, &
             & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
-            & Dissipation_Number, Modified_Rayleigh_Number
+            & Dissipation_Number, Modified_Rayleigh_Number, Heating_Integral
 Contains
 
     Subroutine Initialize_Reference()
@@ -98,6 +101,10 @@ Contains
         Endif
 
         If (reference_type .eq. 3) Then
+            Call Polytropic_ReferenceND()
+        Endif
+
+        If (reference_type .eq. 4) Then
             If (custom_reference_type .eq. 1) Then
                 Call Get_Custom_Reference()
             Endif
@@ -106,9 +113,6 @@ Contains
             Endif
         Endif
 
-        If (reference_type .eq. 4) Then
-            Call Polytropic_ReferenceND()
-        Endif
 
         Call Write_Reference()
     End Subroutine Initialize_Reference
@@ -153,17 +157,20 @@ Contains
 
             pressure_specific_heat = 1.0d0
             Call initialize_reference_heating()
-            Allocate(s_conductive(1:N_R))
-            r_outer = radius(1)
-            r_inner = radius(N_R)
-            prefactor = r_outer*r_inner/(r_inner-r_outer)
-            Do i = 1, N_R
-                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
-            Enddo
+            If (heating_type .eq. 0) Then
+                !Otherwise, s_conductive will be calculated in initial_conditions
+                Allocate(s_conductive(1:N_R))
+                r_outer = radius(1)
+                r_inner = radius(N_R)
+                prefactor = r_outer*r_inner/(r_inner-r_outer)
+                Do i = 1, N_R
+                    s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
+                Enddo
+            Endif
             !Define the various equation coefficients
             ref%dpdr_w_term(:) = ref%density
             ref%pressure_dwdr_term(:) = -1.0d0*ref%density
-			ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+            ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
 
 
             ref%script_N_top       = Prandtl_Number
@@ -324,13 +331,15 @@ Contains
         Ref%Buoyancy_Coeff = ref%gravity/Pressure_Specific_Heat*ref%density
 
         !We initialize s_conductive (modulo delta_s, specified by the boundary conditions)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        ee = -1.d0*poly_n
-        denom = zeta(1)**ee - zeta(N_R)**ee
-        Do r = 1, N_R
-          s_conductive(r) = (zeta(1)**ee - zeta(r)**ee) / denom
-        Enddo
+        !If (heating_type .eq. 0) Then
+        !    Allocate(s_conductive(1:N_R))
+        !    s_conductive(:) = 0.0d0
+        !    ee = -1.d0*poly_n
+        !    denom = zeta(1)**ee - zeta(N_R)**ee
+        !    Do r = 1, N_R
+        !      s_conductive(r) = (zeta(1)**ee - zeta(r)**ee) / denom
+        !    Enddo
+        !Endif
 
         Deallocate(zeta)
 
@@ -364,19 +373,15 @@ Contains
         Endif
 
         If (heating_type .eq. 1) Then
-            Call Constant_Reference_Heating()
+            Call Constant_Entropy_Heating()
         Endif
 
         If (heating_type .eq. 2) Then
             Call Tanh_Reference_Heating()
         Endif
 
-        If (heating_type .eq. 3) Then
-            Call Bouss_Reference_Heating()
-        Endif
-
         If (heating_type .eq. 4) Then
-            Call  Flux_Reference_Heating()
+            Call  Constant_Energy_Heating()
         Endif
 
         !///////////////////////////////////////////////////////////
@@ -391,20 +396,43 @@ Contains
             Call Tanh_Reference_Cooling()            
         Endif
 
+        ! Heating Q_H and cooling Q_C are normalized so that:
+        ! Int_volume rho T Q_H dV = 1 and Int_volume rho T Q_C dV = 1
+
+        !If luminosity or heating_integral has been set,
+        !we set the integral of ref%heating using that.
+
+        !Otherwise, we will use the boundary thermal flux
+        !To establish the integral
+        If ( (heating_type .gt. 0) .or. (cooling_type .gt. 0) )Then
+            adjust_reference_heating = .true.
+            If (abs(Luminosity) .gt. heating_eps) Then
+                adjust_reference_heating = .false.
+                ref%heating = ref%heating*Luminosity
+            Endif
+
+            If (abs(Heating_Integral) .gt. heating_eps) Then
+                adjust_reference_heating = .false.
+                ref%heating = ref%heating*Heating_Integral
+            Endif
+        Endif
     End Subroutine Initialize_Reference_Heating
 
-    Subroutine Flux_Reference_Heating()
+    Subroutine Constant_Energy_Heating()
         Implicit None
+        ! rho T dSdt = alpha : energy deposition per unit volume is constant
+        ! dSdt = alpha/rhoT : entropy deposition per unit volume is ~ 1/Pressure
         ref%heating(:) = 1.0d0/shell_volume
         ref%heating = ref%heating/(ref%density*ref%temperature)
-        !The actual value of the reference heating is adjusted 
-        ! in Later...  DO THIS IN BOUNDARY CONDITIONS?
-    End Subroutine Flux_Reference_Heating
+    End Subroutine Constant_Energy_Heating
 
-    Subroutine Constant_Reference_Heating()
+    Subroutine Constant_Entropy_Heating()
         Implicit None
         Real*8 :: integral, alpha
         Real*8, Allocatable :: temp(:)
+
+        ! dSdt = alpha : Entropy deposition per unit volume is constant
+        ! rho T dSdt = rho T alpha : Energy deposition per unit volume is ~ Pressure
 
         ! Luminosity is specified as an input
         ! Phi(r) is set to alpha such that 
@@ -412,17 +440,18 @@ Contains
         Allocate(temp(1:N_R))
 
         temp = ref%density*ref%temperature
-        Call Integrate_in_radius(temp,integral)
-        integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        Call Integrate_in_radius(temp,integral) !Int_rmin_rmax rho T r^2 dr
+        integral = integral*4.0d0*pi  ! Int_V temp dV
+
+        
+        alpha = 1.0d0/integral
+
+
+
         ref%heating(:) = alpha
         DeAllocate(temp)
-    End Subroutine Constant_Reference_Heating
-
-    Subroutine Bouss_Reference_Heating()
-    Implicit None
-    ref%heating(:) = 1.0d0
-    End Subroutine Bouss_Reference_Heating
+        !Note that in the boussinesq limit, alpha = Luminosity/Volume
+    End Subroutine Constant_Entropy_Heating
 
     Subroutine Tanh_Reference_Heating()
         Implicit None
@@ -435,25 +464,26 @@ Contains
         ! Heating is set so that temp * 4 pi r^2 integrates to one Lsun 
         ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity
         Allocate(temp(1:N_R))
-          Allocate(temp2(1:N_R))
+        Allocate(temp2(1:N_R))
         Allocate(x(1:N_R))
-        x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
+        x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) 
+        ! x runs from zero to 1 if heating_r0 is min(radius)
         !Call tanh_profile(x,temp)
         Do i = 1, n_r
             temp2(i) = 0.5d0*(1.0d0-tanh(x(i))*tanh(x(i)))*heating_factor/(maxval(radius)-minval(radius))
         Enddo
 
-          !temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
+        !temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
 
-          temp2 = -temp2/(4*pi*radius*radius)
+        temp2 = -temp2/(4*pi*radius*radius)
 
         Call Integrate_in_radius(temp2,integral)
 
         integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        alpha = 1.0d0/integral
         
-          ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
-        if (my_rank .eq. 0) Then
+        ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
+        If (my_rank .eq. 0) Then
             heating_file = Trim(my_path)//'reference_heating'
             Open(unit=15,file=heating_file,form='unformatted', status='replace',access='stream')
             Write(15)n_r
@@ -495,7 +525,7 @@ Contains
         Call Integrate_in_radius(temp2,integral)
 
         integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        alpha = 1.0d0/integral
 
         !/////////////////////
         ! The "Cooling" part comes in through the minus sign here - otherwise, this is identical to the heating function
@@ -525,42 +555,17 @@ Contains
         Real*8, Intent(In) :: func(1:)
         Real*8, Intent(Out) :: int_func
         Integer :: i
-        Real*8 :: delr, riweight
+        Real*8 :: rcube
         !compute integrate_r=rmin_r=rmax func*r^2 dr
+        rcube = (rmax**3-rmin**3)*One_Third
         int_func = 0.0d0
-        Do i = 2, n_r-1
-            delr = (radius(i-1)-radius(i+1))/2.0d0
-            riweight = delr*radius(i)**2
-            int_func = int_func+func(i)*riweight
+        Do i = 1, n_r
+            int_func = int_func+func(i)*radial_integral_weights(i)
         Enddo
-        delr = (radius(1)-radius(2))/2.0d0
-        riweight = delr*radius(1)**2
-        int_func = int_func+riweight*func(1)
-
-        delr = (radius(n_r-1)-radius(n_r))/2.0d0
-        riweight = delr*radius(n_r)**2
-        int_func = int_func+riweight*func(n_r)
+        int_func = int_func*rcube
 
     End Subroutine Integrate_in_radius
 
-    Subroutine Indefinite_Integral(func,int_func)
-        Implicit None
-        Real*8, Intent(In) :: func(1:)
-        Real*8, Intent(Out) :: int_func(1:)
-        Integer :: i
-        Real*8 :: delr
-        !computes indefinite integral func dr
-        int_func(1) = 0.0d0
-        Do i = 2, n_r-1
-            delr = (radius(i-1)-radius(i+1))/2.0d0
-            int_func(i) = int_func(i-1)+func(i-1)*delr
-        Enddo
-        delr = (radius(n_r-1)-radius(n_r))/2.0d0
-
-        int_func(n_r) = int_func(n_r-1)+delr*func(n_r-1)
-
-
-    End Subroutine Indefinite_Integral
 
     Subroutine Write_Reference(filename)
         Implicit None
@@ -637,16 +642,18 @@ Contains
 
         ! This conductive profile is based on the assumption that kappa is constant
         ! And it is modulo kappa (s_conductive/kappa)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        Allocate(integrand(1:N_R))
-        integrand = 1.0d0/(ref%density*ref%temperature)
-        integrand = integrand*OneOverRSquared
-        !The routine below integrates r^2 * integrand, hence the extra division by r^2
-        Call Indefinite_Integral(integrand,s_conductive)
-        s_conductive = s_conductive-s_conductive(1)
-        s_conductive = s_conductive/s_conductive(N_R)
-        DeAllocate(integrand)
+        !If (heating_type. eq. 0) Then
+        !    Allocate(s_conductive(1:N_R))
+        !    s_conductive(:) = 0.0d0
+        !    Allocate(integrand(1:N_R))
+        !    integrand = 1.0d0/(ref%density*ref%temperature)
+        !    integrand = integrand*OneOverRSquared
+            !The routine below integrates r^2 * integrand, hence the extra division by r^2
+        !    Call Indefinite_Integral(integrand,s_conductive,radius)
+        !    s_conductive = s_conductive-s_conductive(1)
+        !    s_conductive = s_conductive/s_conductive(N_R)
+        !    DeAllocate(integrand)
+        !Endif
         Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference
 
@@ -697,16 +704,16 @@ Contains
 
         ! This conductive profile is based on the assumption that kappa is constant
         ! And it is modulo kappa (s_conductive/kappa)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        Allocate(integrand(1:N_R))
-        integrand = 1.0d0/(ref%density*ref%temperature)
-        integrand = integrand*OneOverRSquared
+        !Allocate(s_conductive(1:N_R))
+        !s_conductive(:) = 0.0d0
+        !Allocate(integrand(1:N_R))
+        !integrand = 1.0d0/(ref%density*ref%temperature)
+        !integrand = integrand*OneOverRSquared
         !The routine below integrates r^2 * integrand, hence the extra division by r^2
-        Call Indefinite_Integral(integrand,s_conductive)
-        s_conductive = s_conductive-s_conductive(1)
-        s_conductive = s_conductive/s_conductive(N_R)
-        DeAllocate(integrand)
+        !Call Indefinite_Integral(integrand,s_conductive,radius)
+        !s_conductive = s_conductive-s_conductive(1)
+        !s_conductive = s_conductive/s_conductive(N_R)
+        !DeAllocate(integrand)
         Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference2    
     
@@ -917,6 +924,8 @@ Contains
         Call BCAST2D(arr,grp = pfi%rcomm)
 
     End Subroutine Read_Profile_File
+
+
 
 
     Subroutine Restore_Reference_Defaults

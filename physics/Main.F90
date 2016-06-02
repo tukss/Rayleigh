@@ -49,11 +49,9 @@ Contains
         Call Initialize_FFts()
 		Call Initialize_Reference()
 
-		Call Initialize_Transport_Coefficients()
         Call Initialize_Boundary_Conditions()
+		Call Initialize_Transport_Coefficients()
 
-
-        Call Compute_Diffusion_Coefs()
 
 		Call Initialize_Field_Structure()
 		Call Initialize_Diagnostics()

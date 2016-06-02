@@ -2,6 +2,7 @@ Module TransportCoefficients
 	Use ProblemSize
 	Use ReferenceState
 	Use Controls
+    Use BoundaryConditions
 	Implicit None
 	Real*8, Allocatable :: nu(:), kappa(:), eta(:)
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
@@ -111,11 +112,44 @@ Contains
                 ohmic_heating_coeff(1:N_R) = ref%ohmic_amp(1:N_R)*eta(1:N_R)            
             Endif
         Endif
-		!Call Compute_Diffusion_Coefs
+		Call Compute_Diffusion_Coefs()
 
-
+        Call Transport_Dependencies()
 
 	End Subroutine Initialize_Transport_Coefficients
+
+    Subroutine Transport_Dependencies()
+        Implicit None
+        Real*8 :: fsun, lum_top, lum_bottom
+        !Any odd boundary conditions that need the reference state
+        ! or nu/kappa etc. can be set here
+        ! As can any reference state quanitities, such as heating, that
+        ! might depend on nu and kappa
+        If (fix_tdt_bottom) Then
+            ! Set the entropy gradient at the top based on Luminosity and kappa
+            fsun = luminosity/four_pi/radius(1)/radius(1)
+            dtdr_top = -fsun/kappa(1)/ref%density(1)/ref%temperature(1)
+        Endif
+        If (adjust_reference_heating ) Then
+            !Renormalize the reference heating based on boundary fluxes
+            lum_top    = 0.0d0
+            lum_bottom = 0.0d0
+
+            If ( fix_dtdr_top ) Then
+                lum_top = -dtdr_top*kappa(1)*four_pi*(rmax**2)
+                lum_top = lum_top*ref%density(1)*ref%temperature(1)
+            Endif
+
+            If ( fix_dtdr_bottom) Then
+                lum_bottom = -dtdr_bottom*kappa(N_R)*four_pi*(rmin**2)
+                lum_bottom = lum_bottom*ref%density(N_R)*ref%temperature(N_R)
+            Endif
+
+            ref%heating = ref%heating*(lum_top-lum_bottom)
+            !If something has been set inconsistenly, this will result
+            ! in zero reference heating
+         Endif
+    End Subroutine Transport_Dependencies
 
 
 	Subroutine Allocate_Transport_Coefficients()
