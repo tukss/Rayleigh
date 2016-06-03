@@ -90,6 +90,10 @@ Contains
 
     Subroutine Initialize_Reference()
         Implicit None
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Initalizing Reference State...")
+            Call stdout%print(" ---- Specified parameters:")
+        Endif
         Call Allocate_Reference_State()
         If (reference_type .eq. 1) Then
             Call Constant_Reference()
@@ -112,7 +116,10 @@ Contains
                 Call Get_Custom_Reference2()
             Endif
         Endif
-
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Reference State initialized.")
+            Call stdout%print(" ")
+        Endif
 
         Call Write_Reference()
     End Subroutine Initialize_Reference
@@ -135,65 +142,101 @@ Contains
         Allocate(ref%viscous_amp(1:N_R))
     End Subroutine Allocate_Reference_State
     Subroutine Constant_Reference()
-            Implicit None
-            Integer :: i
-            Real*8 :: r_outer, r_inner, prefactor, amp
-            Dimensional_Reference = .false.
-            ref%density = 1.0d0
-            ref%dlnrho = 0.0d0
-            ref%d2lnrho = 0.0d0
-            ref%pressure = 1.0d0
-            ref%temperature = 1.0d0
-            ref%dlnT = 0.0d0
-            ref%dsdr = 0.0d0
-            ref%pressure = 1.0d0
-            ref%gravity = 0.0d0 ! Not used with constant reference right now
-
-            amp = Rayleigh_Number/Prandtl_Number
-
-            Do i = 1, N_R
-                ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
-            Enddo
-
-            pressure_specific_heat = 1.0d0
-            Call initialize_reference_heating()
-            If (heating_type .eq. 0) Then
-                !Otherwise, s_conductive will be calculated in initial_conditions
-                Allocate(s_conductive(1:N_R))
-                r_outer = radius(1)
-                r_inner = radius(N_R)
-                prefactor = r_outer*r_inner/(r_inner-r_outer)
-                Do i = 1, N_R
-                    s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
-                Enddo
-            Endif
-            !Define the various equation coefficients
-            ref%dpdr_w_term(:) = ref%density
-            ref%pressure_dwdr_term(:) = -1.0d0*ref%density
-            ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
-
-
-            ref%script_N_top       = Prandtl_Number
-            ref%script_K_top       = 1.0d0
-            ref%viscous_amp(1:N_R) = 2.0d0
-
+        Implicit None
+        Integer :: i
+        Real*8 :: r_outer, r_inner, prefactor, amp
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        Dimensional_Reference = .false.
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type           : "//trim(" Boussinesq (Non-dimensional)"))
+            Write(dstring,dofmt)Rayleigh_Number
+            Call stdout%print(" ---- Rayleigh Number          : "//trim(dstring))
+            Write(dstring,dofmt)Ekman_Number
+            Call stdout%print(" ---- Ekman Number             : "//trim(dstring))
+            Write(dstring,dofmt)Prandtl_Number
+            Call stdout%print(" ---- Prandtl Number           : "//trim(dstring))
             If (magnetism) Then
-                ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
-                ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
-                ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
-            Else
-                ref%Lorentz_Coeff    = 0.0d0
-                ref%script_H_Top     = 0.0d0
-                ref%ohmic_amp(1:N_R) = 0.0d0
-            Endif            
+                Write(dstring,dofmt)Magnetic_Prandtl_Number
+                Call stdout%print(" ---- Magnetic Prandtl Number  : "//trim(dstring))
+            Endif
+        Endif
+
+        ref%density = 1.0d0
+        ref%dlnrho = 0.0d0
+        ref%d2lnrho = 0.0d0
+        ref%pressure = 1.0d0
+        ref%temperature = 1.0d0
+        ref%dlnT = 0.0d0
+        ref%dsdr = 0.0d0
+        ref%pressure = 1.0d0
+        ref%gravity = 0.0d0 ! Not used with constant reference right now
+
+        amp = Rayleigh_Number/Prandtl_Number
+
+        Do i = 1, N_R
+            ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
+        Enddo
+
+        pressure_specific_heat = 1.0d0
+        Call initialize_reference_heating()
+        If (heating_type .eq. 0) Then
+            !Otherwise, s_conductive will be calculated in initial_conditions
+            Allocate(s_conductive(1:N_R))
+            r_outer = radius(1)
+            r_inner = radius(N_R)
+            prefactor = r_outer*r_inner/(r_inner-r_outer)
+            Do i = 1, N_R
+                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
+            Enddo
+        Endif
+        !Define the various equation coefficients
+        ref%dpdr_w_term(:) = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+
+
+        ref%script_N_top       = Prandtl_Number
+        ref%script_K_top       = 1.0d0
+        ref%viscous_amp(1:N_R) = 2.0d0
+
+        If (magnetism) Then
+            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
+        Else
+            ref%Lorentz_Coeff    = 0.0d0
+            ref%script_H_Top     = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
+        Endif            
     
     End Subroutine Constant_Reference
     Subroutine Polytropic_ReferenceND()
         Implicit None
         Real*8 :: dtmp
         Real*8, Allocatable :: dtmparr(:)
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
         Dimensional_Reference = .false.
-
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type           : "//trim(" Polytrope (Non-dimensional)"))
+            Write(dstring,dofmt)Modified_Rayleigh_Number
+            Call stdout%print(" ---- Modified Rayleigh Number : "//trim(dstring))
+            Write(dstring,dofmt)Ekman_Number
+            Call stdout%print(" ---- Ekman Number             : "//trim(dstring))
+            Write(dstring,dofmt)Prandtl_Number
+            Call stdout%print(" ---- Prandtl Number           : "//trim(dstring))
+            If (magnetism) Then
+                Write(dstring,dofmt)Magnetic_Prandtl_Number
+                Call stdout%print(" ---- Magnetic Prandtl Number  : "//trim(dstring))
+            Endif
+            Write(dstring,dofmt)poly_n
+            Call stdout%print(" ---- Polytropic Index         : "//trim(dstring))
+            Write(dstring,dofmt)poly_nrho
+            Call stdout%print(" ---- Density Scaleheights     : "//trim(dstring))
+        Endif
 
         If (aspect_ratio .lt. 0) Then
             aspect_ratio = rmax/rmin
@@ -260,9 +303,27 @@ Contains
         Real*8 :: One, ee
         Real*8 :: InnerRadius, OuterRadius
         Integer :: r
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type                : "//trim(" Polytrope (Dimensional)"))
+            Write(dstring,dofmt)Angular_Velocity
+            Call stdout%print(" ---- Angular Velocity (rad/s)      : "//trim(dstring))
+            Write(dstring,dofmt)poly_rho_i
+            Call stdout%print(" ---- Inner-Radius Density (g/cm^3) : "//trim(dstring))
+            Write(dstring,dofmt)poly_mass
+            Call stdout%print(" ---- Interior Mass  (g)            : "//trim(dstring))
+            Write(dstring,dofmt)poly_n
+            Call stdout%print(" ---- Polytropic Index              : "//trim(dstring))
+            Write(dstring,dofmt)poly_nrho
+            Call stdout%print(" ---- Density Scaleheights          : "//trim(dstring))
+            Write(dstring,dofmt)pressure_specific_heat
+            Call stdout%print(" ---- CP (erg g^-1 cm^-3 K^-1)      : "//trim(dstring))
+        Endif
+
         Dimensional_Reference = .true. ! This is actually the default
 
-        If (my_rank .eq. 0) Call stdout%print('Initializing polytropic reference state.')
         ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
         ! The following parameters are read from the input file.
         ! poly_n

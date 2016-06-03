@@ -161,11 +161,7 @@ Contains
             Write(dstring,dofmt)rmin
             call stdout%print(" ---- R_MIN    : "//trim(dstring))
             Write(dstring,dofmt)rmax
-            call stdout%print(" ---- R_MAX    : "//trim(dstring))
-            !Write(istr,'(i6)')self%nprow
-            !call stdout%print(" ---- NPROW : "//trim(istr))
-            !Write(istr,'(i6)')self%npcol
-            !call stdout%print(" ---- NPCOL : "//trim(istr))
+            Call stdout%print(" ---- R_MAX    : "//trim(dstring))
         Endif
 		Call Initialize_Timers()
 		Call StopWatch(init_time)%startclock()
@@ -246,7 +242,7 @@ Contains
 		Integer :: r, nthr,i,j 
 		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
         real*8 :: delr0
-        Real*8 ::	Pi  = 3.1415926535897932384626433832795028841972d0
+
 
         !////////////////////////////////////////
         ! Variables for FE approach

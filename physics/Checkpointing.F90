@@ -10,6 +10,7 @@ Module Checkpointing
 	Use MPI_BASE
     Use Chebyshev_Polynomials_Alt
     Use Chebyshev_Polynomials, Only : cheby_from_Spectral
+    Use BufferedOutput
 	! Simple Checkpointing Module
 	! Uses MPI-IO to split writing of files amongst rank zero processes from each row
 	Implicit None
@@ -319,6 +320,8 @@ Contains
         Real*8, Allocatable :: tempfield1(:,:,:,:), tempfield2(:,:,:,:)
 		Character*8 :: iterstring
         Character*2 :: autostring
+        Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
 		Character*120 :: cfile
         Integer :: fcount(3,2)
         Integer :: lb,ub, f, imi, r, ind
@@ -384,8 +387,10 @@ Contains
                 Read(15)Checkpoint_iter
                 old_pars(4) = Checkpoint_iter
             Endif
-            Close(15)				
-            Write(6,*)'Checkpoint time is: ', checkpoint_time
+            Close(15)		
+	
+            write(dstring,dofmt)checkpoint_time
+            call stdout%print(' ------ Checkpoint time is: '//trim(dstring)) 
             old_pars(1) = n_r_old
             old_pars(2) = grid_type_old
             old_pars(3) = l_max_old

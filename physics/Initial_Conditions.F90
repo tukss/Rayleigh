@@ -18,6 +18,7 @@ Module Initial_Conditions
     Use TransportCoefficients, Only : kappa, dlnkappa
     Use Linear_Solve
     Use Math_Utility
+    Use BufferedOutput
 
     Implicit None
     Logical :: alt_check = .false.
@@ -44,6 +45,14 @@ Contains
         ! as part of the checkpoint.
 
         ! Check control variables to see if we need want static or buffers
+
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Initializing Fields...")
+            Call stdout%print(" ---- Specified parameters: ")
+            If (conductive_profile) Then
+                Call stdout%print(" ---- Conductive entropy profile is selected. ")
+            Endif
+        Endif
         dbtrans = .not. static_transpose
         dbconfig = .not. static_config
 
@@ -62,6 +71,16 @@ Contains
 
         !////////////////////////////////////////
         ! Read in checkpoint files as appropriate
+        If (init_type .eq. -1) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : RESTART ")
+            Endif
+        Endif
+        If (magnetism .and. (magnetic_init_type .eq. -1) ) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Magnetic Init Type : RESTART ")
+            Endif
+        Endif
         If ( (init_type .eq. -1) .or. ( magnetism .and. (magnetic_init_type .eq. -1) ) ) Then
             Call restart_from_checkpoint(restart_iter)
         Endif
@@ -69,14 +88,24 @@ Contains
 
         !////////////////////////////////////
         ! Initialize the hydro variables
+
         If (init_type .eq. 1) Then
             call benchmark_init_hydro()
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Benchmark (Christensen et al. 2001) ")
+            Endif
         Endif
 
         If (init_type .eq. 6) Then
             call abenchmark_init_hydro()
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Benchmark (Jones et al. 2011) ")
+            Endif
         Endif
         If (init_Type .eq. 7) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Random Thermal Field ")
+            Endif
             call random_thermal_init()
         Endif
 
@@ -85,17 +114,29 @@ Contains
             ! Initialize the magnetic variables
             If (magnetic_init_type .eq. 1) Then
                 call benchmark_insulating_init()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Benchmark (Christensen et al. 2001) ")
+                Endif
             Endif
             If (magnetic_init_type .eq. 7) Then
                 call random_init_Mag()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Random Field")
+                Endif
             Endif
             If (magnetic_init_type .eq. 10) Then
                 call Dipole_Field_Init()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Dipole Field")
+                Endif
             Endif
         Endif
         ! Fields are now initialized and loaded into the RHS. 
         ! We are ready to enter the main loop
-
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Fields initialized.")
+            Call stdout%print(" ")
+        Endif
     End Subroutine Initialize_Fields
 
     Subroutine Restart_From_Checkpoint(iteration)

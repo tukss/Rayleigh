@@ -448,8 +448,10 @@ Contains
 
         If (my_rank .eq. 0) Then
             If (benchmark_mode .gt. 0) Then
-                Write(6,*)"Run Parameters have been set to:  "
-                Write(6,*) benchmark_name
+                Call stdout%print(" ")
+                Call stdout%print(" -- Benchmarking Mode is Activated.")
+                Call stdout%print(" -- Selected Benchmark :  "//trim(benchmark_name))
+                Call stdout%print(" ")
             Endif
         Endif
         If (benchmark_integration_interval .gt. 0) Then
