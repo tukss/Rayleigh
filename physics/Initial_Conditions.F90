@@ -733,105 +733,60 @@ Contains
         Allocate(tmp1d(1:N_R),tmp1d2(1:N_R))
         tmp1d(:) =0.0d0
         tmp1d2(:) = 0.0d0
+        !Calculates the conductive entropy profile
 
-        If (heating_type .eq. 4) Then
-            ! We can get halfway to our solutiona analytically
-            lum_top = -dtdr_top*kappa(1)*four_pi*(rmax**2)
-            lum_top = lum_top*ref%density(1)*ref%temperature(1)
-            lum_bottom = -dtdr_bottom*kappa(N_R)*four_pi*(rmin**2)
-            lum_bottom = lum_bottom*ref%density(N_R)*ref%temperature(N_R)
+        !The conductive entropy profile is one that is
+        !in agreement with the boundary conditions
+        !and whose associated flux balances any
+        !internal heat sources/sinks.
 
-
-            !Now we build s_conductive (already set to zero)
-            ! This needs to be reorganized, but do it here for now
-            ! First, we build the indefinite integral of ref%heating *r^2
-
-
-            tmp1d2 = r_squared*ref%density*ref%temperature*kappa
-            sfactor = shell_volume/(four_pi)  !I think the one_third needs to be left out here
-
-
-
-            tmp1d = (lum_top-lum_bottom)*(1.0d0/shell_volume)*(radius**3)/3.0d0
-            
-            vhint = tmp1d(1)*four_pi
-            tmp1d = -tmp1d      
-            !tmp1d is now r^2kappa rho T * dSdr_cond modulu an offset determined by the BCs
-            diff = tmp1d2(N_R)*dTdr_bottom- tmp1d(N_R)
-            tmp1d = tmp1d+diff
-            tmp1d = tmp1d/tmp1d2  ! tmp1d is now dSdr_cond
-            !If (my_rank .eq. 0) Then
-            !    Write(6,*)'rmax, rmin: ', rmax, rmin
-            !    Write(6,*)'dsdr bottom is: ', tmp1d(N_R)
-            !    Write(6,*)'dsdr top is: ', tmp1d(1)
-            !    Write(6,*)'vhint is : ', vhint
-            !    Write(6,*)'shell_volume: ', shell_volume
-            !    Write(6,*)'lum_top: ', lum_top
-            !    Write(6,*)'lum_bottom: ', lum_bottom
-            !    Write(6,*)'ltop - lbottom = ', lum_top - lum_bottom
-            !Endif
-            !Next, build s_conductive from dsdr_cond
-            s_conductive(N_R) = 0.0d0
-            Do r = N_R-1, 1,-1
-                dsdr_mean = half*(tmp1d(r)+tmp1d(r+1))
-                dr = radius(r)-radius(r+1)
-                s_conductive(r) = s_conductive(r+1)+dsdr_mean*dr
-            Enddo
-            
-
-        Else
-            ! Do this completely numerically
-            If (heating_type .gt. 0) Then
-                tmp1d = ref%heating*ref%density*ref%temperature*r_squared
-                !tmp1d is zero otherwise - i.e., no heating
-            Endif
-            Call Indefinite_Integral(tmp1d,tmp1d2,radius)
-            !tmp1d2(r) is now int_rmin_r Q rho T r^2 dr  
-            ! tmp1d2 is also now r^2*F_conductive + A {A is undetermined}
-
-            If (fix_dtdr_top .or. fix_dtdr_bottom) Then
-                If (fix_dtdr_bottom) Then
-                    ftest = -dtdr_bottom*kappa(N_R)
-                    ftest = ftest*ref%density(N_R)*ref%temperature(N_R)*r_squared(N_R)
-                    tmp1d2 = tmp1d2-tmp1d2(N_R)+ftest
-
-                    Write(6,*)'This branch.', tmp1d2(N_R), tmp1d2(1)*four_pi
-                Endif
-                
-                If (fix_dtdr_top .and. (.not. fix_dtdr_bottom)) Then
-                    ftest = -dtdr_top*kappa(1)
-                    ftest = ftest*ref%density(1)*ref%temperature(1)*r_squared(1)
-                    tmp1d2 = tmp1d2-tmp1d2(1)+ftest
-                    Write(6,*)'Also this branch...'
-                Endif
-                tmp1d = -tmp1d2*OneOverRSquared/(kappa*ref%density*ref%temperature)
-                !tmp1d is now dsdr_conductive
-                Call Indefinite_Integral(tmp1d,tmp1d2,radius)
-                !tmp1d2 is now s_conductive + A {A is undetermined}
-                tmp1d2 = tmp1d2-tmp1d2(1) ! set to zero at the top ; adjust as needed
-                If (fix_tvar_top) Then                
-                    tmp1d2 = tmp1d2+T_Top
-                Endif
-                If (fix_tvar_bottom) Then                
-                    tmp1d2 = tmp1d2 - tmp1d2(N_R)+T_Bottom
-                Endif
-                s_conductive = tmp1d2
-            Else
-                ! T is fixed at top and bottom - this is a little more complicated
-                Allocate(tmp1d3(1:N_R))
-                tmp1d3(:) = 0.0d0
-                tmp1d = -tmp1d2*OneOverRSquared/(kappa*ref%density*ref%temperature)
-                tmp1d2 = OneOverRSquared/(kappa*ref%density*ref%temperature)
-                Call Indefinite_Integral(tmp1d,tmp1d3,radius)
-                Call Indefinite_Integral(tmp1d2,tmp1d,radius)
-                amp = (T_top-T_bottom) - (tmp1d3(1)-tmp1d3(N_R)) 
-                amp = amp/ (tmp1d(1)-tmp1d(N_R))
-                s_conductive = tmp1d3+amp*tmp1d
-                s_conductive = s_conductive-s_conductive(1)+T_Top
-                DeAllocate(tmp1d3)
-                Write(6,*)'top, bottom: ', s_conductive(1), s_conductive(N_R)
-            Endif
+        If (heating_type .gt. 0) Then
+            tmp1d = ref%heating*ref%density*ref%temperature*r_squared
+            !tmp1d is zero otherwise - i.e., no heating
         Endif
+        Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+        !tmp1d2(r) is now int_rmin_r Q rho T r^2 dr  
+        !tmp1d2 is also now r^2*F_conductive + A {A is undetermined}
+
+        If (fix_dtdr_top .or. fix_dtdr_bottom) Then
+            If (fix_dtdr_bottom) Then
+                ftest = -dtdr_bottom*kappa(N_R)
+                ftest = ftest*ref%density(N_R)*ref%temperature(N_R)*r_squared(N_R)
+                tmp1d2 = tmp1d2-tmp1d2(N_R)+ftest
+            Endif
+            
+            If (fix_dtdr_top .and. (.not. fix_dtdr_bottom)) Then
+                ftest = -dtdr_top*kappa(1)
+                ftest = ftest*ref%density(1)*ref%temperature(1)*r_squared(1)
+                tmp1d2 = tmp1d2-tmp1d2(1)+ftest
+            Endif
+            tmp1d = -tmp1d2*OneOverRSquared/(kappa*ref%density*ref%temperature)
+            !tmp1d is now dsdr_conductive
+            Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+            !tmp1d2 is now s_conductive + A {A is undetermined}
+            tmp1d2 = tmp1d2-tmp1d2(1) ! set to zero at the top ; adjust as needed
+            If (fix_tvar_top) Then                
+                tmp1d2 = tmp1d2+T_Top
+            Endif
+            If (fix_tvar_bottom) Then                
+                tmp1d2 = tmp1d2 - tmp1d2(N_R)+T_Bottom
+            Endif
+            s_conductive = tmp1d2
+        Else
+            ! T is fixed at top and bottom - this is marginally more complicated
+            Allocate(tmp1d3(1:N_R))
+            tmp1d3 = OneOverRSquared/(kappa*ref%density*ref%temperature)
+            tmp1d = -tmp1d2*tmp1d3
+            Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+            Call Indefinite_Integral(tmp1d3,tmp1d,radius)
+            amp = (tmp1d2(1)-tmp1d2(N_R))  - (T_top-T_bottom) 
+            amp = amp/ (tmp1d(1)-tmp1d(N_R))
+            s_conductive = tmp1d2-amp*tmp1d
+            s_conductive = s_conductive-s_conductive(1)+T_Top
+            DeAllocate(tmp1d3)
+
+        Endif
+
 
 
         

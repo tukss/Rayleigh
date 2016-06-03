@@ -39,6 +39,7 @@ Contains
 
 
         Call Initialize_Controls()
+
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
 
@@ -62,6 +63,12 @@ Contains
 		Call Initialize_Checkpointing()
 		Call Initialize_Fields()
 		Call StopWatch(init_time)%increment() ! started in Init_Problemsize just after MPI is started up
+        
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" Initialization Complete.")
+            Call stdout%print(" //////////////////////////////////////")
+            Call stdout%print(" ")
+        Endif
 	End Subroutine Main_Initialization
 
     Subroutine Initialize_Directory_Structure()

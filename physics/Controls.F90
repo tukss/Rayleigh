@@ -79,7 +79,7 @@ Module Controls
     ! What is normally sent to standard out can, if desired, be sent to a file instead
     Integer :: stdout_flush_interval = 50  ! Lines stored before stdout buffer is flushed to stdout_unit
     Character*120 :: stdout_file = 'nofile'
-    Type(OutputBuffer) :: stdout
+    
     Namelist /IO_Controls_Namelist/ stdout_flush_interval,stdout_file
 
     !///////////////////////////////////////////////////////////////////////////

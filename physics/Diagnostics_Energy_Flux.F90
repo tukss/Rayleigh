@@ -148,6 +148,7 @@ Contains
                     fpr2dr = fpr2dr*(radius(r)-radius(r+1))
                     tmp1d(r) = tmp1d(r+1)+qadd*fpr2dr
                 Enddo
+                tmp1d = tmp1d(1)-tmp1d
                 tmp1d = tmp1d/four_pi/r_squared
             Endif
             DO_PSI

@@ -8,6 +8,7 @@ Module Parallel_Framework
 	Use General_MPI
 	Use Load_Balance
 	Use Structures
+    Use BufferedOutput
 	Implicit None
 	Private
 #ifdef usemkl
@@ -95,6 +96,7 @@ Contains
         Integer, Intent(In) :: ncpus(1:)
 		Integer :: pcheck, error
         Integer :: ierr
+        Character*6 :: istr
 		Class(Parallel_Interface) :: self	
 		self%geometry = pars(1)
 		self%n1p = pars(2)
@@ -123,14 +125,30 @@ Contains
             self%gcomm%comm = self%wcomm%comm
 
         Endif
+        If (self%gcomm%rank .eq. 0) Then
+
+            Call stdout%print(" //////////////////////////////////////")
+            Call stdout%print(" Initializating Rayleigh...")
+            Write(istr,'(i6)')self%npe
+            call stdout%print(" ")
+            call stdout%print(" -- Initalizing MPI...")
+            Call stdout%print(" ---- Specified parameters:")
+            call stdout%print(" ---- NCPU  : "//trim(istr))
+            Write(istr,'(i6)')self%nprow
+            call stdout%print(" ---- NPROW : "//trim(istr))
+            Write(istr,'(i6)')self%npcol
+            call stdout%print(" ---- NPCOL : "//trim(istr))
+        Endif
 		if (self%gcomm%np .ne. self%npe) Then
 			If (self%gcomm%rank .eq. 0) Then
-				Write(6,*)'Error np does not agree with number of processes.'
-				Write(6,*)'NCPU from MPI   : ', self%gcomm%np
-				Write(6,*)'Specified ncpu  : ', self%npe
-				Write(6,*)'Specified nprow : ', self%nprow
-				Write(6,*)'Specified npcol : ', self%npcol
-				Write(6,*)'Exiting...'
+                Call stdout%print('........................................................')
+				Call stdout%print(' --- Error NCPU does not agree with number of MPI Ranks!')
+                Write(istr,'(i6)')self%gcomm%np
+				Call stdout%print(' --- NCPU from MPI   : '//trim(istr))
+                Write(istr,'(i6)')self%npe
+				Call stdout%print(' --- NCPU from Input : '//trim(istr))
+                Call stdout%print('........................................................')
+				Call stdout%print(' Exiting...')
 			Endif
 			Call self%exit()
 		Endif
@@ -139,6 +157,10 @@ Contains
 		Call self%Init_Geometry()	
 
         Call self%openmp_init()
+        If (self%gcomm%rank .eq. 0) Then
+            call stdout%print(" -- MPI initialized.")
+            call stdout%print(" ")
+        Endif
 		If (self%gcomm%rank .eq. -1) Then
 			Write(6,*)"/////////////////////////////////////////////////////////////////////"
 			Write(6,*)"//                                                                 //"

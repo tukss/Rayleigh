@@ -1,5 +1,5 @@
 Module BufferedOutput
-    
+    Implicit None
     Type, Public :: OutputBuffer
         Integer :: current_index =1
         Integer :: nlines = 1
@@ -14,7 +14,7 @@ Module BufferedOutput
         Procedure :: partial_flush
         Procedure :: finalize => Reset_OutputBuffer
     End Type OutputBuffer
-
+    Type(OutputBuffer) :: stdout
 Contains
 
     Subroutine Initialize_OutputBuffer(self,file_unit,line_count,filename)

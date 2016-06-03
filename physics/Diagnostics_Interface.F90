@@ -216,7 +216,6 @@ Contains
         Allocate(rweights(1:n_r))
 
         If (chebyshev .or. finite_element) Then
-            If (my_rank .eq. 0) Write(6,*)'Integrating using Chebyshev Quadrature'
             rweights = radial_integral_weights
 
         Else

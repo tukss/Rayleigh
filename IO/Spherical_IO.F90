@@ -6,6 +6,7 @@ Module Spherical_IO
     Use General_MPI
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform
+    Use BufferedOutput
 	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
@@ -1671,8 +1672,8 @@ Contains
         Class(DiagnosticInfo) :: self
         Integer, Intent(In) :: iter
         Integer, Intent(InOut) :: errcheck
-        Character*8 :: iterstring
-        Character*120 :: filename
+        Character*8 :: iterstring,istr
+        Character*120 :: filename, omsg
         Integer :: modcheck, imod, file_iter, next_iter, ibelong
         ! Note - we should do something to make sure that the file has been started before we start writing to it...
         ! possibly look at self%rec_count*self%frequency
@@ -1690,7 +1691,10 @@ Contains
 
         If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
-            Write(6,*)'Creating Filename: ', filename
+            !omsg = ' Creating Filename: '//trim(filename)
+            !Write(6,*)'Creating Filename: ', filename
+            !Call stdout%print(omsg)
+            Call stdout%print(' Creating Filename: '//trim(filename))
             Open(unit=self%file_unit,file=filename,form='unformatted', status='replace',access='stream',iostat = errcheck)
             Write(self%file_unit)endian_tag
             Write(self%file_unit)self%output_version
@@ -1698,7 +1702,7 @@ Contains
             self%current_rec = 1            
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
-                Write(6,*)'Unable to create file!!: ',filename
+                call stdout%print(' Unable to create file!!: '//trim(filename))
             Endif
         Else
             Open(unit=self%file_unit,file=filename,form='unformatted', status='old',access='stream', &
@@ -1709,9 +1713,11 @@ Contains
             self%current_rec = self%current_rec+1
             If (errcheck .ne. 0) Then
                 next_iter =file_iter+modcheck
-                Write(6,*)'Failed to find needed file: ', filename
-                Write(6,*)'Partial diagnostic files are not currently supported.'
-                Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
+                Call stdout%print(' --Failed to find needed file: '//trim(filename))
+                Call stdout%print(' --Partial diagnostic files are not currently supported.')
+                Write(istr,'(i8.8)')ibelong+self%frequency
+               !Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
+                Call stdout%print(' --No data will be written until a new file is created at iteration: '//trim(istr))
             Endif
         Endif
 
