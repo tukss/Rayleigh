@@ -351,6 +351,13 @@ Contains
     	Call wsp%reform()	! move from p1a to s2a
 
         If (output_iteration) Then
+            !Convert p/rho to p
+            ! We already took d/dr(p/rho), so we'll fix that later
+		    Do m = 1, my_num_lm
+			    Do i = 1, 2
+				    wsp%p1a(:,i,m,pvar) = wsp%p1a(:,i,m,pvar)*ref%density(:)
+			    Enddo
+		    Enddo
             Call cobuffer%reform()
         Endif
 		Call StopWatch(ctranspose_time)%increment()
