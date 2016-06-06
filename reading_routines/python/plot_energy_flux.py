@@ -5,7 +5,7 @@
 #  Plots average Energy flux (normalized by 4pi r^2)
 #
 #  This example routine makes use of the ShellAverage
-#  datastructure associated with the Shell_Avg output.
+#  data structure associated with the Shell_Avg output.
 #  Upon initializing a ShellAverage object, the 
 #  object will contain the following attributes:
 #

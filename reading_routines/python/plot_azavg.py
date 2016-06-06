@@ -6,8 +6,8 @@
 #  Plots Entropy, Differential Rotation, and Mass Flux
 #
 #  This example routine makes use of the AZAverage
-#  datastructure associated with the AZ_Avg output.
-#  Upon initializing a AZAverage object, the 
+#  data structure associated with the AZ_Avg output.
+#  Upon initializing an AZAverage object, the 
 #  object will contain the following attributes:
 #    ----------------------------------
 #    self.niter                                    : number of time steps

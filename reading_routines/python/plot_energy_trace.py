@@ -5,7 +5,7 @@
 #  Plots average KE vs time
 #
 #  This example routine makes use of the GlobalAverage
-#  datastructure associated with the G_Avg output.
+#  data structure associated with the G_Avg output.
 #  Upon initializing a GlobalAverage object, the 
 #  object will contain the following attributes:
 #
