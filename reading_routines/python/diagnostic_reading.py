@@ -455,8 +455,23 @@ class ShellSpectra:
             self.lut[q] = i
         fd.close()
 class PowerSpectrum():
+    """Rayleigh Power Spectrum Structure
+    ----------------------------------
+    self.niter                                    : number of time steps
+    self.nr                                       : number of radii at which power spectra are available
+    self.lmax                                     : maximum spherical harmonic degree l
+    self.radius[0:nr-1]                           : radii of the shell slices output
+    self.inds[0:nr-1]                             : radial indices of the shell slices output
+    self.power[0:lmax,0:nr-1,0:niter-1,0:2]       : the velocity power spectrum.  The third
+                                                  : index indicates (0:total,1:m=0, 2:total-m=0 power)
+    self.mpower[0:lmax,0:nr-1,0:niter-1,0:2]      : the magnetic power spectrum
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.magnetic                                 : True if mpower exists
+    """
     #Power Spectrum Class - generated using shell spectra files
-    def __init__(self,infile, dims=[],power_file = False):
+    def __init__(self,infile, dims=[],power_file = False, magnetic = False):
+        self.magnetic = magnetic
         if (power_file):
             self.power_file_init(infile) 
         elif (infile == 'Blank' or infile =='blank'):
@@ -487,6 +502,11 @@ class PowerSpectrum():
         lmax  = swapread(fd,dtype='int32',count=1,swap=bs)
         nr    = swapread(fd,dtype='int32',count=1,swap=bs)
         niter = swapread(fd,dtype='int32',count=1,swap=bs)
+        magint = swapread(fd,dtype='int32',count=1,swap=bs)
+        if (magint == 1):
+            self.magnetic = True
+        else:
+            self.magnetic = False
         self.iters = np.reshape(swapread(fd,dtype='int32',count=niter,swap=bs),(niter), order = 'F')
         self.time = np.reshape(swapread(fd,dtype='float64',count=niter,swap=bs),(niter), order = 'F')
         self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
@@ -494,6 +514,8 @@ class PowerSpectrum():
         pcount = (lmax+1)*nr*niter*3
         pdim = (lmax+1,nr,niter,3)
         self.power = np.reshape(swapread(fd,dtype='float64',count=pcount,swap=bs),pdim, order = 'F')
+        if (self.magnetic):
+            self.mpower = np.reshape(swapread(fd,dtype='float64',count=pcount,swap=bs),pdim, order = 'F')
 
         self.niter = niter
         self.nr = nr
@@ -502,11 +524,15 @@ class PowerSpectrum():
         fd.close()
     def write_power(self,ofile):
         fd = open(ofile,'wb') #w = write, b = binary
-        dims = np.zeros(4,dtype='int32')
+        dims = np.zeros(5,dtype='int32')
         dims[0] = 314
         dims[1] = self.lmax
         dims[2] = self.nr
         dims[3] = self.niter
+        if (self.magnetic):
+            dims[4] = 1
+        else:
+            dims[4] = 0
         dims.tofile(fd)
         self.iters.tofile(fd)
         self.time.tofile(fd)
@@ -514,6 +540,9 @@ class PowerSpectrum():
         self.radius.tofile(fd)
         tmp = np.transpose(self.power)
         tmp.tofile(fd)
+        if (self.magnetic):
+            tmp = np.transpose(self.mpower)
+            tmp.tofile(fd)
         fd.close()
 
     def spectra_file_init(self,sfile):
@@ -566,6 +595,33 @@ class PowerSpectrum():
                     power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
 
         self.power = power
+
+        if(self.magnetic):
+            #Do the same thing for the magnetic field components
+            # We use the lookup table to find where br, vtheta, and bphi are stored
+            br_index = a.lut[401]
+            bt_index = a.lut[402]
+            bp_index = a.lut[403]
+            #the last index indicates 0:full power, 1:m0 power, 2:full-m0
+            mpower = np.zeros((lmax+1,nr,nt,3),dtype='float64')
+            
+            # Next we grab one radial index and one time instance of each variable
+            dims = (a.nell,a.nm,nr,nt)
+            brc = np.reshape(a.vals[:,:,:, br_index, :],dims)
+            btc = np.reshape(a.vals[:,:,:, bt_index, :],dims)
+            bpc = np.reshape(a.vals[:,:,:, bp_index, :],dims)
+
+            for k in range(nt):
+                for j in range(nr):
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vrc[:,0,j,k])**2 +np.imag(vrc[:,0,j,k])**2
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vtc[:,0,j,k])**2 +np.imag(vtc[:,0,j,k])**2
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vpc[:,0,j,k])**2 +np.imag(vpc[:,0,j,k])**2
+                    for m in range(a.nm):
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
+                        mpower[:,j,k,2] = mpower[:,j,k,0]-mpower[:,j,k,1]
+            self.mpower = mpower
 
 def swapread(fd,dtype='float64',count=1,swap=False):
         #simple wrapper to numpy.fromfile that allows byteswapping based on Boolean swap
