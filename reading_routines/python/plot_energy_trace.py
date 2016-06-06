@@ -22,11 +22,15 @@
 from diagnostic_reading import GlobalAverage, build_file_list
 import matplotlib.pyplot as plt
 import numpy
+
+
+# Set saveplot to True to save to a .png file. 
+# Set to False to view plots interactively on-screen.
+saveplot = False
+savefile = 'energy_trace.pdf'  #Change .pdf to .png if pdf conversion gives issues
+
+# Build a list of all files ranging from iteration 2.7 million to 4 million
 files = build_file_list(2700000,4000000,path='G_Avgs')
-
-
-
-
 #The indices associated with our various outputs are stored in a lookup table
 #as part of the GlobalAverage data structure.  We define several variables to
 #hold those indices here:
@@ -81,9 +85,16 @@ for f in files:
 # Plot 1:  Total KE and its breakdown.
 # Plot 2:  Breakdown of the mean KE
 
-plt.figure(1,figsize=(15, 5), dpi=100)
-plt.rcParams.update({'font.size': 14})
+#Changing the plotting parameter somewhat depending on saveplot
+if (saveplot):
+    plt.figure(1,figsize=(7.5, 4.0), dpi=300)
+    plt.rcParams.update({'font.size': 12})
+else:
+    plt.figure(1,figsize=(15,5),dpi=100)
+    plt.rcParams.update({'font.size': 14})
+
 plt.subplot(121)
+plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 plt.plot(alldays,ke,'black', label = 'KE'+r'$_{total}$')
 plt.plot(alldays,rke,'r', label = 'KE'+r'$_{rad}$')
 plt.plot(alldays,tke,'g', label = 'KE'+r'$_\theta$')
@@ -91,10 +102,14 @@ plt.plot(alldays,pke,'b', label = 'KE'+r'$_\phi$')
 plt.yscale('log')
 plt.xlabel('Time (days)')
 plt.ylabel('Energy Density '+r'( erg cm$^{-3}$)')
-legend = plt.legend(loc='upper right', shadow=True, ncol = 2) 
+if (saveplot):
+    legend = plt.legend(loc='upper right', shadow=True, ncol = 2, fontsize = 'x-small') 
+else:
+    legend = plt.legend(loc='upper right', shadow=True, ncol = 2) 
 
 t1 = r'$\frac{1}{2}\rho$'
 plt.subplot(122)
+plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
 plt.plot(alldays,mrke,'r', label = t1+r'$<v^2_r>$')
 plt.plot(alldays,mtke,'g', label = t1+r'$<v^2_\theta>$')
 plt.plot(alldays,mpke,'b', label = t1+r'$<v^2_\phi>$')
@@ -102,7 +117,13 @@ plt.yscale('log')
 plt.ylim([1,1e7])
 plt.xlabel('Time (days)')
 plt.ylabel('Energy Density '+r'( erg cm$^{-3}$)')
-legend = plt.legend(loc='lower right', shadow=True, ncol = 2) 
+if (saveplot):
+    legend = plt.legend(loc='lower right', shadow=True, ncol = 2, fontsize = 'x-small') 
+else:
+    legend = plt.legend(loc='lower right', shadow=True, ncol = 2) 
+plt.tight_layout()
 
-plt.show()
-#plt.savefig('energy_trace.png')
+if (saveplot):
+    plt.savefig(savefile)
+else:
+    plt.show()
