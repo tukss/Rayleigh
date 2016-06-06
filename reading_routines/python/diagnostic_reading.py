@@ -198,7 +198,7 @@ class ShellAverage:
                                              
 
     For version 2:
-    self.vals[0:nr-1,0:3,0:nq-1,0:niter-1] : The spherically averaged diagnostics
+    self.vals[0:n-1,0:3,0:nq-1,0:niter-1] : The spherically averaged diagnostics
                                              0-3 refers to moments (index 0 is mean, index 3 is kurtosis)    
     self.iters[0:niter-1]              : The time step numbers stored in this output file
     self.time[0:niter-1]               : The simulation time corresponding to each time step
@@ -262,7 +262,7 @@ class AzAverage:
     self.radius[0:nr-1]                           : radial grid
     self.costheta[0:ntheta-1]                     : cos(theta grid)
     self.sintheta[0:ntheta-1]                     : sin(theta grid)
-    self.vals[0:nr-1,0:ntheta-1,0:nq-1,0:niter-1] : The phi-averaged diagnostics 
+    self.vals[0:ntheta-1,0:nr-1,0:nq-1,0:niter-1] : The phi-averaged diagnostics 
     self.iters[0:niter-1]                         : The time step numbers stored in this output file
     self.time[0:niter-1]                          : The simulation time corresponding to each time step
     self.version                                  : The version code for this particular output (internal use)
@@ -292,7 +292,7 @@ class AzAverage:
         self.nq = nq
         self.nr = nr
         self.ntheta = ntheta
-        print version, nrec, nq, nr
+
 
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
@@ -672,7 +672,7 @@ def TimeAvg_AZAverages(file_list,ofile):
     nr = a.nr
     ntheta = a.ntheta
     nq = a.nq
-    tmp = np.zeros((nr,ntheta,nq),dtype='float64')
+    tmp = np.zeros((ntheta,nr,nq),dtype='float64')
     simtime   = np.zeros(1,dtype='float64')
     iteration = np.zeros(1,dtype='int32')
     icount = np.zeros(1,dtype='int32')
@@ -683,10 +683,11 @@ def TimeAvg_AZAverages(file_list,ofile):
     t0 = a.time[0]
     for i in range(0,nfiles):
         the_file = file_list[i]
+        print 'Adding '+the_file+' to the average...'
         b = AzAverage(the_file,path='')
         nrec = b.niter
         for j in range(nrec):
-            tmp[0:nr,0:ntheta,0:nq] += b.vals[0:nr,0:ntheta,0:nq,j].astype('float64')
+            tmp[0:ntheta,0:nr,0:nq] += b.vals[0:ntheta,0:nr,0:nq,j].astype('float64')
 
             tfinal[0] = b.time[j]
             ifinal[0] = b.iters[j]
