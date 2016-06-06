@@ -348,7 +348,7 @@ Contains
 		Call StopWatch(ctranspose_time)%startclock()
 
 
-    	Call wsp%reform()	! move from p1a to s2a
+    	
 
         If (output_iteration) Then
             !Convert p/rho to p
@@ -360,6 +360,7 @@ Contains
 		    Enddo
             Call cobuffer%reform()
         Endif
+        Call wsp%reform()	! move from p1a to s2a
 		Call StopWatch(ctranspose_time)%increment()
 
 	End Subroutine Post_Solve_Cheby
