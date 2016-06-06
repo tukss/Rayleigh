@@ -45,7 +45,7 @@ mrke_index = a.lut[130]  # KE associated with mean radial motion
 mtke_index = a.lut[131]  # KE associated with mean theta motion
 mpke_index = a.lut[132]  # KE associated with mean azimuthal motion
 
-#Next, we define some empy lists to hold those variables
+#Next, we intialize some empy lists to hold those variables
 ke = []
 rke = []
 tke = []

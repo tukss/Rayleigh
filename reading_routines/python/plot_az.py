@@ -76,21 +76,21 @@ def plot_azav(fig,axis,field,radius,costheta,sintheta,r_bcz=0.71,mini=-1,maxi=-1
 
 ########################################################################
 # Read in the data
-b = AzAverage(filename='00095000',path='AZ_Avgs/')
+b = AzAverage(filename='03260000',path='AZ_Avgs/')
 print b.qv
 
        
-ind = 1 # record number to grab
+ind = 0 # record number to grab
 
 
 
 n_r = b.nr
 n_t = b.ntheta
 vphi = b.vals[:,:,b.lut[3],ind].reshape(n_t,n_r)
-entropy = b.vals[:,:,b.lut[4],ind].reshape(n_t,n_r)
+entropy = b.vals[:,:,b.lut[64],ind].reshape(n_t,n_r)
 
-rhovr = b.vals[:,:,b.lut[13],ind].reshape(n_t,n_r)
-rhovt = b.vals[:,:,b.lut[14],ind].reshape(n_t,n_r)
+rhovr = b.vals[:,:,b.lut[61],ind].reshape(n_t,n_r)
+rhovt = b.vals[:,:,b.lut[62],ind].reshape(n_t,n_r)
 
 
 sintheta = b.sintheta
@@ -139,6 +139,6 @@ units = r'g cm$^{-2}$ s$^{-1}$'
 plot_azav(f1,ax1,psi,radius,costheta,sintheta,mycmap='RdYlBu_r',boundsfactor = 1.5, boundstype='rms', units=units, fontsize = lsize, underlay = rhovm)
 plt.title('Mass Flux',fontsize = tsize)
 
-p.savefig('az_test.png')  
-#plt.show()
+#p.savefig('az_test.png')  
+plt.show()
 
