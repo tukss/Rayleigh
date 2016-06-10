@@ -80,12 +80,16 @@ Module ReferenceState
     Logical :: Dimensional_Reference = .false.  ! Changed depending on reference state specified
     Character*120 :: custom_reference_file ='nothing'
     Integer :: custom_reference_type = 1
+
+    ! These last two flags are deprecated.  They are retained for now to prevent crashes due to improper input
+    Logical :: Dimensional = .false., NonDimensional_Anelastic = .false. 
     Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
             & gravity_power, heating_factor, heating_r0, custom_reference_file, &
             & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
-            & Dissipation_Number, Modified_Rayleigh_Number, Heating_Integral
+            & Dissipation_Number, Modified_Rayleigh_Number, Heating_Integral, &
+            & Dimensional, NonDimensional_Anelastic
 Contains
 
     Subroutine Initialize_Reference()

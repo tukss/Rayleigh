@@ -48,7 +48,7 @@ Module Spherical_IO
 
         Integer, Allocatable :: oqvals(:)   ! Array of size nq used by I/O process to record output ordering of diagnostics
 
-        Integer :: frequency = 10000000 ! How often we write this diagnostic type
+        Integer :: frequency = 90000000 ! How often we write this diagnostic type
         Integer :: rec_per_file =1     ! How many of these records we write to a file
         Integer :: current_rec = 1       ! Which record we are on within a file
         Integer :: file_header_size =0 ! Size of file header in bytes
@@ -112,11 +112,11 @@ Module Spherical_IO
 
     Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1, shellspectra_nrec =1
 
-    Integer :: globalavg_frequency = 1000000, shellavg_frequency = 1000000
-    Integer :: azavg_frequency = 1000000, shellslice_frequency = 1000000
-    Integer :: shellspectra_frequency=1000000
+    Integer :: globalavg_frequency = 90000000, shellavg_frequency = 90000000
+    Integer :: azavg_frequency = 90000000, shellslice_frequency = 90000000
+    Integer :: shellspectra_frequency=90000000
 
-    Integer :: full3d_frequency= 100000
+    Integer :: full3d_frequency= 90000000
     Character*120 :: local_file_path=''
 
     Namelist /output_namelist/shellavg_values, globalavg_values, &
@@ -2069,7 +2069,7 @@ Contains
         self%file_prefix = 'None'
         If (Allocated(self%oqvals))  DeAllocate(self%oqvals)
 
-        self%frequency = 10000000 
+        self%frequency = 90000000 
         self%rec_per_file =1     
         self%current_rec = 1       
         self%file_header_size =0 
@@ -2118,13 +2118,13 @@ Contains
         shellslice_nrec =1
         shellspectra_nrec =1
 
-        globalavg_frequency = 1000000
-        shellavg_frequency = 1000000
-        azavg_frequency = 1000000
-        shellslice_frequency = 1000000
-        shellspectra_frequency=1000000
+        globalavg_frequency = 90000000
+        shellavg_frequency = 90000000
+        azavg_frequency = 90000000
+        shellslice_frequency = 90000000
+        shellspectra_frequency=90000000
 
-        full3d_frequency= 100000
+        full3d_frequency= 90000000
         local_file_path=''
 
         integer_zero = 0
