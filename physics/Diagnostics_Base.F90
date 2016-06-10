@@ -350,6 +350,12 @@ Module Diagnostics_Base
 
 
     !//////////////////////////////////////////////////////////
+    !  Custom Hydo Outputs:  range from 301 through 400
+    Integer, Parameter :: custom_hydro_offset = 300
+    !Integer, Parameter :: v_grad_s = custom_hydro_offset + 1  ! {Entropy or T} advection
+
+
+    !//////////////////////////////////////////////////////////
     !    Magnetic Outputs.  
     !    Start at 400 to leave ample room for additional hydro
 
@@ -617,11 +623,20 @@ Module Diagnostics_Base
     Integer, Parameter :: induction_vpbp_phi         = indoff+69 ! phi component of del cros {v' x B'}
 
 
-
     !///////////////////////////////////////////////////////////////////////////////////////////////
     ! Magnetic Diffusion Terms -- To Be Implemented
 
     !/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    !//////////////////////////////////////////////////////////////////////////////////////////////
+    ! User custom magnetic outputs:  Numbers range from 701 to 800
+
+    Integer, Parameter :: custom_mag_offset   = 700
+    Integer, Parameter :: cross_helicity      = custom_mag_offset + 1 ! v dot B
+    Integer, Parameter :: turb_cross_helicity = custom_mag_offset+2
+    !Integer, Parameter :: vB_angle       = ??? ! {v dot B}/{|v||B|} - cosine of angle between v and B
+
 
 
     !///////////////////////////////////
@@ -630,6 +645,8 @@ Module Diagnostics_Base
     Real*8, Allocatable :: rweights(:), tweights(:), tmp1d(:)
 
     !//////////////////////////////////
+    ! The ell0 and m0 _ values arrays contain, yes, the ell = 0 and m = 0 values of
+    ! everything in buffer at output time.
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)
 
     ! This array will hold fluctuating quantities from the buffer { q - <q>}      
@@ -659,9 +676,6 @@ Contains
             dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
             hold_cargo = test_reduce, padding = pad_alltoall)        
     End Subroutine Initialize_Diagnostics_Buffer
-
-
-
 
 
     Subroutine Compute_Fluctuations(buffer)

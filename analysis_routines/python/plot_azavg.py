@@ -34,7 +34,7 @@ from azavg_util import *
 # First define a few logical control flags
 # Set saveplot to True to save to a .png file. 
 # Set to False to view plots interactively on-screen.
-saveplot = True
+saveplot = False
 savefile = 'az_average.png'
 
 # Once the data has been time-averaged, the result may be read in

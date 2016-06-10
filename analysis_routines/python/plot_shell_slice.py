@@ -35,7 +35,7 @@ from matplotlib import ticker
 
 # Set saveplot to True to save to a .png file. 
 # Set to False to view plots interactively on-screen.
-saveplot = True
+saveplot = False
 savefile = 'shell_slice.png'
 
 
