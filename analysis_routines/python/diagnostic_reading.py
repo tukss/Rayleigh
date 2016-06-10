@@ -198,7 +198,7 @@ class ShellAverage:
                                              
 
     For version 2:
-    self.vals[0:nr-1,0:3,0:nq-1,0:niter-1] : The spherically averaged diagnostics
+    self.vals[0:n-1,0:3,0:nq-1,0:niter-1] : The spherically averaged diagnostics
                                              0-3 refers to moments (index 0 is mean, index 3 is kurtosis)    
     self.iters[0:niter-1]              : The time step numbers stored in this output file
     self.time[0:niter-1]               : The simulation time corresponding to each time step
@@ -262,7 +262,7 @@ class AzAverage:
     self.radius[0:nr-1]                           : radial grid
     self.costheta[0:ntheta-1]                     : cos(theta grid)
     self.sintheta[0:ntheta-1]                     : sin(theta grid)
-    self.vals[0:nr-1,0:ntheta-1,0:nq-1,0:niter-1] : The phi-averaged diagnostics 
+    self.vals[0:ntheta-1,0:nr-1,0:nq-1,0:niter-1] : The phi-averaged diagnostics 
     self.iters[0:niter-1]                         : The time step numbers stored in this output file
     self.time[0:niter-1]                          : The simulation time corresponding to each time step
     self.version                                  : The version code for this particular output (internal use)
@@ -292,7 +292,7 @@ class AzAverage:
         self.nq = nq
         self.nr = nr
         self.ntheta = ntheta
-        print version, nrec, nq, nr
+
 
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
@@ -454,7 +454,174 @@ class ShellSpectra:
         for i,q in enumerate(self.qv):
             self.lut[q] = i
         fd.close()
+class PowerSpectrum():
+    """Rayleigh Power Spectrum Structure
+    ----------------------------------
+    self.niter                                    : number of time steps
+    self.nr                                       : number of radii at which power spectra are available
+    self.lmax                                     : maximum spherical harmonic degree l
+    self.radius[0:nr-1]                           : radii of the shell slices output
+    self.inds[0:nr-1]                             : radial indices of the shell slices output
+    self.power[0:lmax,0:nr-1,0:niter-1,0:2]       : the velocity power spectrum.  The third
+                                                  : index indicates (0:total,1:m=0, 2:total-m=0 power)
+    self.mpower[0:lmax,0:nr-1,0:niter-1,0:2]      : the magnetic power spectrum
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.magnetic                                 : True if mpower exists
+    """
+    #Power Spectrum Class - generated using shell spectra files
+    def __init__(self,infile, dims=[],power_file = False, magnetic = False):
+        self.magnetic = magnetic
+        if (power_file):
+            self.power_file_init(infile) 
+        elif (infile == 'Blank' or infile =='blank'):
+            self.blank_init(dims)      
+        else:
+            self.spectra_file_init(infile)
 
+    def blank_init(self,dims):
+        print 'blank init'
+        self.lmax = dims[0]
+        self.nr = dims[1]
+        self.niter = dims[2]
+        self.power = np.zeros((self.lmax+1,self.nr,self.niter,3),dtype='float64')
+    def set_pars(self,iters,time,inds,radius):
+        self.iters = np.zeros(self.niter,dtype='int32')
+        self.time = np.zeros(self.niter,dtype='float64')
+
+        self.inds = np.zeros(self.nr,dtype='int32')
+        self.radius = np.zeros(self.nr,dtype='float64')
+    
+        self.iters[:]  = iters[:]
+        self.time[:]   = time[:]
+        self.inds[:]   = inds[:]
+        self.radius[:] = radius[:]
+    def power_file_init(self,pfile):
+        fd = open(pfile,'rb')  
+        bs = check_endian(fd,314,'int32')
+        lmax  = swapread(fd,dtype='int32',count=1,swap=bs)
+        nr    = swapread(fd,dtype='int32',count=1,swap=bs)
+        niter = swapread(fd,dtype='int32',count=1,swap=bs)
+        magint = swapread(fd,dtype='int32',count=1,swap=bs)
+        if (magint == 1):
+            self.magnetic = True
+        else:
+            self.magnetic = False
+        self.iters = np.reshape(swapread(fd,dtype='int32',count=niter,swap=bs),(niter), order = 'F')
+        self.time = np.reshape(swapread(fd,dtype='float64',count=niter,swap=bs),(niter), order = 'F')
+        self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
+        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        pcount = (lmax+1)*nr*niter*3
+        pdim = (lmax+1,nr,niter,3)
+        self.power = np.reshape(swapread(fd,dtype='float64',count=pcount,swap=bs),pdim, order = 'F')
+        if (self.magnetic):
+            self.mpower = np.reshape(swapread(fd,dtype='float64',count=pcount,swap=bs),pdim, order = 'F')
+
+        self.niter = niter
+        self.nr = nr
+        self.lmax = lmax
+        
+        fd.close()
+    def write_power(self,ofile):
+        fd = open(ofile,'wb') #w = write, b = binary
+        dims = np.zeros(5,dtype='int32')
+        dims[0] = 314
+        dims[1] = self.lmax
+        dims[2] = self.nr
+        dims[3] = self.niter
+        if (self.magnetic):
+            dims[4] = 1
+        else:
+            dims[4] = 0
+        dims.tofile(fd)
+        self.iters.tofile(fd)
+        self.time.tofile(fd)
+        self.inds.tofile(fd)
+        self.radius.tofile(fd)
+        tmp = np.transpose(self.power)
+        tmp.tofile(fd)
+        if (self.magnetic):
+            tmp = np.transpose(self.mpower)
+            tmp.tofile(fd)
+        fd.close()
+
+    def spectra_file_init(self,sfile):
+
+        a = ShellSpectra(filename=sfile,path='./')
+        lmax = a.lmax
+        nr = a.nr
+        nt = a.niter
+
+        self.lmax = lmax
+        self.nr = nr
+        self.niter = nt
+        self.radius = a.radius
+        self.inds = a.inds
+        self.iters = a.iters
+        self.time = a.time
+
+        # We use the lookup table to find where vr, vtheta, and vphi are stored
+        vr_index = a.lut[1]
+        vt_index = a.lut[2]
+        vp_index = a.lut[3]
+        #the last index indicates 0:full power, 1:m0 power, 2:full-m0
+        power = np.zeros((lmax+1,nr,nt,3),dtype='float64')
+        
+        # Next we grab one radial index and one time instance of each variable
+        dims = (a.nell,a.nm,nr,nt)
+        vrc = np.reshape(a.vals[:,:,:, vr_index, :],dims)
+        vtc = np.reshape(a.vals[:,:,:, vt_index, :],dims)
+        vpc = np.reshape(a.vals[:,:,:, vp_index, :],dims)
+
+        #print 'first index: '
+        #for i in range(0,lmax+1,10):
+        #    print a.vals[i:i+10,0,0,0,0]   
+
+
+        #print 'second index: '
+        #for i in range(0,lmax+1,10):
+        #    print a.vals[0,i:i+10,0,0,0]   
+
+
+        for k in range(nt):
+            for j in range(nr):
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vrc[:,0,j,k])**2 +np.imag(vrc[:,0,j,k])**2
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vtc[:,0,j,k])**2 +np.imag(vtc[:,0,j,k])**2
+                power[:,j,k,1] = power[:,j,k,1]+np.real(vpc[:,0,j,k])**2 +np.imag(vpc[:,0,j,k])**2
+                for m in range(a.nm):
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
+                    power[:,j,k,0] = power[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
+                    power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
+
+        self.power = power
+
+        if(self.magnetic):
+            #Do the same thing for the magnetic field components
+            # We use the lookup table to find where br, vtheta, and bphi are stored
+            br_index = a.lut[401]
+            bt_index = a.lut[402]
+            bp_index = a.lut[403]
+            #the last index indicates 0:full power, 1:m0 power, 2:full-m0
+            mpower = np.zeros((lmax+1,nr,nt,3),dtype='float64')
+            
+            # Next we grab one radial index and one time instance of each variable
+            dims = (a.nell,a.nm,nr,nt)
+            brc = np.reshape(a.vals[:,:,:, br_index, :],dims)
+            btc = np.reshape(a.vals[:,:,:, bt_index, :],dims)
+            bpc = np.reshape(a.vals[:,:,:, bp_index, :],dims)
+
+            for k in range(nt):
+                for j in range(nr):
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vrc[:,0,j,k])**2 +np.imag(vrc[:,0,j,k])**2
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vtc[:,0,j,k])**2 +np.imag(vtc[:,0,j,k])**2
+                    mpower[:,j,k,1] = mpower[:,j,k,1]+np.real(vpc[:,0,j,k])**2 +np.imag(vpc[:,0,j,k])**2
+                    for m in range(a.nm):
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
+                        mpower[:,j,k,0] = mpower[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
+                        mpower[:,j,k,2] = mpower[:,j,k,0]-mpower[:,j,k,1]
+            self.mpower = mpower
 
 def swapread(fd,dtype='float64',count=1,swap=False):
         #simple wrapper to numpy.fromfile that allows byteswapping based on Boolean swap
@@ -561,7 +728,7 @@ def TimeAvg_AZAverages(file_list,ofile):
     nr = a.nr
     ntheta = a.ntheta
     nq = a.nq
-    tmp = np.zeros((nr,ntheta,nq),dtype='float64')
+    tmp = np.zeros((ntheta,nr,nq),dtype='float64')
     simtime   = np.zeros(1,dtype='float64')
     iteration = np.zeros(1,dtype='int32')
     icount = np.zeros(1,dtype='int32')
@@ -572,10 +739,11 @@ def TimeAvg_AZAverages(file_list,ofile):
     t0 = a.time[0]
     for i in range(0,nfiles):
         the_file = file_list[i]
+        print 'Adding '+the_file+' to the average...'
         b = AzAverage(the_file,path='')
         nrec = b.niter
         for j in range(nrec):
-            tmp[0:nr,0:ntheta,0:nq] += b.vals[0:nr,0:ntheta,0:nq,j].astype('float64')
+            tmp[0:ntheta,0:nr,0:nq] += b.vals[0:ntheta,0:nr,0:nq,j].astype('float64')
 
             tfinal[0] = b.time[j]
             ifinal[0] = b.iters[j]

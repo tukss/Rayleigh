@@ -2,10 +2,13 @@ Module TransportCoefficients
 	Use ProblemSize
 	Use ReferenceState
 	Use Controls
+    Use BoundaryConditions
 	Implicit None
 	Real*8, Allocatable :: nu(:), kappa(:), eta(:)
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
 
+    Real*8, Allocatable :: ohmic_heating_coeff(:)   
+    Real*8, Allocatable :: viscous_heating_coeff(:) 
 	!//////////
 
 	Real*8, Allocatable :: W_Diffusion_Coefs_0(:), W_Diffusion_Coefs_1(:)
@@ -36,7 +39,7 @@ Contains
 
 	Subroutine Compute_Diffusion_Coefs()
         ! These coefficients are nonzero only when nu and/or rho vary in radius
-        ! The formulas here have been verified against the derivation in my notes
+        ! The formulas here have been verified against my notes
         ! and against those implemented in ASH (which are slightly different from Brun et al. 2004
         ! due to sign errors in that paper)
 		!////////////////////////////////////////+
@@ -79,28 +82,74 @@ Contains
 			A_Diffusion_Coefs_1 = eta*dlneta
 		Endif
 
-        !If (my_rank .eq. 0) Then
-        !    Write(6,*)'Checking...', kappa
-        !Endif
+
 	End Subroutine Compute_Diffusion_Coefs
 
 	Subroutine Initialize_Transport_Coefficients()
 		Call Allocate_Transport_Coefficients
-        If (.not. dimensional) Then
-            nu_top = Prandtl_Number
-            kappa_top = 1.0d0
-            eta_top = Prandtl_Number/Magnetic_Prandtl_Number
+        If (.not. Dimensional_Reference) Then
+            ! nu,kappa, and eta are based on the non-dimensionalization employed
+            ! and are not read from the main_input file.
+            nu_top    = ref%script_N_top
+            kappa_top = ref%script_K_top
         Endif
-        If (Nondimensional_Anelastic) Then
-            nu_top = Ekman_Number
-            kappa_top = nu_top/Prandtl_Number
-            eta_top = nu_top/Magnetic_Prandtl_Number
+
+		Call Initialize_Nu()    ! Viscosity
+		Call Initialize_Kappa() ! Thermal Diffusivity
+
+
+
+        If (viscous_heating) Then
+            Allocate(viscous_heating_coeff(1:N_R))
+            viscous_heating_coeff(1:N_R) = ref%viscous_amp(1:N_R)*nu(1:N_R)            
         Endif
-		Call Initialize_Nu()							! Viscosity
-		Call Initialize_Kappa()						! Thermal Diffusivity
-		If (magnetism) Call Initialize_Eta()	! Magnetic Diffusivity
-		!Call Compute_Diffusion_Coefs
+
+		If (magnetism) Then
+            eta_top   = ref%script_H_top
+            Call Initialize_Eta()	! Magnetic Diffusivity
+            If (ohmic_heating) Then
+                Allocate(ohmic_heating_coeff(1:N_R))
+                ohmic_heating_coeff(1:N_R) = ref%ohmic_amp(1:N_R)*eta(1:N_R)            
+            Endif
+        Endif
+		Call Compute_Diffusion_Coefs()
+
+        Call Transport_Dependencies()
+
 	End Subroutine Initialize_Transport_Coefficients
+
+    Subroutine Transport_Dependencies()
+        Implicit None
+        Real*8 :: fsun, lum_top, lum_bottom
+        !Any odd boundary conditions that need the reference state
+        ! or nu/kappa etc. can be set here
+        ! As can any reference state quanitities, such as heating, that
+        ! might depend on nu and kappa
+        If (fix_tdt_bottom) Then
+            ! Set the entropy gradient at the top based on Luminosity and kappa
+            fsun = luminosity/four_pi/radius(1)/radius(1)
+            dtdr_top = -fsun/kappa(1)/ref%density(1)/ref%temperature(1)
+        Endif
+        If (adjust_reference_heating ) Then
+            !Renormalize the reference heating based on boundary fluxes
+            lum_top    = 0.0d0
+            lum_bottom = 0.0d0
+
+            If ( fix_dtdr_top ) Then
+                lum_top = -dtdr_top*kappa(1)*four_pi*(rmax**2)
+                lum_top = lum_top*ref%density(1)*ref%temperature(1)
+            Endif
+
+            If ( fix_dtdr_bottom) Then
+                lum_bottom = -dtdr_bottom*kappa(N_R)*four_pi*(rmin**2)
+                lum_bottom = lum_bottom*ref%density(N_R)*ref%temperature(N_R)
+            Endif
+
+            ref%heating = ref%heating*(lum_top-lum_bottom)
+            !If something has been set inconsistenly, this will result
+            ! in zero reference heating
+         Endif
+    End Subroutine Transport_Dependencies
 
 
 	Subroutine Allocate_Transport_Coefficients()

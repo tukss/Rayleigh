@@ -10,7 +10,6 @@ Module Input
 	Use Initial_Conditions, Only : initial_conditions_namelist, alt_check
 	Use TestSuite, Only : test_namelist
 	Use ReferenceState, Only : reference_namelist
-	Use NonDimensionalization, Only : NonDimensionalization_Namelist
 	Use TransportCoefficients, Only : Transport_Namelist
     Use Parallel_Framework, Only : pfi
 	Implicit None
@@ -34,7 +33,6 @@ Contains
 		Read(unit=20, nml=initial_conditions_namelist)
 		Read(unit=20, nml=test_namelist)
 		Read(unit=20, nml=reference_namelist)
-		Read(unit=20, nml=NonDimensionalization_Namelist)
 		Read(unit=20, nml=Transport_Namelist)
 		Close(20)
 

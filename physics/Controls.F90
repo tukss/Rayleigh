@@ -15,7 +15,7 @@ Module Controls
     ! Numerical Controls
     ! Flats that control details of the parallelization/data layout and 
     ! how the equations are solved (not what equations are solved).
-    Logical :: chebyshev = .false.          ! Set to true to use chebyshev polynomials in radius (default is finite-difference)
+    Logical :: chebyshev = .true.           ! Set to false to use finite-differences (chebyshev polynomials are used by default)
     Logical :: bandsolve = .false.          ! Set to true to use band solves with the finite-differences
     Logical :: static_transpose = .false.   ! When true, transpose buffers for sending/receiving are never de-allocated for spherical buffer objects
     Logical :: static_config = .false.      ! When true, configuration buffers (p3a, s1b, etc.) ar enever de-allocated for spherical buffer objects
@@ -29,14 +29,14 @@ Module Controls
     !////////////////////////////////////////////////////////////////////////////////
     ! Physical Controls
     ! Flags that control various fundamental aspects of the physics employed
-    Logical :: magnetism = .false.          ! Turn magnetism on or off
+    Logical :: magnetism = .false.          ! Turn magnetism on or off (default is off)
     Logical :: nonlinear = .true.           ! Nonlinear terms can be turned off (calculated but zeroed out - for debugging)
     Logical :: Rotation = .false.           ! Rotate or not
-    Logical :: lorentz_forces = .true.      ! Turn Lorentz forces on or off
+    Logical :: lorentz_forces = .true.      ! Turn Lorentz forces on or off (default is on - as long as magnetism is on)
     Logical :: viscous_heating = .true.     ! Turns viscous heating on/off
     Logical :: ohmic_heating = .true.
     Logical :: advect_reference_state = .false.  ! Set to true to advect the reference state
-                                                ! Generally only do this if reference state is not adiabatic
+                                                ! Generally only do this if reference state is nonadiabatic
 
     ! --- This flag determines if the code is run in benchmark mode
     !     0 (default) is no benchmarking.  1-5 are various accuracy benchmarks (see documentation)
@@ -51,7 +51,7 @@ Module Controls
     !///////////////////////////////////////////////////////////////////////////
     !   Temporal Controls
     !   Flags that control details of the time-stepping (some relate to the numerics, but we keep the time-related things together).
-    Real*8  :: alpha_implicit = 0.51d0            ! Crank Nicolson Implict/Explicit weighting factor (1.0 is fully implicit)
+    Real*8  :: alpha_implicit = 0.50001d0            ! Crank Nicolson Implict/Explicit weighting factor (1.0 is fully implicit)
     Integer :: max_iterations = 1000000         ! The maximum number of iterations to be run in a given session
     Real*8  :: max_time_minutes = 1d8            ! Maximum walltime to run the code (this should be ample...)
 
@@ -60,7 +60,7 @@ Module Controls
     Integer :: checkpoint_interval = 1000000    ! Same as check_frequency (check_frequency will be deprecated soon)
     Integer :: quicksave_interval =  -1        ! Number of iterations between quicksave dumps
     Integer :: num_quicksaves = 3              ! Number of quick-save checkpoints to write before rolling back to #1
-    Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves
+    Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves (overrides quicksave interval)
 
     Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
     Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
@@ -79,7 +79,7 @@ Module Controls
     ! What is normally sent to standard out can, if desired, be sent to a file instead
     Integer :: stdout_flush_interval = 50  ! Lines stored before stdout buffer is flushed to stdout_unit
     Character*120 :: stdout_file = 'nofile'
-    Type(OutputBuffer) :: stdout
+    
     Namelist /IO_Controls_Namelist/ stdout_flush_interval,stdout_file
 
     !///////////////////////////////////////////////////////////////////////////

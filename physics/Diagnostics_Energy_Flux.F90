@@ -136,7 +136,7 @@ Contains
 
         !The "Flux" associated with the volume heating
         If (compute_quantity(vol_heat_flux)) Then
-            tmp1d(N_R) = 0.0d0
+            tmp1d(:) = 0.0d0
             If (heating_type .gt. 0) Then
 
                 ! Note that radial_integral_weights give int{f r^2}/int(r^2}
@@ -148,6 +148,7 @@ Contains
                     fpr2dr = fpr2dr*(radius(r)-radius(r+1))
                     tmp1d(r) = tmp1d(r+1)+qadd*fpr2dr
                 Enddo
+                tmp1d = tmp1d(1)-tmp1d
                 tmp1d = tmp1d/four_pi/r_squared
             Endif
             DO_PSI

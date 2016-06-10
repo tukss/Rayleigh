@@ -10,9 +10,8 @@ Program Main
 	Use Diagnostics_Interface, Only : Initialize_Diagnostics
 	Use TestSuite
 	Use Checkpointing
-    Use Equation_Coefficients
-	Use Linear_Terms_Sphere
-	Use Drive_Sphere, Only : Main_Loop_Sphere
+	Use Sphere_Linear_Terms
+	Use Sphere_Driver, Only : Main_Loop_Sphere
 	Use Timers
     Use Fourier_Transform, Only : Initialize_FFTs
     Use Benchmarking, Only : Initialize_Benchmarking, Benchmark_Input_Reset
@@ -20,7 +19,7 @@ Program Main
     
     Call Main_MPI_Init(global_rank)    !Initialize MPI
 
-    Call Check_Run_Mode()   !This needs to be done before ever reading main input
+    Call Check_Run_Mode()   !This needs to be done before ever reading main input (handles multiple runs)
 
 
 	Call Main_Input()
@@ -31,17 +30,16 @@ Program Main
 		Call Test_Lib()
 	Else
 		Call Main_Initialization()
-
-
 		Call Main_Loop_Sphere()
 	Endif
 	Call Finalization()
 Contains
 	Subroutine Main_Initialization()
 		Implicit None
-		Character*120 :: ndrf='reference_nd'
+
 
         Call Initialize_Controls()
+
         Call Set_Math_Constants()
 		Call Init_ProblemSize()
 
@@ -52,24 +50,25 @@ Contains
         Call Initialize_FFts()
 		Call Initialize_Reference()
 
-		Call Initialize_Transport_Coefficients()
         Call Initialize_Boundary_Conditions()
+		Call Initialize_Transport_Coefficients()
 
-		!Call NonDimensionalize()
-        Call Compute_Diffusion_Coefs()
-        Call Init_Equation_Coefficients()
-		Call Write_Reference(ndrf)
+
 		Call Initialize_Field_Structure()
 		Call Initialize_Diagnostics()
 
 		Call Full_Barrier()
-		!Call Initialize_Benchmark_Equations()
-		!Call Compute_Benchmark_Coefficients()
-		!Call Set_Boundary_Conditions()
+
 		Call Linear_Init() 
 		Call Initialize_Checkpointing()
 		Call Initialize_Fields()
 		Call StopWatch(init_time)%increment() ! started in Init_Problemsize just after MPI is started up
+        
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" Initialization Complete.")
+            Call stdout%print(" //////////////////////////////////////")
+            Call stdout%print(" ")
+        Endif
 	End Subroutine Main_Initialization
 
     Subroutine Initialize_Directory_Structure()

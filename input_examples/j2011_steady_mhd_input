@@ -13,6 +13,8 @@
  rotation  = .true.
  magnetism = .true.
  benchmark_mode = 4
+ benchmark_integration_interval = 100
+ benchmark_report_interval = 10000
 /
 &temporal_controls_namelist
  max_time_step = 200.0d0
@@ -26,28 +28,32 @@
 /
 &output_namelist
 shellslice_levels    = 64,65
-shellslice_values    = 1,2,3,4
+shellslice_values    = 1,2,3,64, 401,402,403 !velocity, entropy, B-field
 shellslice_frequency = 10000
 shellslice_nrec      = 5
 
 shellspectra_levels    = 64,65
-shellspectra_values    = 1,2,4,3
+shellspectra_values    = 1,2,3,64,401,402,402 ! velocity, entropy, B-field
 shellspectra_frequency = 100000
 shellspectra_nrec      = 5
 
-azavg_values = 1,3,4,13,14
+! velocity, entropy, {r,theta} mass flux ,  B-field
+azavg_values = 1,2,3,64,61,62, 401,402,403  
 azavg_frequency = 10000
 azavg_nrec = 2
 
-shellavg_values = 1,2,3,4,7,8,9,10,11,16,17
+!velocity, entropy, energy fluxes, various kinetic and magnetic energies (see below)
+shellavg_values = 1,2,3,64,116,117,118,119,120,121,122,125,126,127,128,130,131,132,475,476,477,478,480,481,482
 shellavg_frequency = 100
 shellavg_nrec = 100
 
-globalavg_values = 1,2,3,4,7,8,9,10,11,17,208
+! KE, {radial, theta, phi} KE, Mean {radial, theta, phi} KE 
+! ME, {radial, theta, phi} ME, Mean {radial, theta, phi} ME 
+globalavg_values = 125,126,127,128,130,131,132,475,476,477,478,480,481,482
 globalavg_frequency = 100
 globalavg_nrec = 100
 
-full3d_values = 4
+full3d_values = 4 ! Temperature
 full3d_frequency = 9000000
 /
 
@@ -78,8 +84,6 @@ poly_rho_i = 1.1d0
 pressure_specific_heat = 1.0509d8
 dimensional = .true.
 angular_velocity = 1.76d-4
-/
-&NonDimensionalization_Namelist
 /
 &Transport_Namelist
 nu_top    = 7.28728d12

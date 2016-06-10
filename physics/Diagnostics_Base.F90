@@ -14,7 +14,6 @@ Module Diagnostics_Base
     Use Fields
     Use Math_Constants
     Use ReferenceState
-    Use Equation_Coefficients
     Use TransportCoefficients
 
     Implicit None
@@ -351,6 +350,12 @@ Module Diagnostics_Base
 
 
     !//////////////////////////////////////////////////////////
+    !  Custom Hydo Outputs:  range from 301 through 400
+    Integer, Parameter :: custom_hydro_offset = 300
+    !Integer, Parameter :: v_grad_s = custom_hydro_offset + 1  ! {Entropy or T} advection
+
+
+    !//////////////////////////////////////////////////////////
     !    Magnetic Outputs.  
     !    Start at 400 to leave ample room for additional hydro
 
@@ -446,7 +451,7 @@ Module Diagnostics_Base
     !///////////////////////////////////////////////////
     !       Current Density Outputs (Including Ohmic Heating)
     !       This is Curl B -- rename accordingly
-    Integer, Parameter :: joffset = boffset+54 ! = 350
+    Integer, Parameter :: joffset = boffset+54 ! = 454
 
     Integer, Parameter :: j_r  = joffset+1      ! Radial Current Density
     Integer, Parameter :: jp_r = joffset+2    
@@ -474,7 +479,7 @@ Module Diagnostics_Base
 
     !///////////////////////////////////////////////////////////
     !           Magnetic Energies
-    Integer, Parameter :: meoffset = joffset+20 ! = 374
+    Integer, Parameter :: meoffset = joffset+20 ! = 474
 
     Integer, Parameter :: magnetic_energy = meoffset+1 ! B^2
     Integer, Parameter :: radial_me       = meoffset+2 ! {B_r}^2
@@ -494,10 +499,10 @@ Module Diagnostics_Base
 
 
     !/////////////////////////// Lorentz Forces ///////////////////////////////
-    !  lorentz_coefficient * (del x B) x B 
-    !  lorentz_coefficient = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
-    !  j (below) is shorthand for lorentz_coefficient*delxB  (not quite the current density)
-    Integer, Parameter :: loff = meoffset+12 ! =386
+    !  ref%Lorentz_Coeff * (del x B) x B 
+    !  ref%Lorentz_Coeff = 1/4pi when dimensional, Pr/(Pr_m E) when nondimesional
+    !  j (below) is shorthand for ref%Lorentz_Coeff*delxB  (not quite the current density)
+    Integer, Parameter :: loff = meoffset+12 ! =486
     Integer, Parameter :: j_cross_b_r       = loff+1  ! radial component of j x B
     Integer, Parameter :: j_cross_b_theta   = loff+2  !  theta component of j x B
     Integer, Parameter :: j_cross_b_phi     = loff+3  !    phi component of j x B
@@ -526,7 +531,7 @@ Module Diagnostics_Base
     Integer, Parameter :: magnetic_torque_theta = loff+19 ! -rsintheta <B_theta><B_phi>*Lorentz_Coeff
 
     !////////////////////////////// Induction Terms ///////////////////////////
-    Integer, Parameter :: indoff = loff + 19 ! = 405
+    Integer, Parameter :: indoff = loff + 19 ! = 505
 
     !--------------- Terms involving v x B (full)
     Integer, Parameter :: induction_shear_r          = indoff+1  ! radial component of {B dot grad v}
@@ -618,11 +623,20 @@ Module Diagnostics_Base
     Integer, Parameter :: induction_vpbp_phi         = indoff+69 ! phi component of del cros {v' x B'}
 
 
-
     !///////////////////////////////////////////////////////////////////////////////////////////////
     ! Magnetic Diffusion Terms -- To Be Implemented
 
     !/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+    !//////////////////////////////////////////////////////////////////////////////////////////////
+    ! User custom magnetic outputs:  Numbers range from 701 to 800
+
+    Integer, Parameter :: custom_mag_offset   = 700
+    Integer, Parameter :: cross_helicity      = custom_mag_offset + 1 ! v dot B
+    Integer, Parameter :: turb_cross_helicity = custom_mag_offset+2
+    !Integer, Parameter :: vB_angle       = ??? ! {v dot B}/{|v||B|} - cosine of angle between v and B
+
 
 
     !///////////////////////////////////
@@ -631,6 +645,8 @@ Module Diagnostics_Base
     Real*8, Allocatable :: rweights(:), tweights(:), tmp1d(:)
 
     !//////////////////////////////////
+    ! The ell0 and m0 _ values arrays contain, yes, the ell = 0 and m = 0 values of
+    ! everything in buffer at output time.
     Real*8, Allocatable :: ell0_values(:,:), m0_values(:,:,:)
 
     ! This array will hold fluctuating quantities from the buffer { q - <q>}      
@@ -660,9 +676,6 @@ Contains
             dynamic_transpose =dbtrans, dynamic_config = dbconfig, &
             hold_cargo = test_reduce, padding = pad_alltoall)        
     End Subroutine Initialize_Diagnostics_Buffer
-
-
-
 
 
     Subroutine Compute_Fluctuations(buffer)

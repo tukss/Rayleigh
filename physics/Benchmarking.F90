@@ -19,13 +19,12 @@ Module Benchmarking
     Use BoundaryConditions
     Use Initial_Conditions
     Use TransportCoefficients
-    use NonDimensionalization
     Implicit None
 
     Integer, Private :: nobs, msymm
     Integer, Private :: max_numt, numt_ind, global_count, num_int
-    Integer, Private :: report_interval = 9000000
-    Integer, Private :: integration_interval =9000000
+    Integer, Private :: report_interval = 90000000
+    Integer, Private :: integration_interval =90000000
     Real*8 :: mag_factor
     Real*8, Allocatable :: time_series(:,:), time_saves(:), iter_saves(:), obs_series(:,:)
     Integer :: drift_sign, num_rep
@@ -111,10 +110,9 @@ Contains
             reference_type = 1
             heating_type = 0
             gravity_power = 1.0d0
-            dimensional = .false.
+            !dimensional_reference = .false.
 
-            !Nodimensionalization Namelist
-            use_dimensional_inputs = .false.
+
         Endif
 
         If (benchmark_mode .eq. 2) Then
@@ -163,10 +161,9 @@ Contains
             reference_type = 1
             heating_type = 0
             gravity_power = 1.0d0
-            dimensional = .false.
+            !dimensional_reference = .false.
 
-            !Nodimensionalization Namelist
-            use_dimensional_inputs = .false.
+
 
         Endif
 
@@ -214,7 +211,7 @@ Contains
             poly_mass = 1.9D30
             poly_rho_i = 1.1d0
             pressure_specific_heat = 1.0509d8
-            dimensional = .true.
+            !dimensional = .true.
             angular_velocity = 1.76d-4
 
             !Transport Namelist
@@ -276,7 +273,7 @@ Contains
             poly_mass = 1.9D30
             poly_rho_i = 1.1d0
             pressure_specific_heat = 1.0509d8
-            dimensional = .true.
+            !dimensional = .true.
             angular_velocity = 1.76d-4
 
             !Transport Namelist
@@ -450,8 +447,12 @@ Contains
         Endif
 
         If (my_rank .eq. 0) Then
-            Write(6,*)"Run Parameters have been set to:  "
-            Write(6,*) benchmark_name
+            If (benchmark_mode .gt. 0) Then
+                Call stdout%print(" ")
+                Call stdout%print(" -- Benchmarking Mode is Activated.")
+                Call stdout%print(" -- Selected Benchmark :  "//trim(benchmark_name))
+                Call stdout%print(" ")
+            Endif
         Endif
         If (benchmark_integration_interval .gt. 0) Then
             If (benchmark_report_interval .gt. 0) Then
@@ -583,7 +584,7 @@ Contains
         Character*8 :: fmtstr = '(F14.6)'
         Character*8 :: iter_string
 
-
+        If (benchmark_mode .gt. 0) Then
         If (mod(iteration,integration_interval) .eq. 0) Then
             !Write(6,*)'Integrating!'
             !First we grab the volume-integrated quantities
@@ -882,6 +883,7 @@ Contains
                 Endif
             Endif
             DeAllocate(volume_integrals,volume_sdev, obs_sdev)
+        Endif
         Endif
     End Subroutine Benchmark_Checkup
 

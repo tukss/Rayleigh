@@ -1,16 +1,14 @@
-Module Drive_Sphere
+Module Sphere_Driver
 	Use ClockInfo
-	Use Hybrid_Space_Sphere, Only : rlm_spacea, rlm_spaceb, hybrid_init
-	Use Physical_Space_Sphere, Only : physical_space, coriolis_term, ohmic_heating_coeff
-	Use Spectral_Space_Sphere, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
+	Use Sphere_Hybrid_Space,   Only : rlm_spacea, rlm_spaceb, hybrid_init
+	Use Sphere_Physical_Space, Only : physical_space, ohmic_heating_coeff
+	Use Sphere_Spectral_Space, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
     Use Diagnostics_Interface, Only : Reboot_Diagnostics
     Use Spherical_IO, Only : time_to_output
 	Use Checkpointing
 	Use Controls
 	Use Timers
 	Use Fields
-	Use NonDimensionalization
-    !This is another comment for git - testing merge
 Contains
 
 	Subroutine Initialize_TimeStepping(iter)
@@ -64,10 +62,6 @@ Contains
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
-		!If (finite_element) Then
-			! work structure for post_solveFE (same as above)
-		!	Call ctemp%init(field_count = wsfcount, config = 'p1b')
-		!Endif
 
 
 		Call Hybrid_Init()
@@ -86,7 +80,6 @@ Contains
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
             Else If (finite_element) Then
-                !write(6,*)'Calling post solve FE'
                 Call Post_Solve_FE
 			Else
 				Call Post_Solve()	! Linear Solve configuration
@@ -203,4 +196,4 @@ Contains
 		Call Finalize_Timing(n_r,l_max,max_iterations)
 	End Subroutine Main_Loop_Sphere
 
-End Module Drive_Sphere
+End Module Sphere_Driver

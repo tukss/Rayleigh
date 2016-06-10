@@ -3,7 +3,7 @@
 #define END_DO enddo; enddo; enddo
 #define IDX k,r,t
 #define FIELDSP wsp%p3a
-Module Physical_Space_Sphere
+Module Sphere_Physical_Space
 	Use Parallel_Framework
 	Use Controls
 	Use ProblemSize
@@ -13,11 +13,9 @@ Module Physical_Space_Sphere
 	Use Diagnostics_Interface, Only : PS_Output
 	Use General_MPI, Only : global_max
 	Use Timers
-    Use Equation_Coefficients
 	Use ClockInfo
 	Use ReferenceState
 	Use TransportCoefficients
-	Use NonDimensionalization
     Use Math_Constants
     Use Benchmarking, Only : benchmark_checkup
 	Implicit None
@@ -341,7 +339,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX			
 				RHSP(IDX,wvar) = RHSP(IDX,wvar) + &
-					& coriolis_term*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
+					& ref%Coriolis_Coeff*sintheta(t)*FIELDSP(IDX,vphi)*R_squared(r)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -359,7 +357,7 @@ Contains
 			! Add r_squared [JxB]_r
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*Lorentz_Coefficient* &
+				RHSP(IDX,wvar)= RHSP(IDX,wvar) +r_squared(r)*ref%Lorentz_Coeff* &
 					(FIELDSP(IDX,jtheta)*FIELDSP(IDX,bphi)-FIELDSP(IDX,jphi)*FIELDSP(IDX,btheta))
 			END_DO
 			!$OMP END PARALLEL DO
@@ -450,7 +448,7 @@ Contains
 
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
-				RHSP(IDX,pvar) = RHSP(IDX,pvar)- coriolis_term*costheta(t)*FIELDSP(IDX,vphi)
+				RHSP(IDX,pvar) = RHSP(IDX,pvar)- ref%Coriolis_Coeff*costheta(t)*FIELDSP(IDX,vphi)
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -467,7 +465,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,pvar)= RHSP(IDX,pvar) &
-					- Lorentz_Coefficient*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
+					- ref%Lorentz_Coeff*(FIELDSP(IDX,jphi)*FIELDSP(IDX,br)-FIELDSP(IDX,jr)*FIELDSP(IDX,bphi))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -507,8 +505,8 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar) = RHSP(IDX,zvar)  					  &
-					 + coriolis_term*costheta(t)*FIELDSP(IDX,vtheta) &
-					 + coriolis_term*sintheta(t)*FIELDSP(IDX,vr)
+					 + ref%Coriolis_Coeff*costheta(t)*FIELDSP(IDX,vtheta) &
+					 + ref%Coriolis_Coeff*sintheta(t)*FIELDSP(IDX,vr)
 			END_DO
 			!OMP END PARALLEL DO
 		Endif
@@ -525,7 +523,7 @@ Contains
 			!$OMP PARALLEL DO PRIVATE(t,r,k)
 			DO_IDX
 				RHSP(IDX,zvar)= RHSP(IDX,zvar) - &
-					Lorentz_Coefficient*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
+					ref%Lorentz_Coeff*(FIELDSP(IDX,jr)*FIELDSP(IDX,btheta)-FIELDSP(IDX,jtheta)*FIELDSP(IDX,br))
 			END_DO
 			!$OMP END PARALLEL DO
 		Endif
@@ -593,9 +591,9 @@ Contains
 			! Check on alfven speed as well
 			Do r = my_r%min, my_r%max
 				ovht2 = Maxval(wsp%p3a(:,r,:,btheta)**2+wsp%p3a(:,r,:,bphi)**2) &
-								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*lorentz_coefficient ! horizontal
+								*OneOverRSquared(r)*l_l_plus1(l_max)/(ref%density(r))*ref%Lorentz_Coeff ! horizontal
 				ovt2  = Max(ovt2, ovht2)
-				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*lorentz_coefficient	! radial
+				ovrt2 = Maxval(wsp%p3a(:,r,:,br)**2)/(delta_r(r)**2)/(ref%density(r))*ref%Lorentz_Coeff	! radial
 				ovt2  = Max(ovt2,ovrt2)
 			Enddo
 		Endif
@@ -696,4 +694,4 @@ Contains
 	End Subroutine Compute_dbphi_by_dtheta
 
 
-End Module Physical_Space_Sphere
+End Module Sphere_Physical_Space

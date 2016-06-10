@@ -28,17 +28,34 @@ Module ReferenceState
         Real*8, Allocatable :: dsdr(:)
 
         Real*8, Allocatable :: Gravity(:)
-        Real*8, Allocatable :: Gravity_term_s(:)    ! -(gravity/rho)*drho_by_ds ..typically = gravity/cp
+
         Real*8 :: gamma
         Real*8, Allocatable :: heating(:)
-        Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle
+
+        Real*8 :: Coriolis_Coeff ! Multiplies z_hat x u in momentum eq.
+        Real*8 :: Lorentz_Coeff ! Multiplies (Del X B) X B in momentum eq.
+        Real*8, Allocatable :: Buoyancy_Coeff(:)    ! Multiplies {S,T} in momentum eq. ..typically = gravity/cp
+        Real*8, Allocatable :: dpdr_w_term(:)  ! multiplies d_by_dr{P/rho} in momentum eq.
+        Real*8, Allocatable :: pressure_dwdr_term(:) !multiplies l(l+1)/r^2 (P/rho) in Div dot momentum eq.
+        
+        ! The following two terms are used to compute the ohmic and viscous heating
+        Real*8, Allocatable :: ohmic_amp(:) !multiplied by {eta(r),H(r)}J^2 in dSdt eq.
+        Real*8, Allocatable :: viscous_amp(:) !multiplied by {nu(r),N(r)}{e_ij terms) in dSdt eq.
+
+        Real*8 :: script_N_Top ! If a nondimensional reference state is employed,
+        Real*8 :: script_K_Top ! these are used in lieu of nu_top from the input file.
+        Real*8 :: script_H_Top ! {N:nu, K:kappa, H:eta} 
+
     End Type ReferenceInfo
     Real*8, Allocatable :: s_conductive(:)
 
     Integer :: reference_type =1
     Integer :: heating_type = 0 ! 0 means no reference heating.  > 0 selects optional reference heating
     Integer :: cooling_type = 0 ! 0 means no reference cooling.  > 0 will ADD to any exisiting reference heating
-    Real*8  :: Luminosity = 0.0d0
+    Real*8  :: Luminosity = 0.0d0 ! specifies the integral of the heating function
+    Real*8  :: Heating_Integral = 0.0d0  !same as luminosity (for non-star watchers)
+    Real*8  :: Heating_EPS = 1.0D-12  !Small number to test whether luminosity specified
+    Logical :: adjust_reference_heating = .false.  ! Flag used to decide if luminosity determined via boundary conditions
     Real*8  :: heating_factor = 0.0d0, heating_r0 = 0.0d0  ! scaling and shifting factors for
     Real*8  :: cooling_factor = 0.0d0, cooling_r0 = 0.0d0  ! heating and cooling
     Type(ReferenceInfo) :: ref
@@ -49,8 +66,6 @@ Module ReferenceState
     Real*8 :: poly_mass = 0.0d0
     Real*8 :: poly_rho_i =0.0d0
     Real*8 :: Gravitational_Constant = 6.67d-8
-    Real*8 :: rho_twiddle, g_twiddle, p_twiddle, s_twiddle, t_twiddle, length_twiddle ! also in ref structure..
-
     Real*8 :: Angular_Velocity = 1.0d0
 
     !/////////////////////////////////////////////////////////////////////////////////////
@@ -62,20 +77,27 @@ Module ReferenceState
     Real*8 :: gravity_power           = 0.0d0
     Real*8 :: Dissipation_Number      = 0.0d0
     Real*8 :: Modified_Rayleigh_Number = 0.0d0
-    Logical :: Dimensional = .true.  ! By Default code is dimensional
-    Logical :: NonDimensional_Anelastic = .False. !
+    Logical :: Dimensional_Reference = .false.  ! Changed depending on reference state specified
     Character*120 :: custom_reference_file ='nothing'
     Integer :: custom_reference_type = 1
+
+    ! These last two flags are deprecated.  They are retained for now to prevent crashes due to improper input
+    Logical :: Dimensional = .false., NonDimensional_Anelastic = .false. 
     Namelist /Reference_Namelist/ reference_type,poly_n, poly_Nrho, poly_mass,poly_rho_i, &
             & pressure_specific_heat, heating_type, luminosity, Angular_Velocity, &
             & Rayleigh_Number, Ekman_Number, Prandtl_Number, Magnetic_Prandtl_Number, &
-            & gravity_power, dimensional,heating_factor, heating_r0, custom_reference_file, &
+            & gravity_power, heating_factor, heating_r0, custom_reference_file, &
             & custom_reference_type, cooling_type, cooling_r0, cooling_factor, &
-            & Dissipation_Number, Modified_Rayleigh_Number
+            & Dissipation_Number, Modified_Rayleigh_Number, Heating_Integral, &
+            & Dimensional, NonDimensional_Anelastic
 Contains
 
     Subroutine Initialize_Reference()
         Implicit None
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Initalizing Reference State...")
+            Call stdout%print(" ---- Specified parameters:")
+        Endif
         Call Allocate_Reference_State()
         If (reference_type .eq. 1) Then
             Call Constant_Reference()
@@ -87,6 +109,10 @@ Contains
         Endif
 
         If (reference_type .eq. 3) Then
+            Call Polytropic_ReferenceND()
+        Endif
+
+        If (reference_type .eq. 4) Then
             If (custom_reference_type .eq. 1) Then
                 Call Get_Custom_Reference()
             Endif
@@ -94,9 +120,9 @@ Contains
                 Call Get_Custom_Reference2()
             Endif
         Endif
-
-        If (reference_type .eq. 4) Then
-            Call Polytropic_Reference_DevelND()
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Reference State initialized.")
+            Call stdout%print(" ")
         Endif
 
         Call Write_Reference()
@@ -113,15 +139,109 @@ Contains
         Allocate(ref%d2lnrho(1:N_R))
         Allocate(ref%dlnt(1:N_R))
         Allocate(ref%dsdr(1:N_R))
-        Allocate(ref%gravity_term_s(1:N_R))
+        Allocate(ref%Buoyancy_Coeff(1:N_R))
+        Allocate(ref%dpdr_w_term(1:N_R))
+        Allocate(ref%pressure_dwdr_term(1:N_R))
+        Allocate(ref%ohmic_amp(1:N_R))
+        Allocate(ref%viscous_amp(1:N_R))
     End Subroutine Allocate_Reference_State
+    Subroutine Constant_Reference()
+        Implicit None
+        Integer :: i
+        Real*8 :: r_outer, r_inner, prefactor, amp
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        Dimensional_Reference = .false.
+        viscous_heating = .false.  ! Turn this off for now until I find appropriate non-dimensionalization
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type           : "//trim(" Boussinesq (Non-dimensional)"))
+            Write(dstring,dofmt)Rayleigh_Number
+            Call stdout%print(" ---- Rayleigh Number          : "//trim(dstring))
+            Write(dstring,dofmt)Ekman_Number
+            Call stdout%print(" ---- Ekman Number             : "//trim(dstring))
+            Write(dstring,dofmt)Prandtl_Number
+            Call stdout%print(" ---- Prandtl Number           : "//trim(dstring))
+            If (magnetism) Then
+                Write(dstring,dofmt)Magnetic_Prandtl_Number
+                Call stdout%print(" ---- Magnetic Prandtl Number  : "//trim(dstring))
+            Endif
+        Endif
 
-    Subroutine Polytropic_Reference_DevelND()
+        ref%density = 1.0d0
+        ref%dlnrho = 0.0d0
+        ref%d2lnrho = 0.0d0
+        ref%pressure = 1.0d0
+        ref%temperature = 1.0d0
+        ref%dlnT = 0.0d0
+        ref%dsdr = 0.0d0
+        ref%pressure = 1.0d0
+        ref%gravity = 0.0d0 ! Not used with constant reference right now
+
+        amp = Rayleigh_Number/Prandtl_Number
+
+        Do i = 1, N_R
+            ref%Buoyancy_Coeff(i) = amp*(radius(i)/radius(1))**gravity_power
+        Enddo
+
+        pressure_specific_heat = 1.0d0
+        Call initialize_reference_heating()
+        If (heating_type .eq. 0) Then
+            !Otherwise, s_conductive will be calculated in initial_conditions
+            Allocate(s_conductive(1:N_R))
+            r_outer = radius(1)
+            r_inner = radius(N_R)
+            prefactor = r_outer*r_inner/(r_inner-r_outer)
+            Do i = 1, N_R
+                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
+            Enddo
+        Endif
+        !Define the various equation coefficients
+        ref%dpdr_w_term(:) = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+
+
+        ref%script_N_top       = Prandtl_Number
+        ref%script_K_top       = 1.0d0
+        ref%viscous_amp(1:N_R) = 2.0d0
+
+        If (magnetism) Then
+            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
+        Else
+            ref%Lorentz_Coeff    = 0.0d0
+            ref%script_H_Top     = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
+        Endif            
+    
+    End Subroutine Constant_Reference
+    Subroutine Polytropic_ReferenceND()
         Implicit None
         Real*8 :: dtmp
         Real*8, Allocatable :: dtmparr(:)
-        nondimensional_anelastic = .true.
-        dimensional = .false.
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        Dimensional_Reference = .false.
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type           : "//trim(" Polytrope (Non-dimensional)"))
+            Write(dstring,dofmt)Modified_Rayleigh_Number
+            Call stdout%print(" ---- Modified Rayleigh Number : "//trim(dstring))
+            Write(dstring,dofmt)Ekman_Number
+            Call stdout%print(" ---- Ekman Number             : "//trim(dstring))
+            Write(dstring,dofmt)Prandtl_Number
+            Call stdout%print(" ---- Prandtl Number           : "//trim(dstring))
+            If (magnetism) Then
+                Write(dstring,dofmt)Magnetic_Prandtl_Number
+                Call stdout%print(" ---- Magnetic Prandtl Number  : "//trim(dstring))
+            Endif
+            Write(dstring,dofmt)poly_n
+            Call stdout%print(" ---- Polytropic Index         : "//trim(dstring))
+            Write(dstring,dofmt)poly_nrho
+            Call stdout%print(" ---- Density Scaleheights     : "//trim(dstring))
+        Endif
 
         If (aspect_ratio .lt. 0) Then
             aspect_ratio = rmax/rmin
@@ -134,7 +254,7 @@ Contains
         ref%temperature(:) = dtmp*Dissipation_Number*(dtmp*One_Over_R(:)-1.0D0)+1.0D0
         ref%density(:) = ref%temperature(:)**poly_n
         ref%gravity = (rmax**2)*OneOverRSquared(:)
-        ref%gravity_term_s = ref%gravity*Modified_Rayleigh_Number*ref%density
+        ref%Buoyancy_Coeff = ref%gravity*Modified_Rayleigh_Number*ref%density
 
         !Compute the background temperature gradient : dTdr = -Dg,  d2Tdr2 = 2*D*g/r (for g ~1/r^2)
         dtmparr = -Dissipation_Number*ref%gravity
@@ -156,13 +276,29 @@ Contains
         ref%dsdr(:) = 0.0d0
         ref%pressure(:) = ref%density*ref%temperature !  this is never used, might be missing a prefactor
         Call Initialize_Reference_Heating()
+        
+
+        ref%Coriolis_Coeff = 2.0d0
+        ref%dpdr_w_term(:) = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+
+        ref%script_N_top   = Ekman_Number
+        ref%script_K_top   = Ekman_Number/Prandtl_Number
+        ref%viscous_amp(1:N_R) = 2.0d0/ref%temperature(1:N_R)* &
+                                 & Dissipation_Number/Modified_Rayleigh_Number
+
+        If (magnetism) Then
+            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_top     = Ekman_Number/Magnetic_Prandtl_Number
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff/ref%density(1:N_R)/ref%temperature(1:N_R)
+        Else
+            ref%Lorentz_Coeff    = 0.0d0
+            ref%script_H_Top     = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
+        Endif
 
 
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0  ! will initialize this later in equation coefficients -- messy!
-
-
-    End Subroutine Polytropic_Reference_DevelND
+    End Subroutine Polytropic_ReferenceND
 
     Subroutine Polytropic_Reference()
         Real*8 :: zeta_0,  c0, c1, d
@@ -172,9 +308,27 @@ Contains
         Real*8 :: One, ee
         Real*8 :: InnerRadius, OuterRadius
         Integer :: r
+        Character*6  :: istr
+		Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" ---- Reference type                : "//trim(" Polytrope (Dimensional)"))
+            Write(dstring,dofmt)Angular_Velocity
+            Call stdout%print(" ---- Angular Velocity (rad/s)      : "//trim(dstring))
+            Write(dstring,dofmt)poly_rho_i
+            Call stdout%print(" ---- Inner-Radius Density (g/cm^3) : "//trim(dstring))
+            Write(dstring,dofmt)poly_mass
+            Call stdout%print(" ---- Interior Mass  (g)            : "//trim(dstring))
+            Write(dstring,dofmt)poly_n
+            Call stdout%print(" ---- Polytropic Index              : "//trim(dstring))
+            Write(dstring,dofmt)poly_nrho
+            Call stdout%print(" ---- Density Scaleheights          : "//trim(dstring))
+            Write(dstring,dofmt)pressure_specific_heat
+            Call stdout%print(" ---- CP (erg g^-1 cm^-3 K^-1)      : "//trim(dstring))
+        Endif
 
+        Dimensional_Reference = .true. ! This is actually the default
 
-        If (my_rank .eq. 0) Call stdout%print('Initializing polytropic reference state.')
         ! Adiabatic, Polytropic Reference State (see, e.g., Jones et al. 2011)
         ! The following parameters are read from the input file.
         ! poly_n
@@ -240,21 +394,34 @@ Contains
 
         Ref%dsdr = 0.d0
 
-        Ref%gravity_term_s = ref%gravity/Pressure_Specific_Heat*ref%density
+        Ref%Buoyancy_Coeff = ref%gravity/Pressure_Specific_Heat*ref%density
 
         !We initialize s_conductive (modulo delta_s, specified by the boundary conditions)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        ee = -1.d0*poly_n
-        denom = zeta(1)**ee - zeta(N_R)**ee
-        Do r = 1, N_R
-          s_conductive(r) = (zeta(1)**ee - zeta(r)**ee) / denom
-        Enddo
+        !If (heating_type .eq. 0) Then
+        !    Allocate(s_conductive(1:N_R))
+        !    s_conductive(:) = 0.0d0
+        !    ee = -1.d0*poly_n
+        !    denom = zeta(1)**ee - zeta(N_R)**ee
+        !    Do r = 1, N_R
+        !      s_conductive(r) = (zeta(1)**ee - zeta(r)**ee) / denom
+        !    Enddo
+        !Endif
 
         Deallocate(zeta)
 
         Call Initialize_Reference_Heating()
 
+        ref%Coriolis_Coeff        = 2.0d0*Angular_velocity
+        ref%dpdr_w_term(:)        = ref%density
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        ref%viscous_amp(1:N_R)    = 2.0d0/ref%temperature(1:N_R)
+        If (magnetism) Then
+            ref%Lorentz_Coeff = 1.0d0/four_pi
+            ref%ohmic_amp(1:N_R) = ref%lorentz_coeff/ref%density(1:N_R)/ref%temperature(1:N_R)
+        Else
+            ref%Lorentz_Coeff = 0.0d0
+            ref%ohmic_amp(1:N_R) = 0.0d0
+        Endif
     End Subroutine Polytropic_Reference
 
 
@@ -272,19 +439,15 @@ Contains
         Endif
 
         If (heating_type .eq. 1) Then
-            Call Constant_Reference_Heating()
+            Call Constant_Entropy_Heating()
         Endif
 
         If (heating_type .eq. 2) Then
             Call Tanh_Reference_Heating()
         Endif
 
-        If (heating_type .eq. 3) Then
-            Call Bouss_Reference_Heating()
-        Endif
-
         If (heating_type .eq. 4) Then
-            Call  Flux_Reference_Heating()
+            Call  Constant_Energy_Heating()
         Endif
 
         !///////////////////////////////////////////////////////////
@@ -299,20 +462,43 @@ Contains
             Call Tanh_Reference_Cooling()            
         Endif
 
+        ! Heating Q_H and cooling Q_C are normalized so that:
+        ! Int_volume rho T Q_H dV = 1 and Int_volume rho T Q_C dV = 1
+
+        !If luminosity or heating_integral has been set,
+        !we set the integral of ref%heating using that.
+
+        !Otherwise, we will use the boundary thermal flux
+        !To establish the integral
+        If ( (heating_type .gt. 0) .or. (cooling_type .gt. 0) )Then
+            adjust_reference_heating = .true.
+            If (abs(Luminosity) .gt. heating_eps) Then
+                adjust_reference_heating = .false.
+                ref%heating = ref%heating*Luminosity
+            Endif
+
+            If (abs(Heating_Integral) .gt. heating_eps) Then
+                adjust_reference_heating = .false.
+                ref%heating = ref%heating*Heating_Integral
+            Endif
+        Endif
     End Subroutine Initialize_Reference_Heating
 
-    Subroutine Flux_Reference_Heating()
+    Subroutine Constant_Energy_Heating()
         Implicit None
+        ! rho T dSdt = alpha : energy deposition per unit volume is constant
+        ! dSdt = alpha/rhoT : entropy deposition per unit volume is ~ 1/Pressure
         ref%heating(:) = 1.0d0/shell_volume
         ref%heating = ref%heating/(ref%density*ref%temperature)
-        !The actual value of the reference heating is adjusted 
-        ! in Equation_Coefficients.F90
-    End Subroutine Flux_Reference_Heating
+    End Subroutine Constant_Energy_Heating
 
-    Subroutine Constant_Reference_Heating()
+    Subroutine Constant_Entropy_Heating()
         Implicit None
         Real*8 :: integral, alpha
         Real*8, Allocatable :: temp(:)
+
+        ! dSdt = alpha : Entropy deposition per unit volume is constant
+        ! rho T dSdt = rho T alpha : Energy deposition per unit volume is ~ Pressure
 
         ! Luminosity is specified as an input
         ! Phi(r) is set to alpha such that 
@@ -320,17 +506,18 @@ Contains
         Allocate(temp(1:N_R))
 
         temp = ref%density*ref%temperature
-        Call Integrate_in_radius(temp,integral)
-        integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        Call Integrate_in_radius(temp,integral) !Int_rmin_rmax rho T r^2 dr
+        integral = integral*4.0d0*pi  ! Int_V temp dV
+
+        
+        alpha = 1.0d0/integral
+
+
+
         ref%heating(:) = alpha
         DeAllocate(temp)
-    End Subroutine Constant_Reference_Heating
-
-    Subroutine Bouss_Reference_Heating()
-    Implicit None
-    ref%heating(:) = 1.0d0
-    End Subroutine Bouss_Reference_Heating
+        !Note that in the boussinesq limit, alpha = Luminosity/Volume
+    End Subroutine Constant_Entropy_Heating
 
     Subroutine Tanh_Reference_Heating()
         Implicit None
@@ -343,25 +530,26 @@ Contains
         ! Heating is set so that temp * 4 pi r^2 integrates to one Lsun 
         ! Integral_r=rinner_r=router (4*pi*alpha*rho(r)*T(r)*r^2 dr) = Luminosity
         Allocate(temp(1:N_R))
-          Allocate(temp2(1:N_R))
+        Allocate(temp2(1:N_R))
         Allocate(x(1:N_R))
-        x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) ! x runs from zero to 1 if heating_r0 is min(radius)
+        x = heating_factor*(radius-heating_r0)/ (maxval(radius)-minval(radius)) 
+        ! x runs from zero to 1 if heating_r0 is min(radius)
         !Call tanh_profile(x,temp)
         Do i = 1, n_r
             temp2(i) = 0.5d0*(1.0d0-tanh(x(i))*tanh(x(i)))*heating_factor/(maxval(radius)-minval(radius))
         Enddo
 
-          !temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
+        !temp2 = heating_factor*(1-(temp*temp))/ (maxval(radius)-minval(radius))
 
-          temp2 = -temp2/(4*pi*radius*radius)
+        temp2 = -temp2/(4*pi*radius*radius)
 
         Call Integrate_in_radius(temp2,integral)
 
         integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        alpha = 1.0d0/integral
         
-          ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
-        if (my_rank .eq. 0) Then
+        ref%heating(:) = alpha*temp2/(ref%density*ref%temperature)
+        If (my_rank .eq. 0) Then
             heating_file = Trim(my_path)//'reference_heating'
             Open(unit=15,file=heating_file,form='unformatted', status='replace',access='stream')
             Write(15)n_r
@@ -403,7 +591,7 @@ Contains
         Call Integrate_in_radius(temp2,integral)
 
         integral = integral*4.0d0*pi
-        alpha = Luminosity/integral
+        alpha = 1.0d0/integral
 
         !/////////////////////
         ! The "Cooling" part comes in through the minus sign here - otherwise, this is identical to the heating function
@@ -433,42 +621,17 @@ Contains
         Real*8, Intent(In) :: func(1:)
         Real*8, Intent(Out) :: int_func
         Integer :: i
-        Real*8 :: delr, riweight
+        Real*8 :: rcube
         !compute integrate_r=rmin_r=rmax func*r^2 dr
+        rcube = (rmax**3-rmin**3)*One_Third
         int_func = 0.0d0
-        Do i = 2, n_r-1
-            delr = (radius(i-1)-radius(i+1))/2.0d0
-            riweight = delr*radius(i)**2
-            int_func = int_func+func(i)*riweight
+        Do i = 1, n_r
+            int_func = int_func+func(i)*radial_integral_weights(i)
         Enddo
-        delr = (radius(1)-radius(2))/2.0d0
-        riweight = delr*radius(1)**2
-        int_func = int_func+riweight*func(1)
-
-        delr = (radius(n_r-1)-radius(n_r))/2.0d0
-        riweight = delr*radius(n_r)**2
-        int_func = int_func+riweight*func(n_r)
+        int_func = int_func*rcube
 
     End Subroutine Integrate_in_radius
 
-    Subroutine Indefinite_Integral(func,int_func)
-        Implicit None
-        Real*8, Intent(In) :: func(1:)
-        Real*8, Intent(Out) :: int_func(1:)
-        Integer :: i
-        Real*8 :: delr
-        !computes indefinite integral func dr
-        int_func(1) = 0.0d0
-        Do i = 2, n_r-1
-            delr = (radius(i-1)-radius(i+1))/2.0d0
-            int_func(i) = int_func(i-1)+func(i-1)*delr
-        Enddo
-        delr = (radius(n_r-1)-radius(n_r))/2.0d0
-
-        int_func(n_r) = int_func(n_r-1)+delr*func(n_r-1)
-
-
-    End Subroutine Indefinite_Integral
 
     Subroutine Write_Reference(filename)
         Implicit None
@@ -540,21 +703,23 @@ Contains
         ref%dsdr(:) = ref_arr(:,7)
         ref%entropy(:) = ref_arr(:,8)            
         ref%gravity(:) = ref_arr(:,9)
-        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        ref%Buoyancy_Coeff(:) = -ref%temperature*ref%dlnT
         DeAllocate(ref_arr)
 
         ! This conductive profile is based on the assumption that kappa is constant
         ! And it is modulo kappa (s_conductive/kappa)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        Allocate(integrand(1:N_R))
-        integrand = 1.0d0/(ref%density*ref%temperature)
-        integrand = integrand*OneOverRSquared
-        !The routine below integrates r^2 * integrand, hence the extra division by r^2
-        Call Indefinite_Integral(integrand,s_conductive)
-        s_conductive = s_conductive-s_conductive(1)
-        s_conductive = s_conductive/s_conductive(N_R)
-        DeAllocate(integrand)
+        !If (heating_type. eq. 0) Then
+        !    Allocate(s_conductive(1:N_R))
+        !    s_conductive(:) = 0.0d0
+        !    Allocate(integrand(1:N_R))
+        !    integrand = 1.0d0/(ref%density*ref%temperature)
+        !    integrand = integrand*OneOverRSquared
+            !The routine below integrates r^2 * integrand, hence the extra division by r^2
+        !    Call Indefinite_Integral(integrand,s_conductive,radius)
+        !    s_conductive = s_conductive-s_conductive(1)
+        !    s_conductive = s_conductive/s_conductive(N_R)
+        !    DeAllocate(integrand)
+        !Endif
         Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference
 
@@ -580,7 +745,7 @@ Contains
         ref%entropy(:) = 0.0
         ref%gravity(:) = ref_arr(:,5)
         ref%dlnT(:) = ref_arr(:,6)   
-        ref%gravity_term_s(:) = -ref%temperature*ref%dlnT
+        ref%Buoyancy_Coeff(:) = -ref%temperature*ref%dlnT
              
 
         ref%dlnrho(:) = ref_arr(:,7)
@@ -605,16 +770,16 @@ Contains
 
         ! This conductive profile is based on the assumption that kappa is constant
         ! And it is modulo kappa (s_conductive/kappa)
-        Allocate(s_conductive(1:N_R))
-        s_conductive(:) = 0.0d0
-        Allocate(integrand(1:N_R))
-        integrand = 1.0d0/(ref%density*ref%temperature)
-        integrand = integrand*OneOverRSquared
+        !Allocate(s_conductive(1:N_R))
+        !s_conductive(:) = 0.0d0
+        !Allocate(integrand(1:N_R))
+        !integrand = 1.0d0/(ref%density*ref%temperature)
+        !integrand = integrand*OneOverRSquared
         !The routine below integrates r^2 * integrand, hence the extra division by r^2
-        Call Indefinite_Integral(integrand,s_conductive)
-        s_conductive = s_conductive-s_conductive(1)
-        s_conductive = s_conductive/s_conductive(N_R)
-        DeAllocate(integrand)
+        !Call Indefinite_Integral(integrand,s_conductive,radius)
+        !s_conductive = s_conductive-s_conductive(1)
+        !s_conductive = s_conductive/s_conductive(N_R)
+        !DeAllocate(integrand)
         Call Initialize_Reference_Heating()
     End Subroutine Get_Custom_Reference2    
     
@@ -716,30 +881,7 @@ Contains
 
     
 
-    Subroutine Constant_Reference()
-            Implicit None
-            Integer :: i
-            Real*8 :: r_outer, r_inner, prefactor
-            ref%density = 1.0d0
-            ref%dlnrho = 0.0d0
-            ref%d2lnrho = 0.0d0
-            ref%pressure = 1.0d0
-            ref%temperature = 1.0d0
-            ref%dlnT = 0.0d0
-            ref%dsdr = 0.0d0
-            ref%pressure = 1.0d0
-            ref%gravity = 0.0d0 ! Not used with constant reference right now
-            ref%gravity_term_s = 0.0d0 ! Set to Ra later in equation_coefficients
-            pressure_specific_heat = 1.0d0
-            Call initialize_reference_heating()
-            Allocate(s_conductive(1:N_R))
-            r_outer = radius(1)
-            r_inner = radius(N_R)
-            prefactor = r_outer*r_inner/(r_inner-r_outer)
-            Do i = 1, N_R
-                s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
-            Enddo
-    End Subroutine Constant_Reference
+
 
     Subroutine Read_Profile_File(filename,arr)
     Character*120, Intent(In) :: filename
@@ -850,6 +992,8 @@ Contains
     End Subroutine Read_Profile_File
 
 
+
+
     Subroutine Restore_Reference_Defaults
         Implicit None
         !Restore all values in this module to their default state.
@@ -876,7 +1020,7 @@ Contains
         Prandtl_Number          = 1.0d0
         Magnetic_Prandtl_Number = 1.0d0
         gravity_power           = 0.0d0
-        Dimensional = .true.  
+        Dimensional_Reference = .true.  
         custom_reference_file ='nothing'
         custom_reference_type = 1
 
@@ -890,7 +1034,7 @@ Contains
         If (allocated(ref%Entropy)) DeAllocate(ref%Entropy)
         If (allocated(ref%dsdr)) DeAllocate(ref%dsdr)
         If (allocated(ref%Gravity)) DeAllocate(ref%Gravity)
-        If (allocated(ref%Gravity_term_s)) DeAllocate(ref%Gravity_term_s)
+        If (allocated(ref%Buoyancy_Coeff)) DeAllocate(ref%Buoyancy_Coeff)
         If (allocated(ref%Heating)) DeAllocate(ref%Heating)
 
   

@@ -1,5 +1,4 @@
 Module Fields
-	Use Linear_Solve
 	Use Parallel_Framework
 	Use ProblemSize
 	Use Controls

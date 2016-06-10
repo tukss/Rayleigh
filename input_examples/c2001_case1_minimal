@@ -9,6 +9,8 @@
 /
 &physical_controls_namelist
  benchmark_mode = 2
+ benchmark_integration_interval = 100
+ benchmark_report_interval = 10000
 /
 &temporal_controls_namelist
  max_iterations = 150000
@@ -28,8 +30,6 @@
 &Test_Namelist
 /
 &Reference_Namelist
-/
-&NonDimensionalization_Namelist
 /
 &Transport_Namelist
 /

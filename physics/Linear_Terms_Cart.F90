@@ -161,7 +161,7 @@ Contains
 				! 	 This part of the equation is static (i.e. not time-evolving)
 
 				! 	 t
-                amp = -ref%gravity_term_s
+                amp = -ref%Buoyancy_Coeff
 				Call add_implicit_term(peq, tvar, 0, amp,lp, static = .true.)			! Gravity	--- Need LHS_Only Flag
 
 				amp = 1.0d0
@@ -179,7 +179,7 @@ Contains
 				!				Radial Momentum Equation
 				
 				! Temperature
-                amp = -ref%gravity_term_s/H_Laplacian
+                amp = -ref%Buoyancy_Coeff/H_Laplacian
 				Call add_implicit_term(weq, tvar, 0, amp,lp)			! Gravity
 
 				! Pressure

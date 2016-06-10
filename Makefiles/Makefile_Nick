@@ -15,6 +15,14 @@ ifeq ($(RAYLEIGH_OPT1),openmp)
 else
 	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
 endif
+
+ifeq ($(RAYLEIGH_OPT1),debug)
+        F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
+else
+        F90FLAGS = -O3 -ffixed-line-length-132  -I/usr/include
+endif
+
+
 PROG =	rayleigh
 
 .SUFFIXES: .o .F90 .f .F .c

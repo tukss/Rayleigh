@@ -64,7 +64,7 @@ Contains
         ! Energies associated with the mean velocity field
         If (compute_quantity(mkinetic_energy)) Then
             DO_PSI
-                qty(PSI) = qty(PSI)+m0_values(PSI2,vr    )**2
+                qty(PSI) = m0_values(PSI2,vr    )**2
                 qty(PSI) = qty(PSI)+m0_values(PSI2,vtheta)**2
                 qty(PSI) = qty(PSI)+m0_values(PSI2,vphi  )**2
                 qty(PSI) = qty(PSI)*dfact(r)
@@ -238,7 +238,7 @@ Contains
         Integer :: r,k, t
 
         !This changes depending on the non-dimensionalization (dimensionalization) employed
-        mfact = half*lorentz_coefficient
+        mfact = half*ref%Lorentz_Coeff
 
 
         ! Energies associated with the full (fluctuating + mean) magnetic field

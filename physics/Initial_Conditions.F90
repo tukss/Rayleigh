@@ -10,10 +10,15 @@ Module Initial_Conditions
     Use Controls
     Use Timers
     Use General_MPI, Only : BCAST2D
-    Use ReferenceState, Only : s_conductive, heating_type
+    Use ReferenceState, Only : s_conductive, heating_type,ref
     Use BoundaryConditions, Only : T_top, T_bottom, fix_tvar_Top, fix_tvar_bottom,&
-         fix_dtdr_top, fix_dtdr_bottom, C10_bottom, C11_bottom, C1m1_bottom
+         & fix_dtdr_top, fix_dtdr_bottom, dtdr_top, dtdr_bottom, & 
+         & C10_bottom, C11_bottom, C1m1_bottom
     Use ClockInfo, Only : Euler_Step
+    Use TransportCoefficients, Only : kappa, dlnkappa
+    Use Linear_Solve
+    Use Math_Utility
+    Use BufferedOutput
 
     Implicit None
     Logical :: alt_check = .false.
@@ -40,6 +45,14 @@ Contains
         ! as part of the checkpoint.
 
         ! Check control variables to see if we need want static or buffers
+
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Initializing Fields...")
+            Call stdout%print(" ---- Specified parameters: ")
+            If (conductive_profile) Then
+                Call stdout%print(" ---- Conductive entropy profile is selected. ")
+            Endif
+        Endif
         dbtrans = .not. static_transpose
         dbconfig = .not. static_config
 
@@ -58,6 +71,16 @@ Contains
 
         !////////////////////////////////////////
         ! Read in checkpoint files as appropriate
+        If (init_type .eq. -1) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : RESTART ")
+            Endif
+        Endif
+        If (magnetism .and. (magnetic_init_type .eq. -1) ) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Magnetic Init Type : RESTART ")
+            Endif
+        Endif
         If ( (init_type .eq. -1) .or. ( magnetism .and. (magnetic_init_type .eq. -1) ) ) Then
             Call restart_from_checkpoint(restart_iter)
         Endif
@@ -65,14 +88,24 @@ Contains
 
         !////////////////////////////////////
         ! Initialize the hydro variables
+
         If (init_type .eq. 1) Then
             call benchmark_init_hydro()
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Benchmark (Christensen et al. 2001) ")
+            Endif
         Endif
 
         If (init_type .eq. 6) Then
             call abenchmark_init_hydro()
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Benchmark (Jones et al. 2011) ")
+            Endif
         Endif
         If (init_Type .eq. 7) Then
+            If (my_rank .eq. 0) Then
+                Call stdout%print(" ---- Hydro Init Type    : Random Thermal Field ")
+            Endif
             call random_thermal_init()
         Endif
 
@@ -81,17 +114,29 @@ Contains
             ! Initialize the magnetic variables
             If (magnetic_init_type .eq. 1) Then
                 call benchmark_insulating_init()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Benchmark (Christensen et al. 2001) ")
+                Endif
             Endif
             If (magnetic_init_type .eq. 7) Then
                 call random_init_Mag()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Random Field")
+                Endif
             Endif
             If (magnetic_init_type .eq. 10) Then
                 call Dipole_Field_Init()
+                If (my_rank .eq. 0) Then
+                    Call stdout%print(" ---- Magnetic Init Type : Dipole Field")
+                Endif
             Endif
         Endif
         ! Fields are now initialized and loaded into the RHS. 
         ! We are ready to enter the main loop
-
+        If (my_rank .eq. 0) Then
+            Call stdout%print(" -- Fields initialized.")
+            Call stdout%print(" ")
+        Endif
     End Subroutine Initialize_Fields
 
     Subroutine Restart_From_Checkpoint(iteration)
@@ -347,10 +392,11 @@ Contains
                     profile0(:) = s_conductive(:)
                 Endif
             Else
-                If (my_rank .eq. 0) Then 
-                    Write(6,*)'No conductive profile found.'
-                    Write(6,*)'Ell = 0 entropy perturbations will be zero.'
-                Endif
+                Allocate(s_conductive(1:N_R))
+                !The conductive {S,T} profile depends on kappa and ref%heating, so do this here.
+                Call Calculate_Conductive_Profile()
+                profile0(:) = s_conductive(:)
+
             Endif
             ! Randomize the entropy
             Call Generate_Random_Field(amp, 1, sbuffer,ell0_profile = profile0)            
@@ -717,80 +763,78 @@ Contains
         DeAllocate(radius_in, profile_in, spy2)
     End Subroutine Load_Radial_Profile
 
-    !/////////////////////////////////////////////////////
-    ! Numerical Recipes Routines for Spline Interpolation
-    Subroutine Spline(x,y,n,yp1,ypn,y2)
-        ! From Numerical Recipes in Fortran
-        Integer:: n, NMAX
-        Real(8) :: yp1, ypn, x(n), y(n), y2(n)
-        PARAMETER (NMAX = 10000)
-        Integer :: i, k
-        Real(8) :: p, qn, sig, un, u(NMAX)
 
-        If (yp1 .gt. 0.99D30) Then
-            y2(1) = 0.0D0
-            u(1) = 0.0D0
+
+    Subroutine Calculate_Conductive_Profile
+        Implicit None
+        Integer :: i, r, old_code
+        Real*8 :: amp, grav_r_ref, dr, vhint, qadd2, ftest
+        Real*8 :: lum_top, lum_bottom, sfactor, diff, r2dr, qadd, dsdr_mean
+        Real*8, Allocatable :: tmp1d(:), tmp1d2(:), tmp1d3(:)
+        Allocate(tmp1d(1:N_R),tmp1d2(1:N_R))
+        tmp1d(:) =0.0d0
+        tmp1d2(:) = 0.0d0
+        !Calculates the conductive entropy profile
+
+        !The conductive entropy profile is one that is
+        !in agreement with the boundary conditions
+        !and whose associated flux balances any
+        !internal heat sources/sinks.
+
+        If (heating_type .gt. 0) Then
+            tmp1d = ref%heating*ref%density*ref%temperature*r_squared
+            !tmp1d is zero otherwise - i.e., no heating
+        Endif
+        Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+        !tmp1d2(r) is now int_rmin_r Q rho T r^2 dr  
+        !tmp1d2 is also now r^2*F_conductive + A {A is undetermined}
+
+        If (fix_dtdr_top .or. fix_dtdr_bottom) Then
+            If (fix_dtdr_bottom) Then
+                ftest = -dtdr_bottom*kappa(N_R)
+                ftest = ftest*ref%density(N_R)*ref%temperature(N_R)*r_squared(N_R)
+                tmp1d2 = tmp1d2-tmp1d2(N_R)+ftest
+            Endif
+            
+            If (fix_dtdr_top .and. (.not. fix_dtdr_bottom)) Then
+                ftest = -dtdr_top*kappa(1)
+                ftest = ftest*ref%density(1)*ref%temperature(1)*r_squared(1)
+                tmp1d2 = tmp1d2-tmp1d2(1)+ftest
+            Endif
+            tmp1d = -tmp1d2*OneOverRSquared/(kappa*ref%density*ref%temperature)
+            !tmp1d is now dsdr_conductive
+            Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+            !tmp1d2 is now s_conductive + A {A is undetermined}
+            tmp1d2 = tmp1d2-tmp1d2(1) ! set to zero at the top ; adjust as needed
+            If (fix_tvar_top) Then                
+                tmp1d2 = tmp1d2+T_Top
+            Endif
+            If (fix_tvar_bottom) Then                
+                tmp1d2 = tmp1d2 - tmp1d2(N_R)+T_Bottom
+            Endif
+            s_conductive = tmp1d2
         Else
-            y2(1) = -0.5D0
-            u(1) = ( 3.0D0 / ( x(2)-x(1) ) ) * ( (y(2)-y(1))/(x(2)-x(1)) -yp1 )
+            ! T is fixed at top and bottom - this is marginally more complicated
+            Allocate(tmp1d3(1:N_R))
+            tmp1d3 = OneOverRSquared/(kappa*ref%density*ref%temperature)
+            tmp1d = -tmp1d2*tmp1d3
+            Call Indefinite_Integral(tmp1d,tmp1d2,radius)
+            Call Indefinite_Integral(tmp1d3,tmp1d,radius)
+            amp = (tmp1d2(1)-tmp1d2(N_R))  - (T_top-T_bottom) 
+            amp = amp/ (tmp1d(1)-tmp1d(N_R))
+            s_conductive = tmp1d2-amp*tmp1d
+            s_conductive = s_conductive-s_conductive(1)+T_Top
+            DeAllocate(tmp1d3)
+
         Endif
 
-        Do i = 2, n-1
-            sig = (x(i)-x(i-1)) / (x(i+1)-x(i-1))
-            p = sig*y2(i-1)+2.0D0
-            y2(i) = (sig-1.0D0)/p
-            u(i) = (6.0D0*( (y(i+1)-y(i)) / (x(i+1)-x(i)) - (y(i)-y(i-1)) &
-                & /(x(i)-x(i-1)))/(x(i+1)-x(i-1))-sig*u(i-1))/p
-        Enddo
 
-        If (ypn .gt. 0.99D30) Then
-            qn = 0.0D0
-            un = 0.0D0
-        Else
-            qn = 0.5D0
-            un = (3.0D0/(x(n)-x(n-1)))*(ypn-(y(n)-y(n-1))/(x(n)-x(n-1)))
-        Endif
 
-        y2(n) = (un-qn*u(n-1))/(qn*y2(n-1)+1.0D0)
+        
+        DeAllocate(tmp1d,tmp1d2)
+    End Subroutine Calculate_Conductive_Profile
 
-        Do k = n-1, 1, -1
-            y2(k) = y2(k)*y2(k+1)+u(k)
-        Enddo
-        Return
-    End Subroutine Spline
 
-    Subroutine Splint(xa,ya,y2a,n,x,y)
-        ! From Numerical Recipes in Fortan
-        Integer :: n
-        Real(8) x, y, xa(n), y2a(n), ya(n)
-        Integer :: k, khi, klo
-        Real(8) a,b,h
-
-        klo = 1
-        khi = n
-1   If ( (khi-klo) .gt. 1) Then
-            k = (khi+klo)/2
-            If (xa(k) .lt. x) Then        ! if xa is in ascending order, change lt to gt
-                khi = k
-            else
-             klo = k
-            endif
-            Goto 1
-        Endif
-
-        h = xa(khi)-xa(klo)
-        If (h .eq. 0.0D0) Then
-            Write(6,*) 'bad xa input in splint'
-            STOP
-        Endif
-        a = (xa(khi)-x)/h
-        b = (x-xa(klo))/h
-
-        y = a*ya(klo)+ b*ya(khi)+ &
-            & ( (a**3-a)*y2a(klo)+(b**3-b)*y2a(khi) )*(h**2)/6.0D0
-
-        Return
-    End Subroutine Splint
 
     Subroutine Restore_InitialCondition_Defaults()
         Implicit None

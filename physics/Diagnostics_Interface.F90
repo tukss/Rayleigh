@@ -29,6 +29,9 @@ Module Diagnostics_Interface
     Use Diagnostics_Induction
 
     Use Diagnostics_Miscellaneous
+
+    Use Diagnostics_Custom
+
     Implicit None
 
 
@@ -172,6 +175,7 @@ Contains
 
 
                 Call Compute_Misc_Diagnostics(buffer)
+                Call Custom_Hydro_Diagnostics(buffer)
 
                 !////// Magnetic Quantities
                 If (magnetism) Then
@@ -181,6 +185,7 @@ Contains
                     Call Compute_Induction_Terms(buffer)
                     Call Compute_Magnetic_Diffusion(buffer)
                     Call Compute_Magnetic_Energy(buffer)
+                    Call Custom_MHD_Diagnostics(buffer)
 			    Endif 
                 If (pass_num .eq. 1) Call Finalize_Averages()
             Enddo
@@ -216,7 +221,6 @@ Contains
         Allocate(rweights(1:n_r))
 
         If (chebyshev .or. finite_element) Then
-            If (my_rank .eq. 0) Write(6,*)'Integrating using Chebyshev Quadrature'
             rweights = radial_integral_weights
 
         Else

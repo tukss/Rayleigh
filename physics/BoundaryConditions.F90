@@ -1,8 +1,8 @@
 Module BoundaryConditions
     Use Math_Constants
     Use ProblemSize
-    Use ReferenceState
-    Use TransportCoefficients
+    !Use ReferenceState
+    !Use TransportCoefficients
     Implicit None
 
     Logical :: Fix_Tvar_Top    = .True.
@@ -60,16 +60,10 @@ Contains
             no_slip_top = .true.
             no_slip_bottom = .true.
         Endif
-        If (no_slip_top) Then
-            stress_free_top = .false.
-        Else
-            stress_free_top = .true.
-        Endif
-        If (no_slip_bottom) Then
-            stress_free_bottom = .false.
-        Else
-            stress_free_bottom = .true.
-        Endif
+        stress_free_top = .not. no_slip_top
+        stress_free_bottom = .not. no_slip_bottom
+
+
         If (impose_dipole_field) Then
             fix_poloidalfield_top = .true.
             fix_poloidalfield_bottom = .true.
@@ -90,12 +84,7 @@ Contains
             C1m1_top = C1m1_bottom*(radius(N_R)/radius(1))
 
         Endif
-        If (fix_tdt_bottom) Then
-            
-            fsun = luminosity/four_pi/radius(1)/radius(1)
-            dtdr_top = -fsun/kappa(1)/ref%density(1)/ref%temperature(1)
-            Write(6,*)'Setting dtdr_top to: ', dtdr_top
-        Endif
+
     End Subroutine Initialize_Boundary_Conditions
 
     Subroutine Restore_BoundaryCondition_Defaults()
@@ -104,14 +93,14 @@ Contains
         Fix_Tvar_Bottom = .True.
         Fix_dTdr_Top    = .False.
         Fix_dTdr_Bottom = .False.
-        Fix_divrt_top = .False.
-        Fix_divt_top = .False.
-        Fix_divrfc_top = .False.
-        Fix_divfc_top = .False.
-        Fix_poloidalfield_top = .False.
+        Fix_divrt_top   = .False.
+        Fix_divt_top    = .False.
+        Fix_divrfc_top  = .False.
+        Fix_divfc_top   = .False.
+        Fix_poloidalfield_top    = .False.
         Fix_poloidalfield_bottom = .False.
-        Impose_Dipole_Field = .False.
-        fix_tdt_bottom = .false.
+        Impose_Dipole_Field      = .False.
+        fix_tdt_bottom           = .False.
          
         T_Bottom     = 1.0d0
         T_Top        = 0.0d0

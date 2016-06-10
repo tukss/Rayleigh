@@ -2,6 +2,23 @@ Module Math_Utility
     ! This module contains potentially useful stand alone routines
 Contains
 
+    Subroutine Indefinite_Integral(f,intf,xgrid)
+        Implicit None
+        Real*8, Intent(In) :: f(1:)
+        Real*8, Intent(InOut) :: intf(1:), xgrid(1:)
+        Real*8 :: trap_area
+        Integer :: xsize(1), i, nx
+        !Computes the indefinite integral of f using trapezoidal rule
+        !Integrates from bottom of grid (nx up to 1 --i.e., assumes reverse grid)
+        xsize = size(xgrid)
+        nx = xsize(1)
+        intf(nx) = 0.0d0
+        Do i = nx-1, 1, -1
+            trap_area = (xgrid(i)-xgrid(i+1))*(f(i)+f(i+1))*0.5d0
+            intf(i) = intf(i+1)+trap_area
+        Enddo
+    End Subroutine Indefinite_Integral
+
     Subroutine tanh_profile(x,y,flip)
         Real*8, Intent(In) :: x(1:)
         Real*8, Intent(InOut) :: y(1:)

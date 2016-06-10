@@ -6,13 +6,14 @@
 !
 !//////////////////////////////////////////////////	
 Module Finite_Difference
+    Use Math_Constants, Only : zero, one
 	Implicit None
 	Integer, Private :: n_x_fd
 	Real*8, Private, Allocatable :: x_fd(:)
 	Integer, Private, save :: N_s = 5  ! number of stencil points
 	Integer, Private, save :: kd ! location of the diagonal in the stencil
-	Real*8 :: one=1.0d0
-	Real*8 :: zero = 0.0d0
+	!Real*8 :: one=1.0d0
+	!Real*8 :: zero = 0.0d0
 
 	!***********************************************************************************
 	!			Variables used for the new radial derivative coefficient generation scheme

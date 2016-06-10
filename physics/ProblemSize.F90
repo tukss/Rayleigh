@@ -6,6 +6,7 @@ Module ProblemSize
 	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
 	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
     Use Math_Constants
+    Use BufferedOutput
 	Use Timers
 
 	Implicit None
@@ -51,6 +52,7 @@ Module ProblemSize
     Integer :: fencheby = -1 ! Number of chebyshev modes per subdomain
 	Logical :: finite_element = .false.
 
+
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
             &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max, &
             &  aspect_ratio, shell_depth
@@ -64,6 +66,9 @@ Contains
 		Real*8 :: ell
         Character*120 :: grid_file
         Integer :: cpu_tmp(1)
+		Character*12 :: dstring
+        Character*6  :: istr
+    	Character*8 :: dofmt = '(ES12.5)'
 
         If ((aspect_ratio .gt. 0.0d0) .and. (shell_depth .gt. 0.0d0) ) Then
             ! Set the bounds based on the aspect ratio and shell depth
@@ -140,14 +145,29 @@ Contains
             cpu_tmp(1) = ncpu
     		Call pfi%init(ppars,cpu_tmp)
         Endif
-
+		my_rank = pfi%gcomm%rank
+		my_row_rank = pfi%rcomm%rank
+		my_column_rank = pfi%ccomm%rank
+        If (my_rank .eq. 0) Then
+            Write(istr,'(i6)')n_r
+            call stdout%print(" ")
+            call stdout%print(" -- Initalizing Grid...")
+            Call stdout%print(" ---- Specified parameters:")
+            call stdout%print(" ---- N_R      : "//trim(istr))
+            Write(istr,'(i6)')n_theta
+            call stdout%print(" ---- N_THETA  : "//trim(istr))
+            Write(istr,'(i6)')l_max
+            call stdout%print(" ---- Ell_MAX  : "//trim(istr))
+            Write(dstring,dofmt)rmin
+            call stdout%print(" ---- R_MIN    : "//trim(dstring))
+            Write(dstring,dofmt)rmax
+            Call stdout%print(" ---- R_MAX    : "//trim(dstring))
+        Endif
 		Call Initialize_Timers()
 		Call StopWatch(init_time)%startclock()
 		Call StopWatch(walltime)%startclock()
 		Call Map_Indices()
-		my_rank = pfi%gcomm%rank
-		my_row_rank = pfi%rcomm%rank
-		my_column_rank = pfi%ccomm%rank
+
         !//////////////////////////////////////////////////
         !Provide quick notification that n_r may have changed
         if ( finite_element) Then
@@ -201,7 +221,10 @@ Contains
 		ovr_repeated(my_r%delta+1:2*my_r%delta) = ovr_repeated(1:my_r%delta)
 		tnr = 2*my_r%delta
 		
-
+        If (my_rank .eq. 0) Then
+            call stdout%print(" -- Grid initialized.")
+            call stdout%print(" ")
+        Endif
 	End Subroutine Init_ProblemSize
 
 	Subroutine Map_Indices()
@@ -219,7 +242,7 @@ Contains
 		Integer :: r, nthr,i,j 
 		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
         real*8 :: delr0
-        Real*8 ::	Pi  = 3.1415926535897932384626433832795028841972d0
+
 
         !////////////////////////////////////////
         ! Variables for FE approach
