@@ -153,6 +153,7 @@ Contains
 		Character*12 :: dstring
     	Character*8 :: dofmt = '(ES12.5)'
         Dimensional_Reference = .false.
+        viscous_heating = .false.  ! Turn this off for now until I find appropriate non-dimensionalization
         If (my_rank .eq. 0) Then
             Call stdout%print(" ---- Reference type           : "//trim(" Boussinesq (Non-dimensional)"))
             Write(dstring,dofmt)Rayleigh_Number
