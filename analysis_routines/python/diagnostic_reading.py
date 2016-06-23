@@ -42,24 +42,30 @@ class RayleighProfile:
 
     """
 
-    def __init__(self,filename):
+    def __init__(self,filename='none'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
-
-        fd = open(filename,'rb')
-        # We read an integer to assess which endian the file was written in...
-        bs = check_endian(fd,314,'int32')
-        
-        nr = swapread(fd,dtype='int32',count=1,swap=bs)
-        n2 = swapread(fd,dtype='int32',count=1,swap=bs)
-        nq = n2-1
-        tmp = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr,1), order = 'F')
-        self.radius      = tmp[:,0]
-        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
-        self.nr = nr
-        self.nq = nq
-        self.vals = tmp2[:,:]
+        if (filename != 'none'):
+            
+            fd = open(filename,'rb')
+            # We read an integer to assess which endian the file was written in...
+            bs = check_endian(fd,314,'int32')
+            
+            nr = swapread(fd,dtype='int32',count=1,swap=bs)
+            n2 = swapread(fd,dtype='int32',count=1,swap=bs)
+            nq = n2-1
+            tmp = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr,1), order = 'F')
+            self.radius      = tmp[:,0]
+            tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
+            self.nr = nr
+            self.nq = nq
+            self.vals = tmp2[:,:]
+        else:
+            self.nr = 0
+            self.nq = 0
+            self.vals = []
+            # we initialize the object and set its attributes later
 
         fd.close()
 
@@ -72,23 +78,33 @@ class RayleighArray:
 
     """
 
-    def __init__(self,filename):
+    def __init__(self,filename ='none'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
 
-        fd = open(filename,'rb')
-        # We read an integer to assess which endian the file was written in...
-        bs = check_endian(fd,314,'int32')
-        
-        nx = swapread(fd,dtype='int32',count=1,swap=bs)
-        ny = swapread(fd,dtype='int32',count=1,swap=bs)
-        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
-        self.nx = nx
-        self.ny = ny
-        self.vals = tmp2[:,:]
+        if (filename == 'none'):
+            self.nx = 0
+            self.ny = 0
+            self.vals = []
+        else:
+            fd = open(filename,'rb')
+            # We read an integer to assess which endian the file was written in...
+            bs = check_endian(fd,314,'int32')
+            
+            nx = swapread(fd,dtype='int32',count=1,swap=bs)
+            ny = swapread(fd,dtype='int32',count=1,swap=bs)
+            tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
+            self.nx = nx
+            self.ny = ny
+            self.vals = tmp2[:,:]
 
-        fd.close()
+            fd.close()
+    def set_vals(self,vals):
+        dims = vals.shape
+        self.nx = dims[0]
+        self.ny = dims[1]
+        self.vals = vals
 
 
 
@@ -847,3 +863,19 @@ def integrate_dr(radius,f):
         intf = intf+(dr1+dr0)*f[i]*fpr[i]*weight[i]
     return intf
 
+def swapwrite(val,fd,swap=False,verbose=False, array = False):
+        #simple wrapper to numpy.tofile that allows byteswapping based on Boolean swap
+        #set swap to true to write bytes in different endianness than current machine
+
+        if (swap):
+                if (verbose):
+                    print "Swapping on write."
+                if (array):
+                    if (verbose):
+                        print "Swapping entire array of bytes"
+                    val2 = val.byteswap().newbyteorder()                
+                else:    
+                    val2 = val.newbyteorder()
+                val2.tofile(fd)
+        else:
+                val.tofile(fd)
