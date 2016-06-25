@@ -88,12 +88,14 @@ class RayleighArray:
             self.ny = 0
             self.vals = []
         else:
+            print 'Opening: ', filename
             fd = open(filename,'rb')
             # We read an integer to assess which endian the file was written in...
             bs = check_endian(fd,314,'int32')
             
             nx = swapread(fd,dtype='int32',count=1,swap=bs)
             ny = swapread(fd,dtype='int32',count=1,swap=bs)
+            print nx, ny
             tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
             self.nx = nx
             self.ny = ny
@@ -105,8 +107,15 @@ class RayleighArray:
         self.nx = dims[0]
         self.ny = dims[1]
         self.vals = vals
-
-
+    def write(self,arrfile,byteswap = False):
+        fd = open(arrfile,'wb')
+        dims = np.ndarray((3),dtype='int32')
+        dims[0] = 314
+        dims[1] = self.nx
+        dims[2] = self.ny
+        swapwrite(dims,fd,swap=byteswap,array=True)
+        swapwrite(self.vals,fd,swap=byteswap,array=True)
+        fd.close()
 
 class ReferenceState:
     """Rayleigh Reference State Structure
@@ -873,7 +882,7 @@ def swapwrite(val,fd,swap=False,verbose=False, array = False):
                 if (array):
                     if (verbose):
                         print "Swapping entire array of bytes"
-                    val2 = val.byteswap().newbyteorder()                
+                    val2 = val.byteswap().newbyteorder()          
                 else:    
                     val2 = val.newbyteorder()
                 val2.tofile(fd)
