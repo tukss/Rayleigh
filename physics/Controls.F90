@@ -62,7 +62,7 @@ Module Controls
     Integer :: num_quicksaves = 3              ! Number of quick-save checkpoints to write before rolling back to #1
     Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves (overrides quicksave interval)
 
-    Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
+    Real*8  :: cflmax = 0.6d0, cflmin = 0.4d0  ! Limits for the cfl condition
     Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
     Real*8  :: min_time_step = 1.0d-13
     Integer :: chk_type = 1                     ! Set to 2 for memory friendly IO.  In development

@@ -95,7 +95,7 @@ class RayleighArray:
             
             nx = swapread(fd,dtype='int32',count=1,swap=bs)
             ny = swapread(fd,dtype='int32',count=1,swap=bs)
-            print nx, ny
+
             tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
             self.nx = nx
             self.ny = ny
@@ -113,8 +113,8 @@ class RayleighArray:
         dims[0] = 314
         dims[1] = self.nx
         dims[2] = self.ny
-        swapwrite(dims,fd,swap=byteswap,array=True)
-        swapwrite(self.vals,fd,swap=byteswap,array=True)
+        swapwrite(dims,fd,swap=byteswap,array=True,verbose=True)
+        swapwrite(self.vals,fd,swap=byteswap,array=True,verbose=True)
         fd.close()
 
 class ReferenceState:
@@ -882,9 +882,16 @@ def swapwrite(val,fd,swap=False,verbose=False, array = False):
                 if (array):
                     if (verbose):
                         print "Swapping entire array of bytes"
-                    val2 = val.byteswap().newbyteorder()          
+                    val2 = val.byteswap().newbyteorder() 
+
+                    tmp = np.transpose(val2)
+                    tmp.tofile(fd)        
                 else:    
                     val2 = val.newbyteorder()
-                val2.tofile(fd)
+                    val2.tofile(fd)
         else:
+            if (array):
+                tmp = np.transpose(val)
+                tmp.tofile(fd)
+            else:
                 val.tofile(fd)
