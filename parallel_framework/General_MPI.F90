@@ -320,5 +320,41 @@ Contains
 
     End Subroutine BCAST2D
 
+    !/////////////////////////////////////////////////////////////////////
+    ! SUBROUTINE:  BCAST1D
+    !
+    ! DESCRIPTION:  Performs MPI Broadcast of 1-D dimensional array buff across grp
+    !              from source rank broot.
+    !
+    ! INPUTS:
+    !            buff -  4-byte-integer array to be broadcast
+    !             grp - MPI communicator across which the broadcast is conducted 
+    !                    (optional; default = MPI_COMM_WORLD)
+    !           broot - MPI rank within grp that serves as the source of 
+    !                    the broadcast (optional; default = 0)
+    !///////////////////////////////////////////////////////////////////// 
+    Subroutine BCAST1D(buff, grp, broot)
+        Integer*4, INTENT(INOUT) :: buff(:)
+        Type(communicator), INTENT(IN), Optional :: grp
+        Integer, Intent(In), Optional :: broot
+        Integer :: icount,  comm, MPI_err, root
+
+        If (present(broot)) then
+            root = broot
+        Else
+            root = 0
+        Endif
+
+        icount = size(buff)
+
+        If (Present(grp)) Then
+            comm = grp%comm
+        Else
+            comm = MPI_COMM_WORLD
+        End If
+
+        Call MPI_BCAST(buff, icount, MPI_INTEGER,  root, comm, MPI_err)
+
+    End Subroutine BCAST1D
 
 End Module General_MPI

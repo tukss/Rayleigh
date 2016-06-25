@@ -3,6 +3,8 @@ Module TransportCoefficients
 	Use ReferenceState
 	Use Controls
     Use BoundaryConditions
+    Use General_IO
+    Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
 	Implicit None
 	Real*8, Allocatable :: nu(:), kappa(:), eta(:)
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
@@ -202,8 +204,8 @@ Contains
 			Case(3)
 
                 Call get_custom_profile(eta,dlneta,custom_eta_file)
-                eta(:) = eta(:)*eta_amp
-                eta_top = eta(1)
+                eta(:) = eta(:)*eta_top !this assume profile is 1 at the top
+                !eta_top = eta(1)
                 If (my_rank .eq. 0) then
                     Allocate(tmp_arr(1:N_R,1:3))
                     tmp_arr(:,1) = radius(:)
@@ -220,13 +222,32 @@ Contains
 
 	Subroutine Get_Custom_Profile(coeff, dln, coeff_file)
 		Real*8, Intent(InOut) :: coeff(:), dln(:)
-        Real*8, Allocatable :: tmp_arr(:,:)
+        Real*8, Allocatable :: tmp_arr(:,:),dtemp(:,:,:,:),dtemp2(:,:,:,:)
+        Integer :: dcheck(2)
         Character*120, Intent(In) :: coeff_file 
 		! Reads density from a Rayleigh Profile File
-        Allocate(tmp_arr(1:N_R,1:2))
-        Call Read_Profile_File(coeff_file,tmp_arr)
-        coeff(:) = tmp_arr(:,1)
-        dln(:) = tmp_arr(:,2)
+        Allocate(tmp_arr(1:N_R,1:3))
+        tmp_arr(:,:) = 0.0d0
+        Call Read_Rayleigh_Array(coeff_file,tmp_arr,dims = dcheck)
+        !Radius is assumed to be in tmp_arr(:,1)
+        coeff(:) = tmp_arr(:,2)
+        If (dcheck(2) >2) Then
+            dln(:) = tmp_arr(:,3)
+        Else
+            Allocate(dtemp(1:n_r,1,1,2))
+            Allocate(dtemp2(1:n_r,1,1,2))
+            dtemp(:,:,:,:) = 0.0d0
+            dtemp2(:,:,:,:) = 0.0d0
+            dtemp(1:n_r,1,1,1) = coeff(1:n_r)
+            Call Cheby_To_Spectral(dtemp,dtemp2)
+            dtemp2((n_r*2)/3:n_r,1,1,1) = 0.0d0
+            Call d_by_dr_cp(1,2,dtemp2,1)
+            dtemp2((n_r*2)/3:n_r,1,1,2) = 0.0d0  ! de-alias
+            !transform back to physical
+            Call Cheby_From_Spectral(dtemp2,dtemp)
+            dln(:) = dtemp(:,1,1,2)/coeff
+            DeAllocate(dtemp,dtemp2)
+        Endif
         DeAllocate(tmp_arr)
 	End Subroutine Get_Custom_Profile
 
