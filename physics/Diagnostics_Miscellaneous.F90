@@ -16,7 +16,7 @@ Contains
         Implicit None
         Real*8, Intent(InOut) :: buffer(1:,my_r%min:,my_theta%min:,1:)
         Integer :: r,k, t
-        Real*8 :: mypi
+        Real*8 :: mypi, amp
         !////////////////////////////////////////////////////////
         ! Diagnostics for verifying output is working
         If (compute_quantity(diagnostic1)) Then
@@ -37,6 +37,23 @@ Contains
             END_DO
             Call Add_Quantity(qty)
         Endif
+        If (compute_quantity(test_y11)) Then
+            amp = -sqrt(3.0d0*over_eight_pi)
+            DO_PSI
+                qty(PSI) = 2*amp*sintheta(t)*cos((k-1)*two_pi/n_phi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+        If (compute_quantity(test_y22)) Then
+            amp = 0.25d0*sqrt(60.0d0*over_eight_pi)
+            DO_PSI
+                qty(PSI) = 2*amp*(sintheta(t)**2)*cos(2*(k-1)*two_pi/n_phi)
+            END_DO
+            Call Add_Quantity(qty)
+        Endif
+
+
     End Subroutine Compute_Misc_Diagnostics
 
 End Module Diagnostics_Miscellaneous
