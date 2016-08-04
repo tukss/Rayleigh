@@ -45,12 +45,20 @@ Contains
             Call Add_Quantity(qty)
         Endif
 
-        If (compute_quantity(test_y22)) Then
+        If (compute_quantity(test_y22) .or. compute_quantity(test_y22_sq)) Then
             amp = 0.25d0*sqrt(60.0d0*over_eight_pi)
             DO_PSI
-                qty(PSI) = 2*amp*(sintheta(t)**2)*cos(2*(k-1)*two_pi/n_phi)
+                qty(PSI) = 3*amp*(sintheta(t)**2)*cos(2*(k-1)*two_pi/n_phi)
             END_DO
-            Call Add_Quantity(qty)
+            If (compute_quantity(test_y22)) Then
+                Call Add_Quantity(qty)
+            Endif
+            If (compute_quantity(test_y22_sq)) Then
+                DO_PSI
+                    qty(PSI) = qty(PSI)*qty(PSI)
+                END_DO  
+                Call Add_Quantity(qty)
+            Endif
         Endif
 
 
