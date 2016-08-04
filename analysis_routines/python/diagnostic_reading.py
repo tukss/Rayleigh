@@ -617,7 +617,7 @@ class PowerSpectrum():
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
-                power[:,j,k,0] = power[:,j,k,0]*0.5 # m > 0 POWER is too high by 2 due to normalization
+                power[1:a.nm,j,k,0] = power[1:a.nm,j,k,0]*0.5 # m > 0 POWER is too high by 2 due to normalization
                 power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
 
         self.power = power
