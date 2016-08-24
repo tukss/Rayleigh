@@ -269,7 +269,7 @@ Contains
             Endif
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
 
-            If (Shell_Slices%nshell_r_ids .gt. 0) Then
+            If (Shell_Spectra%nshell_r_ids .gt. 0) Then
                 master_rank = shell_spectra%shell_r_ids(1)
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
             Endif
