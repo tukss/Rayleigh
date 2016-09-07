@@ -3,7 +3,8 @@
 #  installed for this example to work.   In this example, one quantity is used
 #  to generate a 3-D elevation map, and another quantity is used to color that map.
 #  See vis_option = 1 and 2 (in vis_option 2, the same quantity is used for both)
-
+#  You may find Mayavi 2 here:
+#  http://docs.enthought.com/mayavi/mayavi/
 
 from mayavi import mlab
 import matplotlib.pylab as plt
