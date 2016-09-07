@@ -360,9 +360,35 @@ class ShellSlice:
     self.lut                                      : Lookup table for the different diagnostics output
     """
 
+    def print_info(self, print_costheta = False):
+        """ Prints all metadata associated with the shell-slice object."""
+        print 'version  : ', self.version
+        print 'niter    : ', self.niter
+        print 'nq       : ', self.nq
+        print 'nr       : ', self.nr
+        print 'ntheta   : ', self.ntheta
+        print 'nphi     : ', self.nphi
+        print '.......................'
+        print 'radius   : ', self.radius
+        print '.......................'
+        print 'inds     : ', self.inds
+        print '.......................'
+        print 'iters    : ', self.iters
+        print '.......................'
+        print 'time     : ', self.time
+        print '.......................'
+        print 'qv       : ', self.qv
+        if (print_costheta):
+            print '.......................'
+            print 'costheta : ', self.costheta
+
     def __init__(self,filename='none',path='Shell_Slices/',slice_spec = [], rec0 = False):
-        """filename  : The reference state file to read.
-           path      : The directory where the file is located (if full path not in filename
+        """filename   : The reference state file to read.
+           path       : The directory where the file is located (if full path not in filename
+           slice_spec : Optional list of [time index, quantity code, radial index].  If 
+                        specified, only a single shell is read.  time indexing and radial 
+                        indexing start at 0
+           rec0      : Set to true to read the first timestep's data only.
         """
         if (filename == 'none'):
             the_file = path+'00000001'
@@ -376,56 +402,122 @@ class ShellSlice:
         bs = check_endian(fd,314,'int32')
         version = swapread(fd,dtype='int32',count=1,swap=bs)
         nrec = swapread(fd,dtype='int32',count=1,swap=bs)
-        if (rec0):
-            nrec = 1  #For quick reading
-        
+
         ntheta = swapread(fd,dtype='int32',count=1,swap=bs)
         nphi = 2*ntheta
         nr = swapread(fd,dtype='int32',count=1,swap=bs)
         nq = swapread(fd,dtype='int32',count=1,swap=bs)
 
-        self.niter = nrec
+
         self.nq = nq
         self.nr = nr
         self.ntheta = ntheta
         self.nphi = nphi
 
 
-        self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
+        qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         maxq = 801
-        lut = np.zeros(maxq)+int(1000)
+        lut_max = 1000
+        lut = np.zeros(maxq)+int(lut_max)
         self.lut = lut.astype('int32')
-        for i,q in enumerate(self.qv):
+        for i,q in enumerate(qv):
             self.lut[q] = i
 
 
 
 
-        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
-        self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
+        radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
         self.costheta = np.reshape(swapread(fd,dtype='float64',count=ntheta,swap=bs),(ntheta), order = 'F')
         self.sintheta = (1.0-self.costheta**2)**0.5
 
         if (len(slice_spec) == 3):
+
+            self.iters = np.zeros(1,dtype='int32')
+            self.qv    = np.zeros(1,dtype='int32')
+            self.inds  = np.zeros(1,dtype='int32')
+            self.time  = np.zeros(1,dtype='float64')
+            self.iters = np.zeros(1,dtype='float64')
+            self.radius = np.zeros(1,dtype='float64')
+            self.version = version
+
+            self.niter = 1
+            self.nq = 1
+            self.nr = 1
+            self.vals  = np.zeros((nphi,ntheta,1,1,1),dtype='float64')
+
+
+            error = False
             tspec = slice_spec[0]
             qspec = slice_spec[1]
             rspec = slice_spec[2]
+
+            if (tspec > (nrec-1)):
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: specified time index out of range."
+                print " Number of records in this file : ", nrec
+                print " Specified time index           : ", tspec
+                print " Valid time indices range from 0 through "+str(nrec-1)+"." 
+                print "---------------------------------------------------------"
+                print " "
+                error = True
+
+            if (rspec > (nr-1)):
+                error = True
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: specified radial index out of range."
+                print " Number of radii in this file     : ", nr
+                print " Specified radial index           : ", rspec
+                print " Valid radial indices range from 0 through "+str(nr-1)+"." 
+                print "---------------------------------------------------------"
+                print " "
+            qind = -1
             for i in range(nq):
-                if (self.qv[i] == qspec):
+                if (qv[i] == qspec):
                     qind = i
-            print tspec,qind, rspec
-            print self.qv 
-            slice_size = ntheta*nphi
-            qsize = nr*slice_size
-            rec_size = nq*qsize
+            if (qind == -1):
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: Quantity code not found"
+                print " Specified quantity code: ", qind
+                print " Valid quantity codes: "
+                print " ", self.qv
+                print "---------------------------------------------------------"
+                print " "
+                error = True
+
+            if (error):
+                print " Returning zero shell-slice structure."
+                fd.close()
+                return
+
+            self.lut[:] = lut_max
+            self.lut[qspec] = 0
+            slice_size  = ntheta*nphi*8
+            qsize       = nr*slice_size
+            rec_size    = nq*qsize+12  # 8-byte timestamp and 4-byte time index.
             seek_offset = rec_size*tspec+qsize*qind+slice_size*rspec
-            seek_bytes = seek_offset*8
+            seek_bytes  = seek_offset 
             fd.seek(seek_bytes,1)
-            nrec = 1
-            self.vals  = np.zeros((nphi,ntheta),dtype='float64')
+
+
+            self.radius[0] = radius[rspec]
+            self.inds[0]   = inds[rspec]
+            self.qv[0] = qspec
             tmp = np.reshape(swapread(fd,dtype='float64',count=ntheta*nphi,swap=bs),(nphi,ntheta), order = 'F')
-            self.vals[:,:] = tmp
+            self.vals[:,:,0,0,0] = tmp
+            self.time[0]  = swapread(fd, dtype='float64',count=1,swap=bs)
+            self.iters[0] = swapread(fd, dtype='int32'  ,count=1,swap=bs)
         else:
+            if (rec0):
+                #If true, read only the first record of the file.
+                nrec = 1  
+            self.radius = radius
+            self.inds   = inds
+            self.qv     = qv
+            self.niter = nrec
             self.vals  = np.zeros((nphi,ntheta,nr,nq,nrec),dtype='float64')
             self.iters = np.zeros(nrec,dtype='int32')
             self.time  = np.zeros(nrec,dtype='float64')
@@ -458,6 +550,29 @@ class ShellSpectra:
     self.version                                  : The version code for this particular output (internal use)
     self.lut                                      : Lookup table for the different diagnostics output
     """
+
+    def print_info(self):
+        """ Prints all metadata associated with the shell-spectra object."""
+        print 'version  : ', self.version
+        print 'niter    : ', self.niter
+        print 'nq       : ', self.nq
+        print 'nr       : ', self.nr
+        print 'nell     : ', self.nell
+        print 'nm       : ', self.nm
+        print 'lmax     : ', self.lmax
+        print 'mmax     : ', self.mmax
+        print '.......................'
+        print 'radius   : ', self.radius
+        print '.......................'
+        print 'inds     : ', self.inds
+        print '.......................'
+        print 'iters    : ', self.iters
+        print '.......................'
+        print 'time     : ', self.time
+        print '.......................'
+        print 'qv       : ', self.qv
+
+
     def __init__(self,filename='none',path='Shell_Spectra/'):
         """
            filename  : The reference state file to read.
