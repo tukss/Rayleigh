@@ -17,7 +17,7 @@ shellfile = 'r4_2_shell'
 rec_spec = [0,3,1]  # grab time index 0, quantity code 3, and radial index 1  
 
 
-save_figure = True # Set to true to save to a figure_file (below)
+save_figure = False # Set to true to save to a figure_file (below)
 figure_file = 'shell_slice_basemap.png'
 
 #The resolution of the png file or the view window in pixels
