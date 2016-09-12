@@ -56,6 +56,26 @@ Contains
 
 
 		first_iteration = 1+checkpoint_iter ! checkpoint_iter is 0 by default
+        If (first_iteration .eq. 1) Then
+            Euler_step = .true.
+        Endif
+        If ((new_iteration .gt. 0) .and. (checkpoint_iter .gt. 0) ) Then
+            ! Reset the time step # provided by the checkpoint file.
+            first_iteration = new_iteration  
+            If (my_rank .eq. 0) Then
+
+                Call stdout%print(' ')
+                Call stdout%print('///////////////////////////////////////////////////////////////')
+                Call stdout%print(' WARNING:  Time-step counter has been manually reset.')
+                Write(istr,ifmtstr)checkpoint_iter
+                Call stdout%print('           Checkpoint time-step ID: '//istr//'.')
+                Write(istr,ifmtstr)first_iteration
+                Call stdout%print('                  New time-step ID: '//istr//'.')
+                Call stdout%print('           Revise main_input before the next restart!')
+                Call stdout%print('///////////////////////////////////////////////////////////////')
+                Call stdout%print(' ')
+            Endif
+        Endif
 		last_iteration = first_iteration + max_iterations-1
 		Call Initialize_TimeStepping(first_iteration)
 		If ((chebyshev .or. magnetism) .or. finite_element) Then
@@ -67,11 +87,11 @@ Contains
 		Call Hybrid_Init()
 		Call StopWatch(loop_time)%StartClock()
         max_time_seconds = 60*max_time_minutes
-		!Do iteration = first_iteration, last_iteration
+
         iteration = first_iteration
-        If (iteration .eq. 1) Then
-            Euler_step = .true.
-        Endif
+
+
+
         Do while (iteration .le. last_iteration)    
             !Check here to see if this is an output iteration.
             !If so, we will want to transfer additional information within
