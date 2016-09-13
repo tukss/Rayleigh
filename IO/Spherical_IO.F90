@@ -894,6 +894,235 @@ Contains
 	End Subroutine Write_Shell_Slices
 
 
+	Subroutine Write_Shell_Slices_MEM(this_iter,simtime)
+        ! A "more" memory friendly version of write_shell_Slices.  
+        ! Writes one quantity at a time
+        USE MPI_BASE
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
+		Integer :: responsible, current_shell, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, p, sizecheck, t
+		Integer :: n, nn, this_nshell, nq_shell, shell_slice_tag
+		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
+		Integer :: nelem, buffsize, sirq, nrirqs, inds(1:4)
+        Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
+        Real*8, Allocatable :: out_radii(:)
+        Integer, Allocatable :: level_inds(:), rirqs(:)
+        
+        integer :: ierr, rcount
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        sizecheck = sizeof(disp)
+        if (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
+            Endif
+        endif 
+        nq_shell = Shell_Slices%nq
+        shell_slice_tag = Shell_Slices%mpi_tag
+        funit = Shell_Slices%file_unit
+
+		responsible = 0
+		If (my_row_rank .eq. 0) Then
+            If (Shell_Slices%my_nlevels .gt. 0) Then
+                responsible = 1
+            Endif
+        Endif
+
+
+
+
+        this_nshell = Shell_Slices%my_nlevels
+		If (responsible .eq. 1) Then
+			! Responsible node receives  all the pieces of the shell slices from the other nodes
+			Allocate(all_shell_slices(1:nphi,1:ntheta,1:Shell_Slices%my_nlevels,nq_shell))
+
+            Allocate(buff(1:nphi,1:this_nshell,1:nq_shell, 1:ntheta))            
+			all_shell_slices(:,:,:,:) = 0.0d0
+            buff(:,:,:,:) = 0.0d0
+
+            ! Post Ireceives
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))          
+
+            Do nn = 1, nproc2-1
+				your_id = nn
+
+				your_ntheta    = pfi%all_2p(nn)%delta
+				your_theta_min = pfi%all_2p(nn)%min
+
+                inds(1) = 1
+                inds(2) = 1
+                inds(3) = 1
+                inds(4) = your_theta_min
+
+				nelem = nphi*your_ntheta*this_nshell*nq_shell
+
+         		Call IReceive(buff, rirqs(nn),n_elements = nelem, source= your_id,tag=shell_slice_tag,grp = pfi%rcomm, indstart = inds)
+
+            Enddo
+
+            ! Stripe my own data into buff
+
+            Do k = 1, nq_shell
+                Do j = 1, this_nshell
+                    Do t = my_theta_min, my_theta_max
+                        Do i = 1, nphi
+                            buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
+                        Enddo
+                    Enddo
+                Enddo
+            Enddo
+            
+
+            Call IWaitAll(nrirqs,rirqs)
+
+
+            Do k = 1, nq_shell
+                Do j = 1, this_nshell
+                    Do t = 1, ntheta
+                        Do i = 1, nphi
+                            all_shell_slices(i,t,j,k) = buff(i,j,k,t)
+                        Enddo
+                    Enddo
+                Enddo
+            Enddo
+
+            DeAllocate(buff)
+            DeAllocate(rirqs)
+            DeAllocate(shell_slice_outputs)
+		Else
+			!  Non responsible nodes send their info
+			If (Shell_Slices%my_nlevels .gt. 0) Then
+                !Everyone needs to restripe their data before sending it down the row
+                !Stripe so that theta is slowest 
+                Allocate(buff(1:nphi,1:this_nshell,1:nq_shell, my_theta_min:my_theta_max))
+                Do t = my_theta_min, my_theta_max
+                    Do k = 1, nq_shell
+                        Do j = 1, this_nshell
+                            Do i = 1, nphi
+                                buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
+                            Enddo
+                        Enddo
+                    Enddo
+                Enddo
+                nelem = nphi*my_ntheta*this_nshell*nq_shell
+                inds(:) = 1
+				Call Isend(buff,sirq,n_elements = nelem,dest = 0,tag=shell_slice_tag, grp = pfi%rcomm, indstart = inds)
+            
+                Call IWait(sirq)
+                DeAllocate(shell_slice_outputs)
+                DeAllocate(buff)
+			Endif
+		Endif
+
+
+        ! Communication is complete.  Now we open the file using MPI-IO
+        
+
+        ! For the moment, every process in column 0 participates in the mpi operation
+        ! The plan is to tune this later so that 
+        if (my_row_rank .eq. 0) Call Shell_Slices%OpenFile_Par(this_iter, error)
+
+        If (responsible .eq. 1) Then   
+           funit = shell_slices%file_unit
+        If (Shell_Slices%current_rec .eq. 1) Then                
+            
+            If (shell_slices%master) Then            
+                ! The master rank (whoever owns the first output shell level) writes the header
+                dims(1) = ntheta
+                dims(2) = Shell_Slices%nlevels
+                dims(3) =  nq_shell
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_shell
+                call MPI_FILE_WRITE(funit,Shell_Slices%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                allocate(out_radii(1:Shell_Slices%nlevels))
+                Do i = 1, Shell_Slices%nlevels
+                    out_radii(i) = radius(Shell_Slices%levels(i))
+                Enddo
+                buffsize = Shell_Slices%nlevels
+	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+                DeAllocate(out_radii)
+                
+
+                allocate(level_inds(1:Shell_Slices%nlevels))
+                Do i = 1, Shell_Slices%nlevels
+                    level_inds(i) = Shell_Slices%levels(i)
+                Enddo
+
+	            call MPI_FILE_WRITE(funit, Shell_Slices%levels, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+                DeAllocate(level_inds)
+                buffsize = ntheta
+	            call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+            Endif
+        Endif
+
+            ! I might really (really) want to look into file views later.
+            ! Depending on the offset size mpi type, disp will crap out past 2GB
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_shell*4 ! nq
+            hdisp = hdisp+Shell_Slices%nlevels*12  ! level indices and level values
+            hdisp = hdisp+ ntheta*8  ! costheta
+
+            qdisp = ntheta*Shell_Slices%nlevels*nphi*8
+            full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(Shell_Slices%current_rec-1)
+            
+            buffsize = Shell_Slices%my_nlevels*ntheta*nphi
+            ! The file is striped with time step slowest, followed by q
+
+
+            rcount = 0
+            Do p = 1, Shell_Slices%nshell_r_ids
+                if (Shell_Slices%shell_r_ids(p) .lt. my_column_rank) Then
+                    rcount = rcount+ Shell_Slices%nshells_at_rid(p)
+                Endif
+            Enddo
+            my_rdisp = rcount*ntheta*nphi*8
+            Do i = 1, nq_shell
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, all_shell_slices(1,1,1,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+            disp = hdisp+full_disp*Shell_Slices%current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+            If (shell_slices%master) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+
+			DeAllocate(all_shell_slices)
+        Endif  ! Responsible
+
+        If (my_row_rank .eq. 0) Call shell_slices%closefile_par()
+
+
+	End Subroutine Write_Shell_Slices_MEM
+
+
+
     Function Compute_Quantity(qval) result(yesno)
         integer, intent(in) :: qval 
         Logical             :: yesno 

@@ -154,7 +154,7 @@ Contains
                     Call Write_Checkpoint(wsp%p1b,iteration, deltat,new_deltat,simulation_time)                    
 					 
                 Else
-                    Call Write_Checkpoint_Alt(wsp%p1b,iteration, deltat,new_deltat)
+                    Call Write_Checkpoint_Alt(wsp%p1b,iteration, deltat,new_deltat,simulation_time)
 
                 Endif
 				Call StopWatch(cwrite_time)%Increment()

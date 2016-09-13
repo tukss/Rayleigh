@@ -19,6 +19,7 @@ Module Initial_Conditions
     Use Linear_Solve
     Use Math_Utility
     Use BufferedOutput
+    Use Load_Balance, Only : l_lm_values, my_num_lm
 
     Implicit None
     Logical :: alt_check = .false.
@@ -28,8 +29,20 @@ Module Initial_Conditions
     Integer :: restart_iter = 0
     Real*8 :: temp_amp = 1.0d0, temp_w = 0.3d0, mag_amp = 1.0d0
     Logical :: conductive_profile = .false.
+    Logical :: rescale_velocity = .false.
+    Logical :: rescale_bfield = .false.
+    Logical :: rescale_pressure = .false.
+    Logical :: rescale_tvar = .false.
+    Logical :: rescale_entropy = .false.
+    Real*8  :: velocity_scale = 1.0d0
+    Real*8  :: bfield_scale = 1.0d0
+    Real*8  :: tvar_scale = 1.0d0
+    Real*8  :: pressure_scale = 1.0d0
+
     Namelist /Initial_Conditions_Namelist/ init_type, temp_amp, temp_w, restart_iter, &
-            magnetic_init_type,alt_check, mag_amp, conductive_profile
+            & magnetic_init_type,alt_check, mag_amp, conductive_profile, rescale_velocity, &
+            & rescale_bfield, velocity_scale, bfield_scale, rescale_tvar, &
+            & rescale_pressure, tvar_scale, pressure_scale
 Contains
     
     Subroutine Initialize_Fields()
@@ -144,6 +157,9 @@ Contains
         Integer, Intent(In) :: iteration
         type(SphericalBuffer) :: tempfield
         Integer :: fcount(3,2), rpars(1:2),prod
+        Integer :: this_ell, lm
+        Character*14 :: scstr
+        Character*8 ::  scfmt ='(ES10.4)'
         !rpars(1) = 1 if hydro variables are to be read (0 otherwise)
         !rpars(2) = 1 if magnetic variables are to be read (0 otherwise)
         rpars(1:2) = 0
@@ -179,13 +195,64 @@ Contains
         tempfield%p1a(:,:,:,:) = 0.0d0
 
         Call StopWatch(cread_time)%StartClock()
-        If (chk_type .eq. 2) Then
+        If (read_chk_type .eq. 2) Then
             Call Read_Checkpoint_Alt(tempfield%p1a,wsp%p1b,iteration,rpars)
         Else
             Call Read_Checkpoint(tempfield%p1a,wsp%p1b,iteration,rpars)
         Endif
         Call StopWatch(cread_time)%Increment()
 
+        If (rescale_velocity) Then
+            euler_step = .true.
+            tempfield%p1a(:,:,:,wvar) = tempfield%p1a(:,:,:,wvar)*velocity_scale
+            tempfield%p1a(:,:,:,zvar) = tempfield%p1a(:,:,:,zvar)*velocity_scale
+            wsp%p1b(:,:,:,:) = 0.0d0
+
+            If (my_rank .eq. 0) Then
+                Write(scstr,scfmt)velocity_scale
+                Call stdout%print(" Rescaling velocity field by: "//scstr)
+            Endif
+        Endif
+        If (rescale_bfield) Then
+            euler_step = .true.
+            tempfield%p1a(:,:,:,cvar) = tempfield%p1a(:,:,:,cvar)*bfield_scale
+            tempfield%p1a(:,:,:,avar) = tempfield%p1a(:,:,:,avar)*bfield_scale
+            wsp%p1b(:,:,:,:) = 0.0d0
+            If (my_rank .eq. 0) Then
+                Write(scstr,scfmt)bfield_scale
+                Call stdout%print(" Rescaling magnetic field by: "//scstr)
+            Endif
+        Endif
+        If (rescale_pressure) Then
+            ! We do not rescale the ell = 0 mode
+            euler_step = .true.
+			Do lm = 1, my_num_lm
+                this_ell = l_lm_values(lm)
+                If (this_ell .gt. 0) Then
+                    tempfield%p1a(:,:,lm,pvar) = tempfield%p1a(:,:,lm,pvar)*pressure_scale
+                Endif
+			Enddo
+            wsp%p1b(:,:,:,:) = 0.0d0
+            If (my_rank .eq. 0) Then
+                Write(scstr,scfmt)pressure_scale
+                Call stdout%print(" Rescaling magnetic field by: "//scstr)
+            Endif
+        Endif
+        If (rescale_tvar) Then
+            ! We do not rescale the ell = 0 mode
+            euler_step = .true.
+			Do lm = 1, my_num_lm
+                this_ell = l_lm_values(lm)
+                If (this_ell .gt. 0) Then
+                    tempfield%p1a(:,:,lm,tvar) = tempfield%p1a(:,:,lm,tvar)*tvar_scale
+                Endif
+			Enddo
+            wsp%p1b(:,:,:,:) = 0.0d0
+            If (my_rank .eq. 0) Then
+                Write(scstr,scfmt)tvar_scale
+                Call stdout%print(" Rescaling thermal field (ell > 0) by: "//scstr)
+            Endif
+        Endif
 
 
         Call Set_All_RHS(tempfield%p1a)

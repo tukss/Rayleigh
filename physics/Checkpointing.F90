@@ -158,7 +158,7 @@ Contains
 		Integer :: mp, m, offset,nl,p,np, f, imi, r, ind
 		Integer :: dim2, lstart, i, offset_index
 		Real*8, Allocatable :: myarr(:,:), rowstrip(:,:)
-        Real*8 :: elapsed_time
+        Real*8, Intent(In) :: elapsed_time
         Character*2 :: autostring
 		Character*8 :: iterstring
 		Character*120 :: cfile
@@ -339,7 +339,6 @@ Contains
             old_pars(4) = checkpoint_iter
             old_pars(5) = -1
             If (checkpoint_iter .eq. 0) Then
-                ! Get rid of these print statements momentarily
                 open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='old')
                 read(15,'(i9.8)')last_iter
                 If (last_iter .lt. 0) Then  !Indicates a quicksave
@@ -362,7 +361,6 @@ Contains
                     old_pars(5) = -checkpoint_iter
                     Write(autostring,'(i2.2)')-checkpoint_iter
                     checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
-                    Write(6,*)'cpref: ', checkpoint_prefix
             Else
                 Write(iterstring,'(i8.8)') iteration 
                 checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
@@ -886,7 +884,7 @@ Contains
         Endif
     End Subroutine 
 
-	Subroutine Write_Spectral_Field3D(arrin,ind,tag,iter)
+	Subroutine Write_Spectral_Field3D(arrin,ind,tag)
 		! Parallel Writing Routine For Fields in Spectral rlm configuration
 		! ISends and IReceives are used
 		Implicit None
@@ -902,7 +900,7 @@ Contains
 		Real*8, Allocatable :: arr(:,:,:), tarr(:)
 
 
-				Integer, Intent(In) :: ind, iter
+				Integer, Intent(In) :: ind
 				Character*8 :: iterstring
 				Character*3, Intent(In) :: tag
 				Character*120 :: cfile
@@ -910,8 +908,7 @@ Contains
 				integer ierr, funit 
 				integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 				Integer :: mstatus(MPI_STATUS_SIZE)
-	         write(iterstring,'(i8.8)') iter
-            cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+            cfile = Trim(checkpoint_prefix)//'_'//trim(tag)
 
 
 		var_offset = (ind-1)*tnr
@@ -994,8 +991,7 @@ Contains
 			!//////////////////////////////
 			!  MPI Write
 
-	      write(iterstring,'(i8.8)') iter
-         cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+
 
 
  			! We have to be careful here.  Each processor does TWO writes. 
@@ -1059,15 +1055,16 @@ Contains
 	End Subroutine Write_Spectral_Field3D
 
 
-	Subroutine Write_Checkpoint_Alt(abterms,iteration,dt,new_dt)
+	Subroutine Write_Checkpoint_Alt(abterms,iteration,dt,new_dt,elapsed_time)
 		! This uses the memory friendly framework
 		Implicit None
 		Real*8, Intent(In) :: abterms(:,:,:,:)
-		Real*8, Intent(In) :: dt, new_dt
+		Real*8, Intent(In) :: dt, new_dt, elapsed_time
 		Integer, Intent(In) :: iteration
 		Integer :: mp, m, offset,nl,np
 		Integer :: dim2, i, offset_index, r, imi,f,ind
 		Real*8, Allocatable :: myarr(:,:)
+        Character*2 :: autostring
 		Character*8 :: iterstring
 		Character*120 :: cfile
 		np = pfi%rcomm%np
@@ -1099,43 +1096,77 @@ Contains
 				offset = offset+nl
 		Enddo
 		Call chktmp%deconstruct('s2a')
+        If (ItIsTimeForAQuickSave) Then
+            write(autostring,'(i2.2)') (quicksave_num+1) !quick save number starts at 1
+            checkpoint_prefix = 'Checkpoints/quicksave_'//trim(autostring)
+        Else
+            write(iterstring,'(i8.8)') iteration
+            checkpoint_prefix = 'Checkpoints/'//trim(iterstring)
+        Endif
 
-
-		Call Write_Spectral_Field3D(myarr,1,wchar, iteration)
-		Call Write_Spectral_Field3D(myarr,2,pchar, iteration)
-		Call Write_Spectral_Field3D(myarr,3,tchar, iteration)
-		Call Write_Spectral_Field3D(myarr,4,zchar, iteration)
+		Call Write_Spectral_Field3D(myarr,1,wchar)
+		Call Write_Spectral_Field3D(myarr,2,pchar)
+		Call Write_Spectral_Field3D(myarr,3,tchar)
+		Call Write_Spectral_Field3D(myarr,4,zchar)
 		offset_index = 4
 		If (magnetism) Then
-			Call Write_Spectral_Field3D(myarr,5,cchar, iteration)
-			Call Write_Spectral_Field3D(myarr,6,achar, iteration)
+			Call Write_Spectral_Field3D(myarr,5,cchar)
+			Call Write_Spectral_Field3D(myarr,6,achar)
 			offset_index = 6
 		Endif
 
-		Call Write_Spectral_Field3D(myarr,offset_index+1,'WAB', iteration)
-		Call Write_Spectral_Field3D(myarr,offset_index+2,'PAB', iteration)
-		Call Write_Spectral_Field3D(myarr,offset_index+3,'TAB', iteration)
-		Call Write_Spectral_Field3D(myarr,offset_index+4,'ZAB', iteration)
+		Call Write_Spectral_Field3D(myarr,offset_index+1,'WAB')
+		Call Write_Spectral_Field3D(myarr,offset_index+2,'PAB')
+		Call Write_Spectral_Field3D(myarr,offset_index+3,'TAB')
+		Call Write_Spectral_Field3D(myarr,offset_index+4,'ZAB')
 		If (magnetism) Then
-			Call Write_Spectral_Field3D(myarr,offset_index+5,'CAB', iteration)
-			Call Write_Spectral_Field3D(myarr,offset_index+6,'AAB', iteration)
+			Call Write_Spectral_Field3D(myarr,offset_index+5,'CAB')
+			Call Write_Spectral_Field3D(myarr,offset_index+6,'AAB')
 		Endif
       DeAllocate(myarr)
 
-		If (my_column_rank .eq. 0) Then
-		If (my_row_rank .eq. 0) Then
-			! row/column 0 writes out a file with the grid, etc.
-			! This file should contain everything that needs to be known
-        	write(iterstring,'(i8.8)') iteration
-        	cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
-         open(unit=15,file=cfile,form='unformatted', status='replace')
-         Write(15)n_r
-		   Write(15)grid_type
-			Write(15)l_max
-			Write(15)dt
-			Write(15)new_dt
-         Write(15)(radius(i),i=1,N_R)
-         Close(15)
+    If (my_column_rank .eq. 0) Then
+    If (my_row_rank .eq. 0) Then
+        ! row/column 0 writes out a file with the grid, etc.
+        ! This file should contain everything that needs to be known
+        write(iterstring,'(i8.8)') iteration
+        cfile = Trim(checkpoint_prefix)//'_'//'grid_etc'
+        open(unit=15,file=cfile,form='unformatted', status='replace')
+        Write(15)n_r
+        Write(15)grid_type
+        Write(15)l_max
+        Write(15)dt
+        Write(15)new_dt
+        Write(15)(radius(i),i=1,N_R)
+        Write(15)elapsed_time
+        Write(15)iteration
+        Close(15)
+        Close(15)
+
+
+
+        open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='replace')
+        If (ItIsTimeForAQuickSave) Then
+            Write(15,'(i9.8)')-iteration
+            Write(15,'(i2.2)')(quicksave_num+1)
+        Else
+            Write(15,'(i8.8)')iteration
+        Endif
+        Close(15)
+
+        open(unit=15,file=Trim(my_path)//'Checkpoints/checkpoint_log',form='formatted', status='unknown', &
+            position='Append')
+        If (ItIsTimeForAQuickSave) Then
+            Write(iterstring,'(i8.8)')iteration
+            Write(autostring,'(i2.2)')quicksave_num+1
+            Write(15,*)iterstring, ' ', autostring
+
+        Else
+            Write(15,'(i8.8)')iteration
+        Endif
+        Close(15)
+
+
 		Endif
 		Endif
 
@@ -1143,7 +1174,7 @@ Contains
 		
 	End Subroutine Write_Checkpoint_Alt
 
-	Subroutine Read_Spectral_Field3D(arrin,ind,tag,iter)
+	Subroutine Read_Spectral_Field3D(arrin,ind,tag)
 		! Parallel Reading Routine For Fields in Spectral rlm configuration
 		! ISends and IReceives are used
 		! DOES NOT SUPPORT CHANGES IN PROBLEM SIZE (LMAX OR NR) CURRENTLY
@@ -1165,7 +1196,7 @@ Contains
 		Real*8, Allocatable :: arr(:,:,:), tarr(:)
 
 
-		Integer, Intent(In) :: ind, iter
+		Integer, Intent(In) :: ind
 		Character*8 :: iterstring
 		Character*3, Intent(In) :: tag
 		Character*120 :: cfile
@@ -1173,8 +1204,8 @@ Contains
 		integer ierr, funit 
 		integer(kind=MPI_OFFSET_KIND) disp1,disp2 
 		Integer :: mstatus(MPI_STATUS_SIZE)
-        write(iterstring,'(i8.8)') iter
-        cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
+        !write(iterstring,'(i8.8)') iter
+        cfile = trim(checkpoint_prefix)//'_'//trim(tag)
 
 
 		var_offset = (ind-1)*tnr
@@ -1182,19 +1213,6 @@ Contains
 			my_nrad = nradii_at_rank(my_row_rank)
 			Allocate( arr(1:nlm_total,1:my_nrad,2))
 			Allocate(tarr(1:nlm_total*my_nrad))		
-
-			!//////////////////////////////////////////
-			!//////////////////////////////
-			!  MPI Write
-
-	      write(iterstring,'(i8.8)') iter
-         cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)
-
-
- 			!Each processor does TWO reads - reflection of the write
-
-	      write(iterstring,'(i8.8)') iter
-         cfile = 'Checkpoints/'//trim(iterstring)//'_'//trim(tag)			
 
 			Call MPI_FILE_OPEN(pfi%ccomm%comm, cfile, & 
 				MPI_MODE_RDONLY, & 
@@ -1308,81 +1326,136 @@ Contains
 
 	End Subroutine Read_Spectral_Field3D
 
-	Subroutine Read_Checkpoint_Alt(fields, abterms,iteration,read_pars)
-		Implicit None
-		!///////////////////////////////////////
-		! DOES NOT YET PROPERLY HANDLE CHANGE IN RESOLUTION
-		! NEW MEMORY FRIENDLY VERSION FOR MIRA
-		Integer, Intent(In) :: iteration, read_pars(1:2)
-		Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
-		Integer :: n_r_old, l_max_old, grid_type_old
-		Integer :: i, ierr,  m, nl, r, f, imi, ind
-		Integer :: dim2,offset, mp, offset_index
-		Integer :: old_pars(3)
+    Subroutine Read_Checkpoint_Alt(fields, abterms,iteration,read_pars)
+        Implicit None
+        !///////////////////////////////////////
+        ! DOES NOT YET PROPERLY HANDLE CHANGE IN RESOLUTION
+        ! NEW MEMORY FRIENDLY VERSION FOR MIRA
+        Integer, Intent(In) :: iteration, read_pars(1:2)
+        Real*8, Intent(InOut) :: fields(:,:,:,:), abterms(:,:,:,:)
+        Integer :: n_r_old, l_max_old, grid_type_old
+        Integer :: i, ierr,  m, nl, r, f, imi, ind
+        Integer :: dim2,offset, mp, offset_index
+        Integer :: old_pars(5)
 
-		Real*8, Allocatable :: old_radius(:)
-		Real*8, Allocatable ::  myarr(:,:)
-		Real*8 :: dt_pars(2),dt,new_dt
-		Character*8 :: iterstring
-		Character*120 :: cfile
+        Real*8, Allocatable :: old_radius(:)
+        Real*8, Allocatable ::  myarr(:,:)
+        Real*8 :: dt_pars(2),dt,new_dt
+        Character*8 :: iterstring
+        Character*2 :: autostring
+        Character*120 :: cfile
         Integer :: read_hydro = 0, read_magnetism = 0
+        Integer :: last_iter, last_auto
 
         read_hydro = read_pars(1)
         read_magnetism = read_pars(2)
 
-		dim2 = tnr*numfields*2
-		checkpoint_iter = iteration
-		Write(iterstring,'(i8.8)') iteration
-		If (my_rank .eq. 0) Then
-			!process zero reads all the old info and broadcasts to all other ranks
-          cfile = Trim(my_path)//'Checkpoints/'//trim(iterstring)//'_'//'grid_etc'
-	       open(unit=15,file=cfile,form='unformatted', status='old')
-	       Read(15)n_r_old
-			 Read(15)grid_type_old
-			 Read(15)l_max_old
-			 Read(15)dt
-			 Read(15)new_dt
-			 Allocate(old_radius(1:N_r_old))
-	       Read(15)(old_radius(i),i=1,N_R)
-	       Close(15)				
-			 old_pars(1) = n_r_old
-			 old_pars(2) = grid_type_old
-			 old_pars(3) = l_max_old
-			 dt_pars(1) = dt
-			 dt_pars(2) = new_dt
+        dim2 = tnr*numfields*2
+        checkpoint_iter = iteration
+        Write(iterstring,'(i8.8)') iteration
+        If (my_rank .eq. 0) Then
+            old_pars(4) = checkpoint_iter
+            old_pars(5) = -1
+            If (checkpoint_iter .eq. 0) Then
+                open(unit=15,file=Trim(my_path)//'Checkpoints/last_checkpoint',form='formatted', status='old')
+                read(15,'(i9.8)')last_iter
+                If (last_iter .lt. 0) Then  !Indicates a quicksave
+                    Read(15,'(i2.2)')last_auto
+                    old_pars(4) = -last_iter
+                    old_pars(5) = last_auto
+                    Write(autostring,'(i2.2)')last_auto
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+                Else
+                    !Not a quicksave
+                    old_pars(4) = last_iter
+                    Write(iterstring,'(i8.8)') last_iter  
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)                
+                Endif
 
-			If (l_max_old .lt. l_max) Then
-					Write(6,*)' '
-					Write(6,*)'#####################################################################'
-					Write(6,*)'# '
-					Write(6,*)'#  Checkpoint horizontal resolution is lower than current resolution.'
-					Write(6,*)'#  The old solution will be interpolated onto horizontal grid with '
-					Write(6,*)'#  higher resolution corresponding to the new l_max.'
-					Write(6,*)'#  Old l_max: ', l_max_old
-					Write(6,*)'#  New l_max: ', l_max
-					Write(6,*)'# '
-					Write(6,*)'#####################################################################'
-					Write(6,*)' '
-			Endif
-			If (l_max_old .gt. l_max) Then
-					Write(6,*)' '
-					Write(6,*)'#####################################################################'
-					Write(6,*)'# '
-					Write(6,*)'#  Checkpoint horizontal resolution is higher than current resolution.'
-					Write(6,*)'#  The old SPH expansion will be truncated at the new l_max.'
-					Write(6,*)'#  This might not be a good idea.'
-					Write(6,*)'#  Old l_max: ', l_max_old
-					Write(6,*)'#  New l_max: ', l_max
-					Write(6,*)'# '
-					Write(6,*)'#####################################################################'
-					Write(6,*)' '
-			Endif
+                Close(15)
+            ElseIf (checkpoint_iter .lt. 0) Then
+                !User has specified a particular quicksave file
+                    last_auto = -checkpoint_iter
+                    old_pars(5) = -checkpoint_iter
+                    Write(autostring,'(i2.2)')-checkpoint_iter
+                    checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+            Else
+                Write(iterstring,'(i8.8)') iteration 
+                checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
+            Endif
+
+
+            !process zero reads all the old info and broadcasts to all other ranks
+            cfile = trim(checkpoint_prefix)//'_'//'grid_etc'
+            open(unit=15,file=cfile,form='unformatted', status='old')
+            Read(15)n_r_old
+            Read(15)grid_type_old
+            Read(15)l_max_old
+            Read(15)dt
+            Read(15)new_dt
+            Allocate(old_radius(1:N_r_old))
+            Read(15)(old_radius(i),i=1,N_R)
+            Read(15)Checkpoint_time
+            If (checkpoint_iter .lt. 0) Then
+                ! We're loading a quicksave file
+                ! Need to retrieve iteration from the grid_etc file because
+                ! iteration specified in main_input was a low, negative number
+                Read(15)Checkpoint_iter
+                old_pars(4) = Checkpoint_iter
+            Endif
+
+            Close(15)				
+            old_pars(1) = n_r_old
+            old_pars(2) = grid_type_old
+            old_pars(3) = l_max_old
+            dt_pars(1) = dt
+            dt_pars(2) = new_dt
+
+            If (l_max_old .lt. l_max) Then
+                Write(6,*)' '
+                Write(6,*)'#####################################################################'
+                Write(6,*)'# '
+                Write(6,*)'#  Checkpoint horizontal resolution is lower than current resolution.'
+                Write(6,*)'#  The old solution will be interpolated onto horizontal grid with '
+                Write(6,*)'#  higher resolution corresponding to the new l_max.'
+                Write(6,*)'#  Old l_max: ', l_max_old
+                Write(6,*)'#  New l_max: ', l_max
+                Write(6,*)'# '
+                Write(6,*)'#####################################################################'
+                Write(6,*)' '
+            Endif
+            If (l_max_old .gt. l_max) Then
+                Write(6,*)' '
+                Write(6,*)'#####################################################################'
+                Write(6,*)'# '
+                Write(6,*)'#  Checkpoint horizontal resolution is higher than current resolution.'
+                Write(6,*)'#  The old SPH expansion will be truncated at the new l_max.'
+                Write(6,*)'#  This might not be a good idea.'
+                Write(6,*)'#  Old l_max: ', l_max_old
+                Write(6,*)'#  New l_max: ', l_max
+                Write(6,*)'# '
+                Write(6,*)'#####################################################################'
+                Write(6,*)' '
+            Endif
 		Endif
-		Call MPI_Bcast(old_pars,3, MPI_INTEGER, 0, pfi%gcomm%comm, ierr)
+		Call MPI_Bcast(old_pars,5, MPI_INTEGER, 0, pfi%gcomm%comm, ierr)
 
 		n_r_old = old_pars(1)
 		grid_type_old = old_pars(2)
 		l_max_old = old_pars(3)
+        checkpoint_iter = old_pars(4)
+        last_auto = old_pars(5)
+        If (last_auto .ne. -1) Then
+            !The prefix should be formed using quicksave
+            Write(autostring,'(i2.2)')last_auto
+            checkpoint_prefix = Trim(my_path)//'Checkpoints/quicksave_'//Trim(autostring)
+        Else
+            !The prefix should reflect that this is a normal checkpoint file
+            Write(iterstring,'(i8.8)') checkpoint_iter  
+            checkpoint_prefix = Trim(my_path)//'Checkpoints/'//Trim(iterstring)   
+        Endif
+
+
 		!///////// Later we only want to do this if the grid is actually different
 		If (my_rank .ne. 0) Then
 			Allocate(old_radius(1:n_r_old))
@@ -1398,30 +1471,30 @@ Contains
 		Allocate(myarr(1:mode_count(my_row_rank),1:dim2))
         myarr(:,:) = 0.0d0
         If (read_hydro .eq. 1) Then
-		    Call Read_Spectral_Field3D(myarr,1,wchar, iteration)
-		    Call Read_Spectral_Field3D(myarr,2,pchar, iteration)
-		    Call Read_Spectral_Field3D(myarr,3,tchar, iteration)
-		    Call Read_Spectral_Field3D(myarr,4,zchar, iteration)
+		    Call Read_Spectral_Field3D(myarr,1,wchar)
+		    Call Read_Spectral_Field3D(myarr,2,pchar)
+		    Call Read_Spectral_Field3D(myarr,3,tchar)
+		    Call Read_Spectral_Field3D(myarr,4,zchar)
         Endif
 		offset_index = 4
 		If (magnetism) Then
             If (read_magnetism .eq. 1) Then
-			    Call Read_Spectral_Field3D(myarr,5,cchar, iteration)
-			    Call Read_Spectral_Field3D(myarr,6,achar, iteration)
+			    Call Read_Spectral_Field3D(myarr,5,cchar)
+			    Call Read_Spectral_Field3D(myarr,6,achar)
             Endif
 			offset_index = 6
 		Endif
 
         If (read_hydro .eq. 1) Then
-		    Call Read_Spectral_Field3D(myarr,offset_index+1,'WAB', iteration)
-		    Call Read_Spectral_Field3D(myarr,offset_index+2,'PAB', iteration)
-		    Call Read_Spectral_Field3D(myarr,offset_index+3,'TAB', iteration)
-		    Call Read_Spectral_Field3D(myarr,offset_index+4,'ZAB', iteration)
+		    Call Read_Spectral_Field3D(myarr,offset_index+1,'WAB')
+		    Call Read_Spectral_Field3D(myarr,offset_index+2,'PAB')
+		    Call Read_Spectral_Field3D(myarr,offset_index+3,'TAB')
+		    Call Read_Spectral_Field3D(myarr,offset_index+4,'ZAB')
         Endif
 		If (magnetism) Then
             If (read_magnetism .eq. 1) Then
-			    Call Read_Spectral_Field3D(myarr,offset_index+5,'CAB', iteration)
-			    Call Read_Spectral_Field3D(myarr,offset_index+6,'AAB', iteration)
+			    Call Read_Spectral_Field3D(myarr,offset_index+5,'CAB')
+			    Call Read_Spectral_Field3D(myarr,offset_index+6,'AAB')
             Endif
 		Endif
 

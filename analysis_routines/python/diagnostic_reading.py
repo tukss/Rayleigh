@@ -230,7 +230,7 @@ class ShellAverage:
     self.version                       : The version code for this particular output (internal use)
     self.lut                           : Lookup table for the different diagnostics output
     """
-    def __init__(self,filename='none',path='Shell_Avgs/'):
+    def __init__(self,filename='none',path='Shell_Avgs/',ntheta=0):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
@@ -269,6 +269,21 @@ class ShellAverage:
                 self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        print self.version
+        if ((self.version > 1) and (self.version <=3) ):
+            nphi = 2*ntheta
+            self.vals[:,2:4,:,:] = 0.0
+            if (nphi > 0):
+                cfactor = -1.0-1.0/nphi**2+2.0/nphi
+                print 'This ShellAverage file is version 2, but ntheta was provided.'
+                print 'The 2nd moment has been corrected.  3rd and 4th moments are set to zero'
+                for i in range(nr):
+                    self.vals[i,1,:,:] = self.vals[i,1,:,:]+cfactor*self.vals[i,0,:,:]**2
+            else:
+                print 'This ShellAverage file is version 2, and ntheta was not provided.'
+                print 'The 2nd, 3rd and 4th moments are set to zero'   
+                self.vals[:,1,:,:] = 0.0            
         maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
