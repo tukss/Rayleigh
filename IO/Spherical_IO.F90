@@ -896,11 +896,6 @@ Contains
 
         Enddo  ! Q-LOOP
 
-        If (my_row_rank .eq. 0) Call shell_spectra%closefile_par()
-        If (my_nlevels .gt. 0) Then 
-            DeAllocate(sendbuffer, bsendbuffer)
-        Endif
-
         If (responsible .eq. 1) Then
             disp = hdisp+rec_size*current_rec
             disp = disp-12
@@ -919,6 +914,14 @@ Contains
             DeAllocate(buff)
             DeAllocate(rirqs)
         Endif
+
+
+        If (my_row_rank .eq. 0) Call shell_spectra%closefile_par()
+        If (my_nlevels .gt. 0) Then 
+            DeAllocate(sendbuffer, bsendbuffer)
+        Endif
+
+
 
 	End Subroutine Write_Shell_Spectra_MEM
 
