@@ -778,4 +778,5 @@ Contains
             indx = indx + n_m + 1
         Enddo
     End Subroutine Enforce_Boundary_Conditions
+
 End Module Sphere_Linear_Terms
