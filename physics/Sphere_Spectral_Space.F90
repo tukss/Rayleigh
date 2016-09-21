@@ -502,16 +502,6 @@ Contains
 		wsp%p1a(:,:,:,:) = 0.0d0	! Shouldn't need to do this, but just to be sure
 		Call Cheby_From_SpectralFE(ctemp%p1a,wsp%p1a)
 
-
-        !Write(6,*)'MAXVAL2:  ', maxval(wsp%p1a)
-        !Write(6,*)'MINVAL2:  ', minval(wsp%p1a)
-        !Do m = my_lm_min, my_lm_max
-        !    If (l_lm_values(m) .eq. 0) Then
-        !        Write(6,*)'tvar 0 (Post):   ', wsp%p1a(:,:,m,tvar)
-        !    Endif
-        !Enddo
-
-
 		Call ctemp%deconstruct('p1a')
 
 		!/////////////////////////////////////////////////////////////////
@@ -565,8 +555,6 @@ Contains
 			!//////////////
 			! A-terms (Toroidal magnetic field)
 		
-	
-
 			Call Add_Derivative(aeq,avar,0,wsp%p1b,wsp%p1a,avar)
 
 			!///////////////////

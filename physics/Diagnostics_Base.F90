@@ -347,8 +347,9 @@ Module Diagnostics_Base
     Integer, Parameter :: dcheck_off = force_offset+ 21 ! = 190
     Integer, Parameter :: diagnostic1 = dcheck_off+1
     Integer, Parameter :: diagnostic2 = dcheck_off+2
-
-
+    Integer, Parameter :: test_y11 = dcheck_off+3
+    Integer, Parameter :: test_y22 = dcheck_off+4
+    Integer, Parameter :: test_y22_sq = dcheck_off+5
     !//////////////////////////////////////////////////////////
     !  Custom Hydo Outputs:  range from 301 through 400
     Integer, Parameter :: custom_hydro_offset = 300

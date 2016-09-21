@@ -62,15 +62,17 @@ Module Controls
     Integer :: num_quicksaves = 3              ! Number of quick-save checkpoints to write before rolling back to #1
     Real*8  :: quicksave_minutes = -1.0d0      ! Time in minutes between quick saves (overrides quicksave interval)
 
-    Real*8  :: cflmax = 0.4d0, cflmin = 0.6d0  ! Limits for the cfl condition
+    Real*8  :: cflmax = 0.6d0, cflmin = 0.4d0  ! Limits for the cfl condition
     Real*8  :: max_time_step = 1.0d0            ! Maximum timestep to take, whatever CFL says (should always specify this in main_input file)
     Real*8  :: min_time_step = 1.0d-13
-    Integer :: chk_type = 1                     ! Set to 2 for memory friendly IO.  In development
+    Integer :: chk_type = 1                     ! Set to 2 for memory friendly IO (WRITE).  In development
+    Integer :: read_chk_type = 1                ! Same, but (READ)
     Integer :: diagnostic_reboot_interval = -1
+    Integer :: new_iteration = 0
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
                 & cflmax, cflmin, max_time_step,chk_type, diagnostic_reboot_interval, min_time_step, &
                 & num_quicksaves, quicksave_interval, checkpoint_interval, quicksave_minutes, &
-                & max_time_minutes, save_last_timestep
+                & max_time_minutes, save_last_timestep, new_iteration,read_chk_type
 
 
 

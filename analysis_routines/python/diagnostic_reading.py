@@ -42,24 +42,30 @@ class RayleighProfile:
 
     """
 
-    def __init__(self,filename):
+    def __init__(self,filename='none'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
-
-        fd = open(filename,'rb')
-        # We read an integer to assess which endian the file was written in...
-        bs = check_endian(fd,314,'int32')
-        
-        nr = swapread(fd,dtype='int32',count=1,swap=bs)
-        n2 = swapread(fd,dtype='int32',count=1,swap=bs)
-        nq = n2-1
-        tmp = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr,1), order = 'F')
-        self.radius      = tmp[:,0]
-        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
-        self.nr = nr
-        self.nq = nq
-        self.vals = tmp2[:,:]
+        if (filename != 'none'):
+            
+            fd = open(filename,'rb')
+            # We read an integer to assess which endian the file was written in...
+            bs = check_endian(fd,314,'int32')
+            
+            nr = swapread(fd,dtype='int32',count=1,swap=bs)
+            n2 = swapread(fd,dtype='int32',count=1,swap=bs)
+            nq = n2-1
+            tmp = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr,1), order = 'F')
+            self.radius      = tmp[:,0]
+            tmp2 = np.reshape(swapread(fd,dtype='float64',count=nq*nr,swap=bs),(nr,nq), order = 'F')
+            self.nr = nr
+            self.nq = nq
+            self.vals = tmp2[:,:]
+        else:
+            self.nr = 0
+            self.nq = 0
+            self.vals = []
+            # we initialize the object and set its attributes later
 
         fd.close()
 
@@ -72,25 +78,44 @@ class RayleighArray:
 
     """
 
-    def __init__(self,filename):
+    def __init__(self,filename ='none'):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
 
-        fd = open(filename,'rb')
-        # We read an integer to assess which endian the file was written in...
-        bs = check_endian(fd,314,'int32')
-        
-        nx = swapread(fd,dtype='int32',count=1,swap=bs)
-        ny = swapread(fd,dtype='int32',count=1,swap=bs)
-        tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
-        self.nx = nx
-        self.ny = ny
-        self.vals = tmp2[:,:]
+        if (filename == 'none'):
+            self.nx = 0
+            self.ny = 0
+            self.vals = []
+        else:
+            print 'Opening: ', filename
+            fd = open(filename,'rb')
+            # We read an integer to assess which endian the file was written in...
+            bs = check_endian(fd,314,'int32')
+            
+            nx = swapread(fd,dtype='int32',count=1,swap=bs)
+            ny = swapread(fd,dtype='int32',count=1,swap=bs)
 
+            tmp2 = np.reshape(swapread(fd,dtype='float64',count=nx*ny,swap=bs),(nx,ny), order = 'F')
+            self.nx = nx
+            self.ny = ny
+            self.vals = tmp2[:,:]
+
+            fd.close()
+    def set_vals(self,vals):
+        dims = vals.shape
+        self.nx = dims[0]
+        self.ny = dims[1]
+        self.vals = vals
+    def write(self,arrfile,byteswap = False):
+        fd = open(arrfile,'wb')
+        dims = np.ndarray((3),dtype='int32')
+        dims[0] = 314
+        dims[1] = self.nx
+        dims[2] = self.ny
+        swapwrite(dims,fd,swap=byteswap,array=True,verbose=True)
+        swapwrite(self.vals,fd,swap=byteswap,array=True,verbose=True)
         fd.close()
-
-
 
 class ReferenceState:
     """Rayleigh Reference State Structure
@@ -205,7 +230,7 @@ class ShellAverage:
     self.version                       : The version code for this particular output (internal use)
     self.lut                           : Lookup table for the different diagnostics output
     """
-    def __init__(self,filename='none',path='Shell_Avgs/'):
+    def __init__(self,filename='none',path='Shell_Avgs/',ntheta=0):
         """filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
         """
@@ -244,6 +269,21 @@ class ShellAverage:
                 self.vals[:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        print self.version
+        if ((self.version > 1) and (self.version <=3) ):
+            nphi = 2*ntheta
+            self.vals[:,2:4,:,:] = 0.0
+            if (nphi > 0):
+                cfactor = -1.0-1.0/nphi**2+2.0/nphi
+                print 'This ShellAverage file is version 2, but ntheta was provided.'
+                print 'The 2nd moment has been corrected.  3rd and 4th moments are set to zero'
+                for i in range(nr):
+                    self.vals[i,1,:,:] = self.vals[i,1,:,:]+cfactor*self.vals[i,0,:,:]**2
+            else:
+                print 'This ShellAverage file is version 2, and ntheta was not provided.'
+                print 'The 2nd, 3rd and 4th moments are set to zero'   
+                self.vals[:,1,:,:] = 0.0            
         maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
@@ -335,50 +375,174 @@ class ShellSlice:
     self.lut                                      : Lookup table for the different diagnostics output
     """
 
-    def __init__(self,filename='none',path='Shell_Slices/'):
-        """filename  : The reference state file to read.
-           path      : The directory where the file is located (if full path not in filename
+    def print_info(self, print_costheta = False):
+        """ Prints all metadata associated with the shell-slice object."""
+        print 'version  : ', self.version
+        print 'niter    : ', self.niter
+        print 'nq       : ', self.nq
+        print 'nr       : ', self.nr
+        print 'ntheta   : ', self.ntheta
+        print 'nphi     : ', self.nphi
+        print '.......................'
+        print 'radius   : ', self.radius
+        print '.......................'
+        print 'inds     : ', self.inds
+        print '.......................'
+        print 'iters    : ', self.iters
+        print '.......................'
+        print 'time     : ', self.time
+        print '.......................'
+        print 'qv       : ', self.qv
+        if (print_costheta):
+            print '.......................'
+            print 'costheta : ', self.costheta
+
+    def __init__(self,filename='none',path='Shell_Slices/',slice_spec = [], rec0 = False):
+        """filename   : The reference state file to read.
+           path       : The directory where the file is located (if full path not in filename
+           slice_spec : Optional list of [time index, quantity code, radial index].  If 
+                        specified, only a single shell is read.  time indexing and radial 
+                        indexing start at 0
+           rec0      : Set to true to read the first timestep's data only.
         """
         if (filename == 'none'):
             the_file = path+'00000001'
         else:
             the_file = path+filename
+
+        #slice_spec is [time, qcode, radindex] ; time and rad_index start at 0
+
         fd = open(the_file,'rb')
         # We read an integer to assess which endian the file was written in...
         bs = check_endian(fd,314,'int32')
         version = swapread(fd,dtype='int32',count=1,swap=bs)
         nrec = swapread(fd,dtype='int32',count=1,swap=bs)
+
         ntheta = swapread(fd,dtype='int32',count=1,swap=bs)
         nphi = 2*ntheta
         nr = swapread(fd,dtype='int32',count=1,swap=bs)
         nq = swapread(fd,dtype='int32',count=1,swap=bs)
 
-        self.niter = nrec
+
         self.nq = nq
         self.nr = nr
         self.ntheta = ntheta
         self.nphi = nphi
 
-        self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
-        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
-        self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
+
+        qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
+        maxq = 801
+        lut_max = 1000
+        lut = np.zeros(maxq)+int(lut_max)
+        self.lut = lut.astype('int32')
+        for i,q in enumerate(qv):
+            self.lut[q] = i
+
+
+
+
+        radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
         self.costheta = np.reshape(swapread(fd,dtype='float64',count=ntheta,swap=bs),(ntheta), order = 'F')
         self.sintheta = (1.0-self.costheta**2)**0.5
 
-        self.vals  = np.zeros((nphi,ntheta,nr,nq,nrec),dtype='float64')
-        self.iters = np.zeros(nrec,dtype='int32')
-        self.time  = np.zeros(nrec,dtype='float64')
-        self.version = version
-        for i in range(nrec):
-            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta*nphi,swap=bs),(nphi,ntheta,nr,nq), order = 'F')
-            self.vals[:,:,:,:,i] = tmp
-            self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
-            self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
-        maxq = 801
-        lut = np.zeros(maxq)+int(1000)
-        self.lut = lut.astype('int32')
-        for i,q in enumerate(self.qv):
-            self.lut[q] = i
+        if (len(slice_spec) == 3):
+
+            self.iters = np.zeros(1,dtype='int32')
+            self.qv    = np.zeros(1,dtype='int32')
+            self.inds  = np.zeros(1,dtype='int32')
+            self.time  = np.zeros(1,dtype='float64')
+            self.iters = np.zeros(1,dtype='float64')
+            self.radius = np.zeros(1,dtype='float64')
+            self.version = version
+
+            self.niter = 1
+            self.nq = 1
+            self.nr = 1
+            self.vals  = np.zeros((nphi,ntheta,1,1,1),dtype='float64')
+
+
+            error = False
+            tspec = slice_spec[0]
+            qspec = slice_spec[1]
+            rspec = slice_spec[2]
+
+            if (tspec > (nrec-1)):
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: specified time index out of range."
+                print " Number of records in this file : ", nrec
+                print " Specified time index           : ", tspec
+                print " Valid time indices range from 0 through "+str(nrec-1)+"." 
+                print "---------------------------------------------------------"
+                print " "
+                error = True
+
+            if (rspec > (nr-1)):
+                error = True
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: specified radial index out of range."
+                print " Number of radii in this file     : ", nr
+                print " Specified radial index           : ", rspec
+                print " Valid radial indices range from 0 through "+str(nr-1)+"." 
+                print "---------------------------------------------------------"
+                print " "
+            qind = -1
+            for i in range(nq):
+                if (qv[i] == qspec):
+                    qind = i
+            if (qind == -1):
+                print " "
+                print "---------------------------------------------------------"
+                print " Error: Quantity code not found"
+                print " Specified quantity code: ", qind
+                print " Valid quantity codes: "
+                print " ", self.qv
+                print "---------------------------------------------------------"
+                print " "
+                error = True
+
+            if (error):
+                print " Returning zero shell-slice structure."
+                fd.close()
+                return
+
+            self.lut[:] = lut_max
+            self.lut[qspec] = 0
+            slice_size  = ntheta*nphi*8
+            qsize       = nr*slice_size
+            rec_size    = nq*qsize+12  # 8-byte timestamp and 4-byte time index.
+            seek_offset = rec_size*tspec+qsize*qind+slice_size*rspec
+            seek_bytes  = seek_offset 
+            fd.seek(seek_bytes,1)
+
+
+            self.radius[0] = radius[rspec]
+            self.inds[0]   = inds[rspec]
+            self.qv[0] = qspec
+            tmp = np.reshape(swapread(fd,dtype='float64',count=ntheta*nphi,swap=bs),(nphi,ntheta), order = 'F')
+            self.vals[:,:,0,0,0] = tmp
+            self.time[0]  = swapread(fd, dtype='float64',count=1,swap=bs)
+            self.iters[0] = swapread(fd, dtype='int32'  ,count=1,swap=bs)
+        else:
+            if (rec0):
+                #If true, read only the first record of the file.
+                nrec = 1  
+            self.radius = radius
+            self.inds   = inds
+            self.qv     = qv
+            self.niter = nrec
+            self.vals  = np.zeros((nphi,ntheta,nr,nq,nrec),dtype='float64')
+            self.iters = np.zeros(nrec,dtype='int32')
+            self.time  = np.zeros(nrec,dtype='float64')
+            self.version = version
+            for i in range(nrec):
+                tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*ntheta*nphi,swap=bs),(nphi,ntheta,nr,nq), order = 'F')
+                self.vals[:,:,:,:,i] = tmp
+                self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
+                self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
         fd.close()
 
 class ShellSpectra:
@@ -401,6 +565,29 @@ class ShellSpectra:
     self.version                                  : The version code for this particular output (internal use)
     self.lut                                      : Lookup table for the different diagnostics output
     """
+
+    def print_info(self):
+        """ Prints all metadata associated with the shell-spectra object."""
+        print 'version  : ', self.version
+        print 'niter    : ', self.niter
+        print 'nq       : ', self.nq
+        print 'nr       : ', self.nr
+        print 'nell     : ', self.nell
+        print 'nm       : ', self.nm
+        print 'lmax     : ', self.lmax
+        print 'mmax     : ', self.mmax
+        print '.......................'
+        print 'radius   : ', self.radius
+        print '.......................'
+        print 'inds     : ', self.inds
+        print '.......................'
+        print 'iters    : ', self.iters
+        print '.......................'
+        print 'time     : ', self.time
+        print '.......................'
+        print 'qv       : ', self.qv
+
+
     def __init__(self,filename='none',path='Shell_Spectra/'):
         """
            filename  : The reference state file to read.
@@ -592,7 +779,8 @@ class PowerSpectrum():
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
                     power[:,j,k,0] = power[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
-                    power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
+                power[1:a.nm,j,k,0] = power[1:a.nm,j,k,0]*0.5 # m > 0 POWER is too high by 2 due to normalization
+                power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
 
         self.power = power
 
@@ -847,3 +1035,26 @@ def integrate_dr(radius,f):
         intf = intf+(dr1+dr0)*f[i]*fpr[i]*weight[i]
     return intf
 
+def swapwrite(val,fd,swap=False,verbose=False, array = False):
+        #simple wrapper to numpy.tofile that allows byteswapping based on Boolean swap
+        #set swap to true to write bytes in different endianness than current machine
+
+        if (swap):
+                if (verbose):
+                    print "Swapping on write."
+                if (array):
+                    if (verbose):
+                        print "Swapping entire array of bytes"
+                    val2 = val.byteswap().newbyteorder() 
+
+                    tmp = np.transpose(val2)
+                    tmp.tofile(fd)        
+                else:    
+                    val2 = val.newbyteorder()
+                    val2.tofile(fd)
+        else:
+            if (array):
+                tmp = np.transpose(val)
+                tmp.tofile(fd)
+            else:
+                val.tofile(fd)

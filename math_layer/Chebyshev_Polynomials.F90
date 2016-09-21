@@ -14,6 +14,11 @@ Module Chebyshev_Polynomials
 	Logical :: initialized = .false.
     Logical, Private :: use_extrema = .false. ! Set to true to use extrema points instead of zeros for T_Nmax
 	Real*8, Private :: scaling ! x runs from -0.5 to 0.5 by default
+
+    Interface Dealias_Buffer
+        Module Procedure DeAlias_Buffer_4d
+    End Interface
+
 	Interface Cheby_To_Spectral
 		Module Procedure To_Spectral_1D, To_Spectral_2D, To_Spectral_3D, To_Spectral_4D !2
 	End Interface
@@ -39,6 +44,20 @@ Module Chebyshev_Polynomials
 	End Interface
 
 Contains
+
+    Subroutine Dealias_Buffer_4d(buff)
+        Implicit None
+        Real*8, Intent(InOut) :: buff(1:,:,:,:)
+        Integer :: r, nglobal, rstart, rend, nr_dealias
+        Do r = 1, Nglobal, n_max
+
+            rend = r+n_max-1 !fencheby
+            rstart = rend-nr_dealias
+
+            buff(rstart:rend,:,:,:) = 0.0d0
+
+        Enddo
+    End Subroutine DeAlias_Buffer_4d
 
     Subroutine To_Spectral_4D2(c_in,f_out)
         Implicit None

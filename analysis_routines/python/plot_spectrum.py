@@ -44,6 +44,13 @@ import numpy as np
 #Set savefig to True to save to savefile.  Interactive plot otherwise.
 savefig = False
 savefile = 'power_spectrum.pdf'
+if (savefig):
+    plt.figure(1,figsize=(7.5, 4.0), dpi=300)
+    plt.rcParams.update({'font.size': 12})
+else:
+    pass
+    #plt.figure(1,figsize=(15,5),dpi=100)
+    #plt.rcParams.update({'font.size': 14})
 
 # spec.power will contain the power spectrum
 # this object can also be initialized with magnetic=True
@@ -62,6 +69,7 @@ plt.plot(spec.power[:,rad_index,time_index,1], label ='m=0 Power',linewidth=lw)
 plt.plot(spec.power[:,rad_index,time_index,2], label ='Convective Power ( Total - {m=0} )',linewidth=lw)
 plt.yscale('log')
 plt.xscale('log')
+
 plt.xlim(xmin=1,xmax=spec.lmax-1)
 plt.xlabel('Spherical Harmonic Degree '+r'$\ell$')
 plt.ylabel('Velocity Power ')

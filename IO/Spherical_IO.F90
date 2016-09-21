@@ -118,13 +118,15 @@ Module Spherical_IO
 
     Integer :: full3d_frequency= 90000000
     Character*120 :: local_file_path=''
+    Logical :: mem_friendly = .false.
 
     Namelist /output_namelist/shellavg_values, globalavg_values, &
         & shellslice_values, shellslice_levels, azavg_values, &
         & full3d_values, &
         & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
         & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency, &
-        & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values
+        & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values, &
+        & mem_friendly 
 
 
 
@@ -269,7 +271,7 @@ Contains
             Endif
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
 
-            If (Shell_Slices%nshell_r_ids .gt. 0) Then
+            If (Shell_Spectra%nshell_r_ids .gt. 0) Then
                 master_rank = shell_spectra%shell_r_ids(1)
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
             Endif
@@ -667,6 +669,264 @@ Contains
 	End Subroutine Write_Shell_Spectra
 
 
+	Subroutine Write_Shell_Spectra_MEM(this_iter,simtime)
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:,:), all_spectra(:,:,:,:,:)
+        Real*8, Allocatable :: sendbuffer(:,:,:,:,:), out_radii(:)
+        Real*8, Allocatable :: bsendbuffer(:,:,:,:,:)
+		Integer :: responsible, current_shell, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
+        Integer :: rone,  p,  counter, nf
+		Integer :: n, nn, this_nshell, nq_shell, shell_spectra_tag, nmodes
+        Integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp
+        Integer(kind=MPI_OFFSET_KIND)  :: qsize, qdisp, rec_size
+		Integer :: your_mp_min, your_mp_max, your_nm, your_id
+		Integer :: nelem, m_ind, m_val, current_rec
+        Integer :: funit, error, sirq, inds(5), dims(3)
+        Integer :: my_nlevels, nlevels, qindex
+        Integer :: lp1, nrirqs, ind5
+        Integer :: ierr, rcount, buffsize
+        Integer, Allocatable :: rirqs(:)
+        Integer :: mstatus(MPI_STATUS_SIZE)       
+
+        nlevels = Shell_Spectra%nlevels             ! The total number of spectra levels that needs to be output
+        my_nlevels = Shell_Spectra%my_nlevels       ! The number of radial levels that this rank needs to write out
+        nq_shell = Shell_Spectra%nq                 ! The number of quantities 
+        shell_spectra_tag = Shell_Spectra%mpi_tag
+        funit = Shell_Spectra%file_unit
+        lmax = maxval(pfi%inds_3s)
+        lp1 = lmax+1
+        nmodes = lp1*lp1
+		responsible = 0
+		If ( (my_row_rank .eq. 0) .and. (my_nlevels .gt. 0) )  Then
+            responsible = 1
+            Allocate(all_spectra(0:lmax,0:lmax, my_nlevels,1, 1:2))
+            Allocate(buff(0:lmax,my_nlevels,1,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))
+        Endif
+
+
+        !Before we start the main communication, all processes that contribute to the
+        ! spectral output must get their buffers in the correct form
+        If (my_nlevels .gt. 0) Then
+            !//////////////////////
+            ! First thing we do is FFT/reform the buffer/Legendre Transform
+            !
+            Call FFT_To_Spectral(spectra_buffer%p3b, rsc = .true.)
+            spectra_buffer%config ='p3b'
+            Call spectra_buffer%reform()
+            Call spectra_buffer%construct('s2b')
+            Call Legendre_Transform(spectra_buffer%p2b,spectra_buffer%s2b)
+            Call spectra_buffer%deconstruct('p2b')
+
+            Allocate(bsendbuffer(0:lmax,my_nlevels,nq_shell,2, my_mp_min:my_mp_max ))
+            Allocate(sendbuffer(0:lmax,my_nlevels,1,2, my_mp_min:my_mp_max ))
+            bsendbuffer = 0.0d0 
+            sendbuffer = 0.0d0
+            nf = spectra_buffer%nf2b
+            Do p = 1, 2  ! Real and imaginary parts
+            Do mp = my_mp_min,my_mp_max
+                m = pfi%inds_3s(mp)
+                    counter = 0
+                    Do f = 1, nq_shell
+
+                        field_ind = counter/my_nr+1
+                        Do r = 1, shell_spectra%my_nlevels   
+                                
+                            rind = MOD(counter,my_nr)+my_rmin
+                            bsendbuffer(m:lmax,r,f,p,mp) = &
+                                & spectra_buffer%s2b(mp)%data(m:lmax,rind,p,field_ind)
+                            counter = counter+1
+                        Enddo
+                    Enddo
+                Enddo
+
+            Enddo
+            call spectra_buffer%deconstruct('s2b')
+
+        Endif
+
+
+        If (my_row_rank .eq. 0) Call Shell_Spectra%OpenFile_Par(this_iter, error)
+
+        If (responsible .eq. 1) Then
+            ! Processes that take part in the write have some extra work to do
+            funit = shell_spectra%file_unit
+            current_rec = Shell_Spectra%current_rec  ! Note that we have to do this after the file is opened
+            If  ( (current_rec .eq. 1) .and. (shell_spectra%master) ) Then                
+                !Write(6,*)'I am master: ', my_column_rank
+                dims(1) =  lmax
+                dims(2) =  nlevels
+                dims(3) =  nq_shell
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_shell
+                call MPI_FILE_WRITE(funit,Shell_Spectra%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                allocate(out_radii(1:nlevels))
+                Do i = 1, nlevels
+                    out_radii(i) = radius(Shell_Spectra%levels(i))
+                Enddo
+                buffsize = nlevels
+	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+                DeAllocate(out_radii)
+                
+	            call MPI_FILE_WRITE(funit, Shell_Spectra%levels, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+            Endif
+
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_shell*4 ! nq
+            hdisp = hdisp+nlevels*12  ! level indices and level values
+            
+            rcount = 0
+            Do p = 1, Shell_Spectra%nshell_r_ids
+                if (Shell_Spectra%shell_r_ids(p) .lt. my_column_rank) Then
+                    rcount = rcount+ Shell_Spectra%nshells_at_rid(p)
+                Endif
+            Enddo
+            my_rdisp = rcount*nmodes*8
+
+                
+
+            ! This is the LOCAL number ELEMENTS in the real or imaginary component of
+            ! of a single quantity  (This is not in bytes)
+            buffsize = my_nlevels*nmodes 
+
+            !This is the half-size (bytes) of a single quantity's information
+            !Each quantity has real/imaginary components, and
+            ! so the full size is twice this value.  THIS IS GLOBAL
+            qsize = nlevels*nmodes*8
+
+            !This is the size (bytes) of a single iteration's record
+            rec_size = qsize*2*nq_shell+12  ! 12 is for the simtime+iteration at the end
+
+            disp = hdisp+rec_size*(current_rec-1)
+
+        Endif
+
+
+        Do qindex = 1, nq_shell  ! Q LOOP starts here!
+
+            !Load the current quantity into the sendbuffer
+            If (my_nlevels .gt. 0) Then
+                sendbuffer(:,:,1,:,:) = & 
+                    & bsendbuffer(:,:,qindex,:,:)
+            Endif
+
+
+
+            If (responsible .eq. 1) Then
+                ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
+
+                all_spectra(:,:,:,:,:) = 0.0d0
+                buff(:,:,:,:,:) = 0.0d0
+
+
+                rirqs(:) = 0
+                ind5 = pfi%all_3s(0)%delta+1
+                Do nn = 1, nrirqs
+                    !Write(6,*)'Ind5: ', ind5
+                    your_id = nn
+
+                    your_nm     = pfi%all_3s(nn)%delta
+                    your_mp_min = pfi%all_3s(nn)%min
+                    your_mp_max = pfi%all_3s(nn)%max
+
+
+                    nelem = your_nm*my_nlevels*2*lp1
+
+                    inds(:) = 1
+                    inds(5) = ind5  !This is the mp_index here.
+
+                    Call Ireceive(buff, rirqs(nn), n_elements = nelem,source= your_id, &
+                        &  tag=shell_spectra_tag,grp = pfi%rcomm, indstart = inds)
+                    ind5 = ind5+your_nm
+                Enddo
+
+                ! Stripe my own data into the receive buffer
+
+                Do mp = my_mp_min,  my_mp_max
+                    m = pfi%inds_3s(mp)
+                    Do p = 1,2
+                        Do r = 1, my_nlevels   
+                            buff(m:lmax,r,1,p,mp) = sendbuffer(m:lmax,r,1,p,mp) 
+                        Enddo
+                    Enddo
+                Enddo
+
+                Call IWaitAll(nrirqs,rirqs)
+
+                !Stripe the receiver buffer into the spectra buffer
+               
+                Do mp = 1,lp1
+                    m = pfi%inds_3s(mp)
+                    Do p = 1, 2  ! Real and imaginary parts
+                        Do r = 1, my_nlevels   
+                            all_spectra(m:lmax,m,r,1,p) = buff(m:lmax,r,1,p,mp)  
+                        Enddo
+                    Enddo
+                Enddo
+
+                !Write the slice we just received
+                Do p = 1, 2
+                    new_disp = disp+my_rdisp +(p-1)*qsize*nq_shell +(qindex-1)*qsize        
+                    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                    
+                    Call MPI_FILE_WRITE(funit, all_spectra(0,0,1,1,p), buffsize, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Enddo
+
+            Else
+			    !  Non-responsible nodes send their info
+			    If (my_nlevels .gt. 0) Then
+                    inds(:) = 1
+				    Call Isend(sendbuffer,sirq, dest = 0,tag=shell_spectra_tag, grp = pfi%rcomm, indstart = inds)
+                    Call IWait(sirq)
+			    Endif
+		    Endif
+
+        Enddo  ! Q-LOOP
+
+        If (responsible .eq. 1) Then
+            disp = hdisp+rec_size*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+            If (shell_spectra%master) Then
+
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+            DeAllocate(all_spectra)
+            DeAllocate(buff)
+            DeAllocate(rirqs)
+        Endif
+
+
+        If (my_row_rank .eq. 0) Call shell_spectra%closefile_par()
+        If (my_nlevels .gt. 0) Then 
+            DeAllocate(sendbuffer, bsendbuffer)
+        Endif
+
+
+
+	End Subroutine Write_Shell_Spectra_MEM
+
+
+
 
 	Subroutine Write_Shell_Slices(this_iter,simtime)
         USE MPI_BASE
@@ -694,6 +954,7 @@ Contains
             Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
             Endif
         endif 
+
         nq_shell = Shell_Slices%nq
         shell_slice_tag = Shell_Slices%mpi_tag
         funit = Shell_Slices%file_unit
@@ -894,6 +1155,231 @@ Contains
 	End Subroutine Write_Shell_Slices
 
 
+	Subroutine Write_Shell_Slices_MEM(this_iter,simtime)
+        ! A "more" memory friendly version of write_shell_Slices.  
+        ! Writes one quantity at a time
+        USE MPI_BASE
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:), all_shell_slices(:,:,:,:)
+		Integer :: responsible, current_shell, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, p, sizecheck, t
+		Integer :: n, nn, this_nshell, nq_shell, shell_slice_tag
+		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
+		Integer :: nelem, buffsize, sirq, nrirqs, inds(1:4),qbuffsize
+        Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
+        Real*8, Allocatable :: out_radii(:)
+        Integer, Allocatable :: level_inds(:), rirqs(:)
+        
+        integer :: ierr, rcount, qindex
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        sizecheck = sizeof(disp)
+        if (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
+            Endif
+        endif 
+        nq_shell = Shell_Slices%nq
+        shell_slice_tag = Shell_Slices%mpi_tag
+        
+
+		responsible = 0
+        this_nshell = Shell_Slices%my_nlevels
+		If (my_row_rank .eq. 0) Then
+            Call Shell_Slices%OpenFile_Par(this_iter, error)
+            If (Shell_Slices%my_nlevels .gt. 0) Then
+                responsible = 1
+			    Allocate(all_shell_slices(1:nphi,1:ntheta,1:Shell_Slices%my_nlevels,1))
+                Allocate(buff(1:nphi,1:this_nshell,1:1, 1:ntheta))  
+                nrirqs = nproc2-1
+                Allocate(rirqs(1:nrirqs))  
+
+                ! Some displacements for accessing the file
+                hdisp = 24 ! dimensions+endian+version+record count
+                hdisp = hdisp+nq_shell*4 ! nq
+                hdisp = hdisp+Shell_Slices%nlevels*12  ! level indices and level values
+                hdisp = hdisp+ ntheta*8  ! costheta
+
+                qdisp = ntheta*Shell_Slices%nlevels*nphi*8
+                full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
+                disp = hdisp+full_disp*(Shell_Slices%current_rec-1)
+                ! The file is striped with time step slowest, followed by q
+                rcount = 0
+                Do p = 1, Shell_Slices%nshell_r_ids
+                    if (Shell_Slices%shell_r_ids(p) .lt. my_column_rank) Then
+                        rcount = rcount+ Shell_Slices%nshells_at_rid(p)
+                    Endif
+                Enddo
+                my_rdisp = rcount*ntheta*nphi*8
+
+                qbuffsize = Shell_Slices%my_nlevels*ntheta*nphi ! Number of elements in one q's worth of shells
+
+            Endif
+        Endif
+        If (responsible .eq. 0) Then
+            If (Shell_Slices%my_nlevels .gt. 0) Then
+                Allocate(buff(1:nphi,1:this_nshell,1:1, my_theta_min:my_theta_max))
+            Endif
+        Endif
+        funit = Shell_Slices%file_unit
+        !////////////////////////////
+        !Write a header
+        If (Shell_Slices%current_rec .eq. 1) Then                
+            
+            If (shell_slices%master .and. (responsible .eq. 1)) Then            
+                ! The master rank (whoever owns the first output shell level) writes the header
+                dims(1) = ntheta
+                dims(2) = Shell_Slices%nlevels
+                dims(3) =  nq_shell
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_shell
+                call MPI_FILE_WRITE(funit,Shell_Slices%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                allocate(out_radii(1:Shell_Slices%nlevels))
+                Do i = 1, Shell_Slices%nlevels
+                    out_radii(i) = radius(Shell_Slices%levels(i))
+                Enddo
+                buffsize = Shell_Slices%nlevels
+	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+                DeAllocate(out_radii)
+                
+
+                allocate(level_inds(1:Shell_Slices%nlevels))
+                Do i = 1, Shell_Slices%nlevels
+                    level_inds(i) = Shell_Slices%levels(i)
+                Enddo
+
+	            call MPI_FILE_WRITE(funit, Shell_Slices%levels, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+                DeAllocate(level_inds)
+                buffsize = ntheta
+	            call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+            Endif
+        Endif
+
+
+        !///////////////////////////////////////////////////////////////////////////
+        ! In this revised version, we send one quantity's worth of shells at a time
+        Do qindex = 1, nq_shell
+
+		    If (responsible .eq. 1) Then
+			    ! Responsible node receives  all the pieces of the shell slices from the other nodes
+          
+			    all_shell_slices(:,:,:,:) = 0.0d0
+                buff(:,:,:,:) = 0.0d0
+            
+                Do nn = 1, nproc2-1
+				    your_id = nn
+
+				    your_ntheta    = pfi%all_2p(nn)%delta
+				    your_theta_min = pfi%all_2p(nn)%min
+
+                    inds(1) = 1
+                    inds(2) = 1
+                    inds(3) = 1
+                    inds(4) = your_theta_min
+
+				    nelem = nphi*your_ntheta*this_nshell
+
+             		Call IReceive(buff, rirqs(nn),n_elements = nelem, source= your_id, &
+                        & tag=shell_slice_tag,grp = pfi%rcomm, indstart = inds)
+
+                Enddo
+
+                ! Stripe my own data into the receive buffer
+                Do j = 1, this_nshell
+                    Do t = my_theta_min, my_theta_max
+                        Do i = 1, nphi
+                            buff(i,j,1,t) = shell_slice_outputs(i,t,j,qindex)
+                        Enddo
+                    Enddo
+                Enddo
+                
+                Call IWaitAll(nrirqs,rirqs)
+
+                !Re-organize the buffer
+                Do j = 1, this_nshell
+                    Do t = 1, ntheta
+                        Do i = 1, nphi
+                            all_shell_slices(i,t,j,1) = buff(i,j,1,t)
+                        Enddo
+                    Enddo
+                Enddo
+
+
+		    Else
+			    !  Non responsible nodes send their info
+			    If (Shell_Slices%my_nlevels .gt. 0) Then
+                    !Everyone needs to restripe their data before sending it down the row
+                    !Stripe so that theta is slowest 
+
+                    Do t = my_theta_min, my_theta_max
+                        Do j = 1, this_nshell
+                            Do i = 1, nphi
+                                buff(i,j,1,t) = shell_slice_outputs(i,t,j,qindex)
+                            Enddo
+                        Enddo
+                    Enddo
+                    nelem = nphi*my_ntheta*this_nshell
+                    inds(:) = 1
+				    Call Isend(buff,sirq,n_elements = nelem,dest = 0,tag=shell_slice_tag, &
+                        & grp = pfi%rcomm, indstart = inds)
+                
+                    Call IWait(sirq)
+
+			    Endif
+		    Endif
+
+
+            ! Communication is complete.  Write this q-value using MPI-IO
+
+            If (responsible .eq. 1) Then   
+
+                new_disp = disp+qdisp*(qindex-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, all_shell_slices(1,1,1,1), qbuffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+
+            Endif  ! Responsible
+        Enddo
+
+        If (responsible .eq. 1) Then
+			DeAllocate(all_shell_slices)
+            DeAllocate(rirqs)
+            disp = hdisp+full_disp*Shell_Slices%current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+            If (shell_slices%master) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+        Endif
+        If (my_row_rank .eq. 0) Call shell_slices%closefile_par()
+        If (Shell_Slices%my_nlevels .gt. 0) Then
+            DeAllocate(shell_slice_outputs)
+            DeAllocate(buff)
+        Endif
+	End Subroutine Write_Shell_Slices_MEM
+
+
+
     Function Compute_Quantity(qval) result(yesno)
         integer, intent(in) :: qval 
         Logical             :: yesno 
@@ -972,8 +1458,20 @@ Contains
 		Integer, Intent(In) :: iter
 		Real*8, Intent(In) :: sim_time
 
-	    If (Mod(iter,Shell_Slices%frequency) .eq. 0 ) Call Write_Shell_Slices(iter,sim_time)
-	    If (Mod(iter,Shell_Spectra%frequency) .eq. 0 ) Call Write_Shell_Spectra(iter,sim_time)
+	    If (Mod(iter,Shell_Slices%frequency) .eq. 0 ) Then
+            If (mem_friendly) Then
+                Call Write_Shell_Slices_MEM(iter,sim_time)
+            Else
+                Call Write_Shell_Slices(iter,sim_time)
+            Endif
+        Endif
+	    If (Mod(iter,Shell_Spectra%frequency) .eq. 0 ) Then
+            If (mem_friendly) Then
+                Call Write_Shell_Spectra_MEM(iter,sim_time)
+            else
+                Call Write_Shell_Spectra(iter,sim_time)
+            Endif
+        Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
 	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
