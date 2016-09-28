@@ -1040,45 +1040,7 @@ End Subroutine Band_Load_Single
 	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
 		Integer, Intent(In) :: rind,row, col, dorder, nglobal
 		Integer :: n, off1, off2, r, rstart,rmod, extra, rind1, rind2
-        Integer :: del1, del2
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
-
-        del1 = rind-1
-        del2 = n_max - rind
-
-        ! We'll either be doing index 1 (within a subdomain) or index N_max
-        !if (rind .eq. 1) Then
-        If (del1 .lt. del2) Then
-            rstart = N_max+ rind !1
-            !write(6,*)'rstart is: ', rstart, rind
-            extra = -N_max      ! We link current domain and previous domain (domain to the left)
-        else
-            rstart = rind !N_max
-            extra = 0   ! Link current domain and next domain (to the right)
-        endif
-        r = rstart
-        Do While (r .lt. nglobal)
-        !Do r = rstart, nglobal-1, N_max  ! explicitly leave out the boundaries
-            
-    		! clear everything in this row
-    		mpointer(r+row,:) = 0.0d0
-            !rmod = MOD(r-1,N_max)+1
-            off1 = N_max*((r-1)/N_max)+extra
-            off2 = off1+N_max
-            if (off1 .lt. off2) then
-                rind1 = n_max
-                rind2 = 1
-            else
-                rind1 = 1
-                rind2 = n_max
-            endif
-            !Write(6,*)"r: ", r, rmod, off1, off2, rind, rstart
-		    Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
-			    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) + dcheby(rind1,n,dorder)
-                mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) - dcheby(rind2,n,dorder)
-		    Enddo
-            
-        Enddo
 
 
         ! If rind = 1, 
@@ -1110,6 +1072,71 @@ End Subroutine Band_Load_Single
 
 
 	End Subroutine Cheby_Continuity
+
+    !////////////////////////////////////////////////////////////////////////
+    ! Finite Element versions of load row routines
+	Subroutine Load_Interior_Rows_Cheby(nglobal,row,col,amp,dorder,mpointer)
+		Integer, Intent(In) :: row, col, dorder, nglobal
+		Integer :: r, n, off1,npoly
+		real*8, Intent(In) :: amp(:)
+		real*8, Pointer, Dimension(:,:), Intent(In) :: mpointer
+
+        r = 1
+        off1 = 0
+        nsub = grid%domain_count
+        Do hh = 1, nsub
+            npoly = grid%npoly(hh)
+            do i = 1, npoly
+			    Do n = 1, N_max
+				    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
+                        & +amp(r)*dcheby(hh)%data(i,n,dorder)
+			    Enddo
+                r = r+1
+            enddo
+            off1 = off1+npoly
+        Enddo
+
+	End Subroutine Load_Interior_Rows_Cheby
+
+	Subroutine Load_Single_Row_Cheby(r,row,col,amp,dorder,mpointer, clear_row, boundary)
+		Integer, Intent(In) :: r,row, col, dorder
+		Integer :: n, off1, local_index, domain, nsub
+		real*8, Intent(In) :: amp
+		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
+		Logical, Intent(In), Optional :: clear_row, boundary
+		Logical :: bjunk
+		If (present(clear_row)) Then
+			! clear everything in this row
+			mpointer(r+row,:) = 0.0d0
+		Endif
+		If (present(boundary)) Then
+			! Do nothing at the moment
+			bjunk = boundary	! Placeholder to avoid Intel compiler warnings (unused vars)
+		Endif
+
+        ! We need to do a little work to find which domain we're in
+        nsub = grid%domain_count
+        domain = 1
+        off1 = 0
+        rlower = grid%npoly(1)
+        local_index = r
+        do hh = 2, nsub
+            If (r .gt. rlower) Then 
+                off1 = off1+grid%npoly(hh-1)
+                domain = hh
+                local_index = local_index-rlower
+            Endif
+            rlower = rlower+grid%npoly(hh) 
+        Enddo
+
+		Do n = 1, grid%rda(domain)-1 	! De-Alias at boundaries (single rows are really just for boundaries)
+			mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
+                & + amp*grid%dcheby(domain)%data(local_index,n,dorder)
+		Enddo
+
+	End Subroutine Load_Single_Row_Cheby
+
+
 
 End Module Linear_Solve
 
