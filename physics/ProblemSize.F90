@@ -50,12 +50,17 @@ Module ProblemSize
     ! Radial Grid Variables Related to the Finite-Element Approach
     Integer :: fensub = -1   !  Number of subdomains to divide N_R into
     Integer :: fencheby = -1 ! Number of chebyshev modes per subdomain
-	Logical :: finite_element = .false.
-
+    Integer, Parameter :: nsubmax = 64
+    Integer :: ncheby(1:nsubmax)=-1
+    Integer :: dealias_by(1:nsubmax) = -1
+    Integer :: cheby_count
+    Integer :: n_uniform_domains =1
+    Real*8  :: domain_bounds(1:nsubmax+1)=-1.0d0
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
             &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max, &
-            &  aspect_ratio, shell_depth
+            &  aspect_ratio, shell_depth, ncheby, domain_bounds, dealias_by, &
+            &  nuniform_domains
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -69,6 +74,7 @@ Contains
 		Character*12 :: dstring
         Character*6  :: istr
     	Character*8 :: dofmt = '(ES12.5)'
+        Integer :: cheby_count, bounds_count, i
 
         If ((aspect_ratio .gt. 0.0d0) .and. (shell_depth .gt. 0.0d0) ) Then
             ! Set the bounds based on the aspect ratio and shell depth
@@ -77,15 +83,58 @@ Contains
 
         Endif
 
-        if (precise_bounds .eq. 1) Then ! This will be deprecated soon -- use aspect_ratio/shell_depth instead
-		    rmin = (7.0d0)/13.0d0		! Benchmark bounds have infinite decimal places
-		    rmax = (20.0d0)/13.0d0      ! We override (if desired) the inputs for accuracy
+
+        !////////////////////////////////////////////////////////////////////
+        ! Decide how many chebyshev domains we have
+        !   - Users may specify:
+        !       a.) a single Chebyshev domain (normal mode)
+        !       b.) a uniform set of N Chebyshev domains (original SFE mode)
+        !       c.) N Chebyshev domains with differing number of polynomials
+        If (ncheby(1) .le. 0) Then
+            ! Case (a)
+            ncheby(1) = n_r
+            domain_bounds(1) = rmin
+            domain_bounds(2) = rmax
         Endif
-        if ( (fensub .gt. 0) .and. (fencheby .gt. 0) ) Then
-            !Overwrite n_r
-            n_r =fensub*fencheby 
-            finite_element = .true.
+
+
+        cheby_count = 0
+        bounds_count = 1
+        Do i = 1, nsubmax
+            If (ncheby(i) .gt. 0) Then
+                cheby_count = cheby_count+1
+            Endif
+            If (domain_bounds(i+1) .ge. 0) Then
+                bounds_count = bounds_count+1
+            Endif
+        Enddo
+
+
+        If (n_uniform_domains .gt. 1) Then
+            ! Case (b)
+            n_r =n_uniform_domains*ncheby(1) 
+            cheby_count = n_uniform_domains
+            domain_bounds(1) = rmin
+            rdelta = (rmax-rmin)/DBLE(cheby_count)
+            bounds_count = cheby_count+1
+            Do i = 2,bounds_count
+                domain_bounds(i) = domain_bounds(i-1)+rdelta
+            Enddo
+        Else
+            ! Case (c)
+            n_r = 0
+            Do i = 1, cheby_count
+                n_r = n_r+ncheby(i)
+            Enddo
         Endif
+
+
+        rmin = domain_bounds(1)
+        rmax = domain_bounds(bounds_count)
+
+
+
+
         shell_volume = four_pi*one_third*(rmax**3-rmin**3)
         If (l_max .le. 0) Then
 
@@ -168,11 +217,6 @@ Contains
 		Call StopWatch(walltime)%startclock()
 		Call Map_Indices()
 
-        !//////////////////////////////////////////////////
-        !Provide quick notification that n_r may have changed
-        if ( finite_element) Then
-            if (my_rank .eq. 0) Write(6,*)"Finite Elements.  N_R is: ", n_r
-        Endif
 
 		!//////////////////////////////////////////////////
 		! Intialize Legendre Transforms & Horizontal Grid
@@ -255,9 +299,24 @@ Contains
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))
         Allocate(Radial_Integral_Weights(1:N_R))
+
+
+        !--------------------------------------
+        ! New Multi-domain version
+        If (chebyshev) Then
+            grid_type = 2
+
+			Call Initialize_Chebyshev(radius, radial_integral_weights, &
+                & cheby_count,ncheby,domain_bounds,nthr)
+
+
+        Endif
+        !-------------------------------------
+
 		If (chebyshev) Then
 			grid_type = 2
-			Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights, nthr)
+            Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights, nthr)
+
 			Delta_r(1) = radius(1)-radius(2)
 			Do r = 2, N_R
 				Delta_r(r) = radius(r)-radius(r-1)

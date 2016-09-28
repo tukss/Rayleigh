@@ -827,6 +827,9 @@ Module Linear_Solve
 	!  Write(6,*)'info : ',info,n
 	End Subroutine LU_Decompose_full
 
+
+
+
 Subroutine LU_Decompose_band(mat, pvt)
   Real*8, Intent(InOut) :: mat(:,:)
   Integer, Intent(out) :: pvt(:)
@@ -1031,6 +1034,82 @@ Subroutine Band_Load_Single(j,k,n_upper)
       Equation_Set(j,k)%LHS(:,:) = band_matrix(:,:)
       DeAllocate(band_matrix)
 End Subroutine Band_Load_Single
+
+
+!Matrix row-loading routines
+	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
+		Integer, Intent(In) :: rind,row, col, dorder, nglobal
+		Integer :: n, off1, off2, r, rstart,rmod, extra, rind1, rind2
+        Integer :: del1, del2
+		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
+
+        del1 = rind-1
+        del2 = n_max - rind
+
+        ! We'll either be doing index 1 (within a subdomain) or index N_max
+        !if (rind .eq. 1) Then
+        If (del1 .lt. del2) Then
+            rstart = N_max+ rind !1
+            !write(6,*)'rstart is: ', rstart, rind
+            extra = -N_max      ! We link current domain and previous domain (domain to the left)
+        else
+            rstart = rind !N_max
+            extra = 0   ! Link current domain and next domain (to the right)
+        endif
+        r = rstart
+        Do While (r .lt. nglobal)
+        !Do r = rstart, nglobal-1, N_max  ! explicitly leave out the boundaries
+            
+    		! clear everything in this row
+    		mpointer(r+row,:) = 0.0d0
+            !rmod = MOD(r-1,N_max)+1
+            off1 = N_max*((r-1)/N_max)+extra
+            off2 = off1+N_max
+            if (off1 .lt. off2) then
+                rind1 = n_max
+                rind2 = 1
+            else
+                rind1 = 1
+                rind2 = n_max
+            endif
+            !Write(6,*)"r: ", r, rmod, off1, off2, rind, rstart
+		    Do n = 1, (2*N_max)/3 	! De-Alias at boundaries (single rows are really just for boundaries)
+			    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) + dcheby(rind1,n,dorder)
+                mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) - dcheby(rind2,n,dorder)
+		    Enddo
+            
+        Enddo
+
+
+        ! If rind = 1, 
+        ! We link to the "left", starting with domain 2
+        ! index 1 of domain 2 matches index nmax of domain 1
+
+        ! Otherwise,
+        ! We link to the "right," starting with domain 1.
+        ! Index nmax of domain 1 matches index 1 of domain 2
+        r = grid%npoly(1)
+        if (rind .eq. 1) r = r+1
+        off1 = grid%npoly(1)
+        off2 = 0
+        Do hh = 2, nsub
+            mpointer(r+row,:) = 0.0d0
+            Do n = 1, grid%rda(hh) -1 	! De-Alias at boundaries (single rows are really just for boundaries)
+		        mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
+                    &  + grid%dcheby(hh)%data(1,n,dorder)
+	        Enddo
+            ind = grid%npoly(hh-1)
+            Do n = 1, grid%rda(hh-1)
+                mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) &
+                    & - grid%dcheby(hh-1)%data(ind,n,dorder)
+            Enddo
+            r = r+grid%npoly(hh) !advance to next subdomain
+            off1 = off1+grid%npoly(hh)
+            off2 = off2+grid%npoly(hh-1)
+        Enddo
+
+
+	End Subroutine Cheby_Continuity
 
 End Module Linear_Solve
 

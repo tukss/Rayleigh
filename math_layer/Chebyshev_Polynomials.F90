@@ -2,6 +2,9 @@ Module Chebyshev_Polynomials
 	! Module for computing Chebyshev Polynomial Arrays and the associated Derivative Arrays
 	Implicit None
 	Integer, Private :: N_max, N_even, N_odd, n_x, cp_nthreads
+    Integer, Private :: domain_count
+    Integer, Private, Allocatable :: n_x(:)
+    Real*8, Allocatable, Private :: domain_bounds(:)
 	Real*8, Allocatable, Private :: x(:)  ! The colocation points
 	Real*8, Allocatable :: cheby(:,:)		! cheby(r,k) is chebyshev polynomial of degree k-1 at radius r
 	Real*8, Allocatable :: cheby_even(:,:), cheby_odd(:,:) ! even and odd chebyshev arrays
@@ -14,6 +17,20 @@ Module Chebyshev_Polynomials
 	Logical :: initialized = .false.
     Logical, Private :: use_extrema = .false. ! Set to true to use extrema points instead of zeros for T_Nmax
 	Real*8, Private :: scaling ! x runs from -0.5 to 0.5 by default
+
+    Type Cheby_Grid
+        Integer :: domain_count
+        Integer, Allocatable :: n_max(:)
+        Integer, Allocatable :: n_x(:)
+        Real*8, Allocatable :: domain_bounds(:)
+        Real*8, Allocatable :: x(:,:), ctheta(:,:)
+
+        Type(rmcontainer)  , Allocatable :: cheby_even(:), cheby_odd(:)
+        Type(rmcontainer3d), Allocatable :: dcheby(:)
+        Contains
+        Initialize_Cheby_Grid => Init
+        
+    End Type Cheby_Grid
 
     Interface Dealias_Buffer
         Module Procedure DeAlias_Buffer_4d
@@ -44,6 +61,206 @@ Module Chebyshev_Polynomials
 	End Interface
 
 Contains
+
+	Subroutine Initialize_Cheby_Grid(self,grid,integration_weights,ndomains,npoly, bounds,nthread)
+        Implicit None
+        Class(Cheby_Grid) :: self
+        Real*8, Intent(InOut) :: grid(:)
+        Real*8, Intent(In), Optional :: xmin, xmax
+        Real*8 ::delta, gmin, tmp, xx
+        Real*8, Intent(InOut) :: integration_weights(1:)
+        Integer :: r, i, domain_count
+        Integer, Intent(In) :: nthread
+
+
+
+        Allocate(self%cheby_even(1:ndomains))
+        Allocate(self%cheby_odd(1:ndomains))
+        Allocate(self%dcheby(1:ndomains))
+
+
+        domain_count = ndomains
+        self%domain_count = ndomains
+        Allocate(self%domain_bounds(1:domain_count+1))
+        Allocate(self%n_max(1:domain_count+1))
+
+        self%domain_bounds(1:domain_count+1) = bounds(1:domain_count+1)
+        self%npoly(1:domain_count+1) = npoly(1:domain_count+1)
+        self%max_npoly = maxval(self%n_max)
+        Allocate(self%x(1:self%max_npoly, 1:domain_count)
+        Allocate(self%ctheta(1:self%max_npoly,1:domain_count)
+
+        Call self%gen_colocation_points()
+        Call sefl%gen_Tn()
+
+
+	    cp_nthreads = nthread
+	    N_max = size(grid)
+
+	    grid(:) = x(:)
+	    Call Gen_Tn()
+	    Call Gen_Tn_Deriv_Arrays(3)
+	    If (present(xmin)) Then
+		    delta = xmax-xmin
+		    scaling = (x(1)-x(N_max))/delta
+		    dcheby(:,:,1) = dcheby(:,:,1)*scaling
+		    dcheby(:,:,2) = dcheby(:,:,2)*(scaling**2)
+		    dcheby(:,:,3) = dcheby(:,:,3)*(scaling**3)
+		    grid(:) = grid(:)/scaling
+		    gmin = grid(N_max)
+		    grid(:) = grid(:)-gmin+xmin
+	    Endif
+	    initialized = .true.
+		Else
+			grid(:) = x(:)
+		Endif
+
+
+        integration_weights(1:n_max) = 0.0d0
+
+
+        !these weights evaluated the spherical radial average - i.e.
+        ! sum{integration_weights * f } = int{f*r^2 dr}/int{r^2 dr}
+
+        !Because we're using the zeros, x(1)-x(n_max) is not quite 2
+		tmp = (3*Pi * (grid(1)-grid(N_max)) )/ &
+			& ( (x(1)-x(N_max))* (grid(1)**3 - grid(N_max)**3) * N_max )
+		Do r=1,N_max
+			xx = x(r) ! (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
+            !xx = (2.0d0*x(r)-x(N_max)-x(1) )
+			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
+		Enddo
+        integration_weights(1) = integration_weights(1)*0.5d0      !Boundaries x 1/2 (since on zero points)
+        integration_weights(N_max) = integration_weights(N_max)*0.5d0
+
+
+
+	End Subroutine Initialize_Chebyshev
+
+
+	Subroutine Gen_Colocation_Points(self)
+		Implicit None
+        Class(Cheby_Grid) :: self
+		Integer           :: i,n,n_max
+		Real*8            :: arg
+        ! Calculate the colocation points X { -1 , 1
+        ! Also calculate the theta grid ctheta { 0 , pi 
+	    !Allocate(x(1:N_max))
+        !Allocate(ctheta(1:N_max))
+        Do n = 1,self%domain_count
+            n_max = self%npoly(n)
+        
+            If (use_extrema) Then  !Use the extrema of T_{N_max-1}  
+
+                dctheta = pi/(N_max-1)
+                ctheta0 = 0.0d0
+                arg = ctheta0
+                Do i = 1, N_max
+                    self%ctheta(i,n) = arg
+                    self%x(i,n) = cos(arg)
+                    arg = arg+dctheta
+                Enddo
+
+            Else !Use the zeroes of T_{N_max}
+
+                dctheta = pi/N_max
+                ctheta0 = dctheta*0.5d0
+                arg = ctheta0
+                Do i = 1, N_Max
+                    self%ctheta(i,n) = arg
+                    self%x(i,n) = cos(arg)
+                    arg = arg+dctheta
+                Enddo
+
+            Endif
+
+        Enddo
+	End Subroutine Gen_Colocation_Points
+
+
+	Subroutine Gen_Tn(self)
+		Implicit None
+        Class (Cheby_Grid)  :: self
+		Integer             :: i, k,n,n_max,r
+		Real*8              :: arg
+        Real*8, Allocatable :: cheby(:,:) ! workspace
+		Allocate(cheby(1:self%max_npoly,1:self%max_npoly))
+        Do n = 1,self%domain_count
+            n_max = self%npoly(n)
+		    Do r = 1, N_max
+			    Do i = 1, N_max
+				    k = i -1
+				    arg = k*self%ctheta(r,n)
+				    cheby(r,i) = cos(arg)
+			    Enddo
+		    Enddo
+
+			n_odd = N_max/2
+			n_even = n_odd+mod(N_max,2)
+			n_x = n_even
+            self%n_odd(n) = n_odd
+            self%n_even(n) = n_even
+            !Note:  may want to store n_x too
+			Allocate(self%cheby_even(n)%data(1:N_x,1:N_even))
+			Allocate(self%cheby_odd( n)%data(1:N_x,1:N_odd))
+			Do i = 1, n_even
+				self%cheby_even(n)%data(1:N_x,i) = &
+                    & cheby(1:N_x,2*i-1)
+			Enddo
+			Do i = 1,n_odd
+				self%cheby_odd(n)%data(1:N_x,i) = &
+                    & cheby(1:N_x,2*i)
+			Enddo
+			If (n_x .ne. n_odd) Then
+				! We actually have an x = 0 point
+				! We must be careful not to double count the power here
+				! when exploiting parity to speed up the transforms.
+				! No such adjustment need be made for the regular cheby array
+				self%cheby_even(n)%data(n_x,:) = &
+                    & 0.5d0*self%cheby_even(n)%data(n_x,:)
+				self%cheby_odd(n )%data(n_x,:) = &
+                    & 0.5d0*self%cheby_odd( n)%data(n_x,:)
+				! There is really no need to modify cheby_odd, but this way it is consistently stored.
+			Endif
+        Enddo
+        DeAllocate(cheby)
+	End Subroutine Gen_Tn
+
+    !Note:  Was working here
+	Subroutine Gen_Tn_Deriv_Arrays(dmax)
+		Implicit None
+		Integer, Intent(In) :: dmax
+		Integer :: i, k,n,d 
+		Real*8, Allocatable :: alpha(:,:)
+
+		! sum_n (alpha_kn  c_n) = c'_k
+		Allocate(alpha(1:N_max,1:N_max))
+        alpha(:,:) = 0.0d0
+		alpha(N_max,:) = 0.0d0
+		alpha(N_max-1,N_max) = 2.0d0*(N_max-1)
+		Do k = N_max-2, 1, -1
+			alpha(k,k+1) = 2.0d0*k
+			alpha(k,:) = alpha(k,:)+alpha(k+2,:)
+		Enddo	 
+		Allocate(dcheby(1:N_max,1:N_max,0:dmax))
+		dcheby(:,:,:) = 0.0d0
+		dcheby(:,:,0) = cheby(:,:)
+		dcheby(:,1,0) = dcheby(:,1,0) - 0.5d0	! This accounts for the -1/2c_0 in going from_spectral
+		If (dmax .ge. 1) Then
+			Do d = 1, dmax
+			Do n = 1, N_Max
+			Do k = 1, N_max
+				Do i = 1, N_max
+					dcheby(k,n,d) = dcheby(k,n,d) + dcheby(k,i,d-1)*alpha(i,n)
+				Enddo
+			Enddo
+			Enddo
+			Enddo
+		Endif
+		DeAllocate(alpha)
+	End Subroutine Gen_Tn_Deriv_Arrays
+
+    !End current revision work
 
     Subroutine Dealias_Buffer_4d(buff)
         Implicit None
@@ -138,57 +355,7 @@ Contains
         !f_out = f_out/maxval(abs(f_out))
     End Subroutine From_Spectral_4D2
 
-	Subroutine Initialize_Chebyshev(grid, xmin,xmax, integration_weights,nthread)
-		Implicit None
-		Real*8, Intent(InOut) :: grid(:)
-		Real*8, Intent(In), Optional :: xmin, xmax
-		Real*8 ::delta, gmin, tmp, xx
-        Real*8, Intent(InOut) :: integration_weights(1:)
-        Integer :: r
-		Integer, Intent(In) :: nthread
-		If (.not. initialized) Then
-			 cp_nthreads = nthread
-		    N_max = size(grid)
-		    Call gen_colocation_points()
-		    grid(:) = x(:)
-		    Call Gen_Tn()
-		    Call Gen_Tn_Deriv_Arrays(3)
-		    If (present(xmin)) Then
-			    delta = xmax-xmin
-			    scaling = (x(1)-x(N_max))/delta
-			    dcheby(:,:,1) = dcheby(:,:,1)*scaling
-			    dcheby(:,:,2) = dcheby(:,:,2)*(scaling**2)
-			    dcheby(:,:,3) = dcheby(:,:,3)*(scaling**3)
-			    grid(:) = grid(:)/scaling
-			    gmin = grid(N_max)
-			    grid(:) = grid(:)-gmin+xmin
-		    Endif
-		    initialized = .true.
-		Else
-			grid(:) = x(:)
-		Endif
 
-
-        integration_weights(1:n_max) = 0.0d0
-
-
-        !these weights evaluated the spherical radial average - i.e.
-        ! sum{integration_weights * f } = int{f*r^2 dr}/int{r^2 dr}
-
-        !Because we're using the zeros, x(1)-x(n_max) is not quite 2
-		tmp = (3*Pi * (grid(1)-grid(N_max)) )/ &
-			& ( (x(1)-x(N_max))* (grid(1)**3 - grid(N_max)**3) * N_max )
-		Do r=1,N_max
-			xx = x(r) ! (2.0d0*grid(r)-grid(N_max)-grid(1))/(grid(1)-grid(N_max))
-            !xx = (2.0d0*x(r)-x(N_max)-x(1) )
-			integration_weights(r) = grid(r)**2 * tmp * sqrt(1.0d0-xx*xx)
-		Enddo
-        integration_weights(1) = integration_weights(1)*0.5d0      !Boundaries x 1/2 (since on zero points)
-        integration_weights(N_max) = integration_weights(N_max)*0.5d0
-
-
-
-	End Subroutine Initialize_Chebyshev
 
 	Subroutine Rescale_Grid_CP(length_scale)
 		Implicit None
