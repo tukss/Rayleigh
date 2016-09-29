@@ -1,7 +1,6 @@
 Module Linear_Solve
 	Use Finite_Difference
-	Use Chebyshev_Polynomials, Only : Load_Single_Row_Cheby, Load_Interior_Rows_Cheby, Load_Single_Row_FECheby, &
-        &  Load_Interior_Rows_FECheby, Cheby_Continuity
+	Use Chebyshev_Polynomials, Only : Cheby_Grid
 	!==========================================================================
 	! Generalized Implicit Time-stepping
 	! Currently assumes that implicit time stepping can be done with 1 dimension (only)
@@ -18,8 +17,8 @@ Module Linear_Solve
 	real*8, Allocatable :: dfield(:,:,:,:)
 	Logical :: band_solve = .false.
 	Logical, Private :: chebyshev = .false.
-    Logical, Private :: finite_element = .false.
 	Real*8, Allocatable, Private :: temp_rhs(:,:,:)
+    Type(Cheby_Grid), Pointer, Private :: cpgrid
 	Type Data_arrays		! support structure for the equation structure
 		real*8, Allocatable :: data(:,:,:)	! dimensioned (r, mode, derivative_order)
 	End Type Data_arrays
@@ -91,9 +90,12 @@ Module Linear_Solve
 	Subroutine Use_BandSolve()
 		band_solve = .true.
 	End Subroutine Use_BandSolve
-	Subroutine Use_Finite_Elements()
-		finite_element = .true.
-	End Subroutine Use_Finite_Elements
+    Subroutine Set_CPGRID(ingrid)
+        Type(Cheby_Grid), Pointer, Intent(InOut) :: ingrid
+        nullify(cpgrid)
+        cpgrid => ingrid
+    End Subroutine Set_CPGRID
+
 	Subroutine DeAllocate_Derivatives()
 		Implicit None
 		Integer :: i, j, dmax, dtype
@@ -469,8 +471,6 @@ Module Linear_Solve
 		If (present(static)) Then
 			If (chebyshev) Then
 				Call Load_Interior_Rows_Cheby(rowblock, colblock,amp,dorder,mpointer)
-            Else If (finite_element) Then
-                Call Load_Interior_Rows_FECheby(ndim1,rowblock, colblock,amp,dorder,mpointer)
 			Else
 				Call Load_Interior_Rows(rowblock, colblock,amp,dorder,mpointer) ! Uses existing version of load rows
 			Endif
@@ -481,8 +481,6 @@ Module Linear_Solve
 			amp = amp*time_amp
 			If (chebyshev) Then
 				Call Load_Interior_Rows_Cheby(rowblock, colblock,amp,dorder,mpointer)
-            Else If (finite_element) Then
-                Call Load_Interior_Rows_FECheby(ndim1,rowblock, colblock,amp,dorder,mpointer)
 			Else
 				Call Load_Interior_Rows(rowblock, colblock,amp,dorder,mpointer) ! Uses existing version of load rows
 			Endif
@@ -785,9 +783,6 @@ Module Linear_Solve
         Else
     		If (chebyshev) Then
 	    		Call Load_Single_Row_Cheby(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
-            Else If (finite_element) Then
-	            Call Load_Single_Row_FECheby(row,rowblock,colblock,amp,dorder,mpointer,&
-                     &  boundary = .true.)
 		    Else
 			    Call Load_Single_Row(row,rowblock,colblock,amp,dorder,mpointer, boundary = .true.)
 		    Endif
@@ -1050,24 +1045,24 @@ End Subroutine Band_Load_Single
         ! Otherwise,
         ! We link to the "right," starting with domain 1.
         ! Index nmax of domain 1 matches index 1 of domain 2
-        r = grid%npoly(1)
+        r = cpgrid%npoly(1)
         if (rind .eq. 1) r = r+1
-        off1 = grid%npoly(1)
+        off1 = cpgrid%npoly(1)
         off2 = 0
         Do hh = 2, nsub
             mpointer(r+row,:) = 0.0d0
-            Do n = 1, grid%rda(hh) -1 	! De-Alias at boundaries (single rows are really just for boundaries)
+            Do n = 1, cpgrid%rda(hh) -1 	! De-Alias at boundaries (single rows are really just for boundaries)
 		        mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
-                    &  + grid%dcheby(hh)%data(1,n,dorder)
+                    &  + cpgrid%dcheby(hh)%data(1,n,dorder)
 	        Enddo
-            ind = grid%npoly(hh-1)
-            Do n = 1, grid%rda(hh-1)
+            ind = cpgrid%npoly(hh-1)
+            Do n = 1, cpgrid%rda(hh-1)
                 mpointer(row+r,col+n+off2) = mpointer(row+r,col+n+off2) &
-                    & - grid%dcheby(hh-1)%data(ind,n,dorder)
+                    & - cpgrid%dcheby(hh-1)%data(ind,n,dorder)
             Enddo
-            r = r+grid%npoly(hh) !advance to next subdomain
-            off1 = off1+grid%npoly(hh)
-            off2 = off2+grid%npoly(hh-1)
+            r = r+cpgrid%npoly(hh) !advance to next subdomain
+            off1 = off1+cpgrid%npoly(hh)
+            off2 = off2+cpgrid%npoly(hh-1)
         Enddo
 
 
@@ -1083,9 +1078,9 @@ End Subroutine Band_Load_Single
 
         r = 1
         off1 = 0
-        nsub = grid%domain_count
+        nsub = cpgrid%domain_count
         Do hh = 1, nsub
-            npoly = grid%npoly(hh)
+            npoly = cpgrid%npoly(hh)
             do i = 1, npoly
 			    Do n = 1, N_max
 				    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
@@ -1115,23 +1110,23 @@ End Subroutine Band_Load_Single
 		Endif
 
         ! We need to do a little work to find which domain we're in
-        nsub = grid%domain_count
+        nsub = cpgrid%domain_count
         domain = 1
         off1 = 0
-        rlower = grid%npoly(1)
+        rlower = cpgrid%npoly(1)
         local_index = r
         do hh = 2, nsub
             If (r .gt. rlower) Then 
-                off1 = off1+grid%npoly(hh-1)
+                off1 = off1+cpgrid%npoly(hh-1)
                 domain = hh
                 local_index = local_index-rlower
             Endif
-            rlower = rlower+grid%npoly(hh) 
+            rlower = rlower+cpgrid%npoly(hh) 
         Enddo
 
-		Do n = 1, grid%rda(domain)-1 	! De-Alias at boundaries (single rows are really just for boundaries)
+		Do n = 1, cpgrid%rda(domain)-1 	! De-Alias at boundaries (single rows are really just for boundaries)
 			mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
-                & + amp*grid%dcheby(domain)%data(local_index,n,dorder)
+                & + amp*cpgrid%dcheby(domain)%data(local_index,n,dorder)
 		Enddo
 
 	End Subroutine Load_Single_Row_Cheby
