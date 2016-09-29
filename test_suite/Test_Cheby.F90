@@ -1,6 +1,6 @@
 Module Test_Cheby
 	Use ProblemSize
-	Use Chebyshev_Polynomials
+
 	Implicit None
 	Real*8, Allocatable :: colocx(:)
 Contains	
@@ -32,25 +32,25 @@ Contains
 		f = exp(-4.0d0*colocx**2)	! Even function
 		f = f+exp(-4.0d0*(colocx+0.25)**2)	! odd function
 		f = f-exp(-4.0d0*(colocx-0.25)**2)
-		parity = .false.
+
 		
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 1-D array.'
 			Write(6,*)'Parity is off'
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_Spectral(c,fcheck)
 			Call reldiff1d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
-		parity = .true.
+
 
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 1-D array.'
 			Write(6,*)'Parity is on'
 			c(:) = 0.0d0
 			fcheck(:) = 0.0d0
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_spectral(c,fcheck)
 			Call reldiff1d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
@@ -113,24 +113,24 @@ Contains
 			f(:,i) = f(:,i)+exp(-i*(colocx-0.25)**2) -exp(-i*(colocx-0.25)**2)
 		Enddo
 
-		parity = .false.
-		Call Cheby_to_spectral(f,c)
+
+		!Call gridcp%to_spectral(f,c)
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 2-D array.'
 			Write(6,*)'Parity is off'
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_spectral(c,fcheck)
 			Call reldiff2d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
-		parity = .true.
+
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 2-D array.'
 			Write(6,*)'Parity is on'
 			fcheck(:,:) = 0.0d0
 			c(:,:) = 0.0d0
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_spectral(c,fcheck)
 			Call reldiff2d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
@@ -157,23 +157,23 @@ Contains
 			f(:,i,j) = f(:,i,j)+exp(-j*colocx**2)
 		Enddo
 		Enddo
-		parity = .false.
-		Call Cheby_to_spectral(f,c)
+
+		!Call gridcp%to_spectral(f,c)
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 3-D array.'
 			Write(6,*)'Parity is off'
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_spectral(c,fcheck)
 			Call reldiff3d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
-		parity = .true.
+
 
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 3-D array.'
 			Write(6,*)'Parity is on'
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			!Call gridcp%to_spectral(f,c)
+			!Call gridcp%from_spectral(c,fcheck)
 			Call reldiff3d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
@@ -224,25 +224,25 @@ Contains
 		Enddo
 		f(:,:,:,2) = 2.0d0*f(:,:,:,1)
 
-		parity = .false.
-		Call Cheby_to_spectral(f,c)
+
+		Call gridcp%to_spectral(f,c)
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 4-D array.'
 			Write(6,*)'Parity is off'
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			Call gridcp%to_spectral(f,c)
+			Call gridcp%from_spectral(c,fcheck)
 			Call reldiff4d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
-		parity = .true.
+
 
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev transform of 4-D array.'
 			Write(6,*)'Parity is on'
 			fcheck = 0.0d0
 			c = 0.0d0
-			Call Cheby_to_spectral(f,c)
-			Call Cheby_from_Spectral(c,fcheck)
+			Call gridcp%to_spectral(f,c)
+			Call gridcp%from_spectral(c,fcheck)
 			Call reldiff4d(f,fcheck,rdiff)
 			Write(6,*)'Maximum relative difference (fcheck-f)/f is : ', rdiff
 		Endif
@@ -308,15 +308,15 @@ Contains
             ans(:,i,j,4) = -f(:,i,j,1)
 		Enddo
 		Enddo
-		parity = .false.
-		dorder = 1
-		Call Cheby_to_spectral(f,c)
-		!Out of place derivatives
-		Call Cheby_Deriv_Buffer_4D(1,2,c,1)
-		Call Cheby_Deriv_Buffer_4D(1,3,c,2)
-		Call Cheby_Deriv_Buffer_4D(1,4,c,3)
 
-		Call Cheby_from_spectral(c,f)
+		dorder = 1
+		Call gridcp%to_spectral(f,c)
+		!Out of place derivatives
+		Call gridcp%d_by_dr_cp(1,2,c,1)
+		Call gridcp%d_by_dr_cp(1,3,c,2)
+		Call gridcp%d_by_dr_cp(1,4,c,3)
+
+		Call gridcp%from_spectral(c,f)
 		
 		If (my_rank .eq. 0) Then
 			Write(6,*)'Checking Chebyshev Derivative of 4-D array.'
@@ -341,7 +341,7 @@ Contains
 			Do j = 1, n2
 				Do i = 1, n_r
 					Do nn = 1, n_r
-					f(i,j,k,d+1) = f(i,j,k,d+1)+dcheby(i,nn,d)*c(nn,j,k,1)
+					f(i,j,k,d+1) = 0 !f(i,j,k,d+1)+dcheby(i,nn,d)*c(nn,j,k,1)
 					Enddo
 				Enddo
 			Enddo

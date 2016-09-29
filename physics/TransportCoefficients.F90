@@ -4,7 +4,7 @@ Module TransportCoefficients
 	Use Controls
     Use BoundaryConditions
     Use General_IO
-    Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp
+
 	Implicit None
 	Real*8, Allocatable :: nu(:), kappa(:), eta(:)
 	Real*8, Allocatable :: dlnu(:), dlnkappa(:), dlneta(:)
@@ -239,12 +239,12 @@ Contains
             dtemp(:,:,:,:) = 0.0d0
             dtemp2(:,:,:,:) = 0.0d0
             dtemp(1:n_r,1,1,1) = coeff(1:n_r)
-            Call Cheby_To_Spectral(dtemp,dtemp2)
+            Call gridcp%to_Spectral(dtemp,dtemp2)
             dtemp2((n_r*2)/3:n_r,1,1,1) = 0.0d0
-            Call d_by_dr_cp(1,2,dtemp2,1)
+            Call gridcp%d_by_dr_cp(1,2,dtemp2,1)
             dtemp2((n_r*2)/3:n_r,1,1,2) = 0.0d0  ! de-alias
             !transform back to physical
-            Call Cheby_From_Spectral(dtemp2,dtemp)
+            Call gridcp%From_Spectral(dtemp2,dtemp)
             dln(:) = dtemp(:,1,1,2)/coeff
             DeAllocate(dtemp,dtemp2)
         Endif

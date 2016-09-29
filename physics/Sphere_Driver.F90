@@ -2,7 +2,7 @@ Module Sphere_Driver
 	Use ClockInfo
 	Use Sphere_Hybrid_Space,   Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Sphere_Physical_Space, Only : physical_space, ohmic_heating_coeff
-	Use Sphere_Spectral_Space, Only : post_solve, post_solve_cheby, advancetime, ctemp, post_solve_fe
+	Use Sphere_Spectral_Space, Only : post_solve, post_solve_cheby, advancetime, ctemp
     Use Diagnostics_Interface, Only : Reboot_Diagnostics
     Use Spherical_IO, Only : time_to_output
 	Use Checkpointing
@@ -78,7 +78,7 @@ Contains
         Endif
 		last_iteration = first_iteration + max_iterations-1
 		Call Initialize_TimeStepping(first_iteration)
-		If ((chebyshev .or. magnetism) .or. finite_element) Then
+		If ((chebyshev .or. magnetism)) Then
 			! work structure for post_solve_cheby
 			Call ctemp%init(field_count = wsfcount, config = 'p1b')
 		Endif
@@ -99,8 +99,6 @@ Contains
             output_iteration = time_to_output(iteration)
 			If (chebyshev) Then
 				Call Post_Solve_Cheby()
-            Else If (finite_element) Then
-                Call Post_Solve_FE
 			Else
 				Call Post_Solve()	! Linear Solve configuration
 			Endif

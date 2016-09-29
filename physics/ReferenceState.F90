@@ -11,8 +11,6 @@ Module ReferenceState
     Use Math_Constants
     Use Math_Utility
     Use General_MPI, Only : BCAST2D
-    Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp, &
-        & cheby_to_spectralFE, cheby_from_spectralFE, d_by_dr_cpFE
     Implicit None
     Type ReferenceInfo
         Real*8, Allocatable :: Density(:)
@@ -757,14 +755,14 @@ Contains
         dtemp(:,1,1,1) = ref%dlnrho(:)
 
         ! transform to spectral
-        Call Cheby_To_Spectral(dtemp,dtemp2)
+        Call gridcp%to_Spectral(dtemp,dtemp2)
         !Take derivative of 4th dimension, index 1 of dtemp2 (first 1)
         ! store it in 4th dimension, index 2
         ! Take a first derivative (second 1)
-        Call d_by_dr_cp(1,2,dtemp2,1)
+        Call gridcp%d_by_dr_cp(1,2,dtemp2,1)
         !dtemp2((n_r*2)/3:n_r,1,1,2) = 0.0d0  ! de-alias
         !transform back to physical
-        Call Cheby_From_Spectral(dtemp2,dtemp)
+        Call gridcp%from_Spectral(dtemp2,dtemp)
 
         ref%d2lnrho(:) = dtemp(:,1,1,2)        
 

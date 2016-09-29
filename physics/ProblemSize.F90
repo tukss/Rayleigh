@@ -4,7 +4,7 @@ Module ProblemSize
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
-	Use Chebyshev_Polynomials, Only : Initialize_Chebyshev, Rescale_Grid_CP
+	Use Chebyshev_Polynomials, Only : Cheby_Grid
     Use Math_Constants
     Use BufferedOutput
 	Use Timers
@@ -53,14 +53,15 @@ Module ProblemSize
     Integer, Parameter :: nsubmax = 64
     Integer :: ncheby(1:nsubmax)=-1
     Integer :: dealias_by(1:nsubmax) = -1
-    Integer :: cheby_count
+    Integer :: ndomains = 1
     Integer :: n_uniform_domains =1
     Real*8  :: domain_bounds(1:nsubmax+1)=-1.0d0
+    Type(Cheby_Grid), Target :: gridcp
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
             &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max, &
             &  aspect_ratio, shell_depth, ncheby, domain_bounds, dealias_by, &
-            &  nuniform_domains
+            &  n_uniform_domains
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -68,7 +69,7 @@ Contains
 		Integer :: ppars(1:10)
 		Integer :: tmp,r, l
 		Integer, Allocatable :: m_vals(:)
-		Real*8 :: ell
+		Real*8 :: ell, rdelta
         Character*120 :: grid_file
         Integer :: cpu_tmp(1)
 		Character*12 :: dstring
@@ -109,6 +110,7 @@ Contains
             Endif
         Enddo
 
+        
 
         If (n_uniform_domains .gt. 1) Then
             ! Case (b)
@@ -127,7 +129,7 @@ Contains
                 n_r = n_r+ncheby(i)
             Enddo
         Endif
-
+        ndomains = cheby_count
 
         rmin = domain_bounds(1)
         rmax = domain_bounds(bounds_count)
@@ -283,7 +285,7 @@ Contains
 
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
-		Integer :: r, nthr,i,j 
+		Integer :: r, nthr,i,j ,n
 		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
         real*8 :: delr0
 
@@ -306,54 +308,19 @@ Contains
         If (chebyshev) Then
             grid_type = 2
 
-			Call Initialize_Chebyshev(radius, radial_integral_weights, &
-                & cheby_count,ncheby,domain_bounds,nthr)
-
-
-        Endif
-        !-------------------------------------
-
-		If (chebyshev) Then
-			grid_type = 2
-            Call Initialize_Chebyshev(radius,rmin,rmax,radial_integral_weights, nthr)
-
-			Delta_r(1) = radius(1)-radius(2)
-			Do r = 2, N_R
-				Delta_r(r) = radius(r)-radius(r-1)
-			Enddo
-
-        Else If (finite_element) Then
-            !Write(6,*)"Initializing grid..."
-            Allocate(xtemp(1:fencheby))
-            Allocate(weight_Temp(1:fencheby))
-            dsub = (rmax-rmin)/DBLE(fensub)
-            xmin = 0.0d0
-            xmax = dsub
-            
-            Call Initialize_Chebyshev(xtemp,xmin,xmax,weight_temp, nthr)
-            offset = rmax-xtemp(1)
-            istart = 1
-            iend = istart+fencheby-1
-            Do j = 1, fensub
-                radius(istart:iend) = xtemp(1:fencheby)+offset
-                radial_integral_weights(istart:iend) = weight_temp(1:fencheby)
-                offset = radius(iend)-xtemp(1)
-                istart = istart+fencheby
-                iend = iend+fencheby
-            Enddo 
-            Do j = 1, n_r
-                if (MOD(j,fencheby) .eq. 0) Then
-                    delta_r(j) = radius(j-1)-radius(j)
-                Else
-                    delta_r(j) = radius(j)-radius(j+1)
-                Endif
-            Enddo
-            If (my_rank .eq. 0) Then
-                Do j = 1, n_r
-                    write(6,*)j," : ", radius(j), " , ", delta_r(j)
-                    if (MOD(j,fencheby) .eq. 0) Write(6,*)"---------------------"
+			Call gridcp%Init(radius, radial_integral_weights, &
+                & ndomains,ncheby,domain_bounds,nthread = nthr, &
+                & dealias_by = dealias_by)
+            r = 1
+            Do n = 1, ndomains
+                Delta_r(r) = radius(r)-radius(r+1)
+                r = r+1
+                Do i = 2, ncheby(n)
+                    Delta_r(r) = radius(r)-radius(r-1)
+                    r = r+1
                 Enddo
-            Endif
+            Enddo
+
 		Else
 
 			Select Case (grid_type)
@@ -424,16 +391,9 @@ Contains
 			End Select
 		Endif
 
-        If (.not. finite_element) Then
-		! Compute delta_r for CFL
-		do r = N_R-1, 1, -1
-			Delta_r(r) = Radius(r)-Radius(r+1)
-		enddo
-		Delta_r(N_R) = Delta_r(N_R-1) ! Duplicated extra value
-        Endif
 
 		Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
-		R_squared       = Radius**2
+		R_squared     = Radius**2
       One_Over_R      = (1.0d0)/Radius
       Two_Over_R      = (2.0d0)/Radius
       OneOverRSquared = (1.0d0)/r_Squared
@@ -452,7 +412,7 @@ Contains
         ovr_repeated = ovr_repeated*length_scale
         ovrsq_repeated = ovrsq_repeated*length_scale
         If (chebyshev) Then
-            Call Rescale_Grid_CP(length_scale)
+         !   Call Rescale_Grid_CP(length_scale)
         Else
             Call Rescale_Grid_FD(length_scale)
         Endif

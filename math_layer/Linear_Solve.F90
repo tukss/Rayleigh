@@ -84,17 +84,16 @@ Module Linear_Solve
 	Type(variable), Allocatable, Target :: var_set(:)
 
 	Contains
-	Subroutine Use_Chebyshev()
+	Subroutine Use_Chebyshev(ingrid)
+        Type(Cheby_Grid), Pointer, Intent(InOut) :: ingrid
 		chebyshev = .true.
+        nullify(cpgrid)
+        cpgrid => ingrid
 	End Subroutine Use_Chebyshev
 	Subroutine Use_BandSolve()
 		band_solve = .true.
 	End Subroutine Use_BandSolve
-    Subroutine Set_CPGRID(ingrid)
-        Type(Cheby_Grid), Pointer, Intent(InOut) :: ingrid
-        nullify(cpgrid)
-        cpgrid => ingrid
-    End Subroutine Set_CPGRID
+
 
 	Subroutine DeAllocate_Derivatives()
 		Implicit None
@@ -799,7 +798,7 @@ Module Linear_Solve
 		colblock = equation_set(mode,eqind)%colblock(varind)
 		rowblock = equation_set(mode,eqind)%rowblock
 
-        Call Cheby_Continuity(ndim1,row,rowblock,colblock,dorder,mpointer)
+        Call Cheby_Continuity(row,rowblock,colblock,dorder,mpointer)
 
     End Subroutine FEContinuity
 	Subroutine Clear_Row(eqind, mode,row)
@@ -1032,9 +1031,10 @@ End Subroutine Band_Load_Single
 
 
 !Matrix row-loading routines
-	Subroutine Cheby_Continuity(nglobal,rind,row,col,dorder,mpointer) !, clear_row, boundary)
-		Integer, Intent(In) :: rind,row, col, dorder, nglobal
+	Subroutine Cheby_Continuity(rind,row,col,dorder,mpointer) !, clear_row, boundary)
+		Integer, Intent(In) :: rind,row, col, dorder
 		Integer :: n, off1, off2, r, rstart,rmod, extra, rind1, rind2
+        Integer :: hh, ind, nsub
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
 
 
@@ -1070,9 +1070,9 @@ End Subroutine Band_Load_Single
 
     !////////////////////////////////////////////////////////////////////////
     ! Finite Element versions of load row routines
-	Subroutine Load_Interior_Rows_Cheby(nglobal,row,col,amp,dorder,mpointer)
-		Integer, Intent(In) :: row, col, dorder, nglobal
-		Integer :: r, n, off1,npoly
+	Subroutine Load_Interior_Rows_Cheby(row,col,amp,dorder,mpointer)
+		Integer, Intent(In) :: row, col, dorder
+		Integer :: r, n, off1,npoly, hh, i, nsub
 		real*8, Intent(In) :: amp(:)
 		real*8, Pointer, Dimension(:,:), Intent(In) :: mpointer
 
@@ -1082,9 +1082,9 @@ End Subroutine Band_Load_Single
         Do hh = 1, nsub
             npoly = cpgrid%npoly(hh)
             do i = 1, npoly
-			    Do n = 1, N_max
+			    Do n = 1, npoly
 				    mpointer(row+r,col+n+off1) = mpointer(row+r,col+n+off1) &
-                        & +amp(r)*dcheby(hh)%data(i,n,dorder)
+                        & +amp(r)*cpgrid%dcheby(hh)%data(i,n,dorder)
 			    Enddo
                 r = r+1
             enddo
@@ -1095,7 +1095,7 @@ End Subroutine Band_Load_Single
 
 	Subroutine Load_Single_Row_Cheby(r,row,col,amp,dorder,mpointer, clear_row, boundary)
 		Integer, Intent(In) :: r,row, col, dorder
-		Integer :: n, off1, local_index, domain, nsub
+		Integer :: n, off1, local_index, domain, nsub,hh,rlower
 		real*8, Intent(In) :: amp
 		real*8, Pointer, Dimension(:,:), Intent(InOut) :: mpointer
 		Logical, Intent(In), Optional :: clear_row, boundary
