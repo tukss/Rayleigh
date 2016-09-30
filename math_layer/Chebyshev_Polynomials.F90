@@ -57,6 +57,14 @@ Contains
         Integer :: r, i,n, domain_count
         Integer :: ind, ind2, n_max, dmx, gindex, db,scheck
         Logical :: custom_dealiasing = .false.
+
+        write(6,*)'Ndomains: ', ndomains
+        write(6,*)'npoly   : ', npoly(1:ndomains)
+        write(6,*)'bounds  : ', bounds(1:ndomains+1)
+        If (present(dealias_by)) Then
+            scheck = size(dealias_by)
+            if (scheck .ge. ndomains) Write(6,*)'dealias_by: ', dealias_by(1:ndomains)
+        Endif        
    
         !Note that bounds and npoly are assumed to be provided in ascending order
         !We reverse them so that the subdomains agree with a globally reversed grid
@@ -89,11 +97,13 @@ Contains
             db = (2*n)/3+1
             self%rda(i) = db
             If (custom_dealiasing) Then
-                db = dealias_by(i)
-                If ((db .gt. 1) .and. (db .lt. n) ) Then
-                    self%rda = db
+                db = dealias_by(domain_count+1-i)
+                Write(6,*)'db!: ', db
+                If ((db .ge. 1) .and. (db .lt. n) ) Then
+                    self%rda(i) = n-db+1
                 Endif
             Endif
+            Write(6,*)'dacheck 1:', self%rda(i), self%npoly(i)
         Enddo
 
         Do i = 1, domain_count+1
@@ -319,9 +329,9 @@ Contains
         Real*8, Intent(InOut) :: buffer(1:,1:,1:,1:)
         Integer :: bsize(4), i,j,k,n
         bsize = shape(buffer)
-        do n = 1, self%domain_count
-            WRite(6,*)'da check: ', self%rda(n), self%npoly(n)
-        Enddo
+        !do n = 1, self%domain_count
+        !    WRite(6,*)'da check: ', self%rda(n), self%npoly(n)
+        !Enddo
         Do k = 1, bsize(4)
         Do j = 1, bsize(3)
         Do i = 1, bsize(2)

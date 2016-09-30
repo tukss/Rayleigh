@@ -375,6 +375,8 @@ Contains
             Call Clear_Row(teq,lp,1)
             Call Clear_Row(teq,lp,N_R)
 
+            ! "1" denotes linking at index 1, starting in domain 2
+            ! "2" denotes linking at index npoly, starting in domain 1
             Call FEContinuity(peq,lp,pvar,1,0) ! Pressure is continuous
             Call FEContinuity(teq,lp,tvar,2,0) ! T/S is continuous
             Call FEContinuity(teq,lp,tvar,1,1)   ! T' / S' is continuous (for ell = 0)
@@ -426,6 +428,8 @@ Contains
             Call Clear_Row(zeq,lp,1)
             Call Clear_Row(zeq,lp,N_R)
 
+            ! "1" denotes linking at index 1, starting in domain 2
+            ! "2" denotes linking at index npoly, starting in domain 1
             Call FEContinuity(peq,lp,pvar,2,0)   ! Pressure is continuous
             Call FEContinuity(peq,lp,wvar,1,2)          ! W'' is continuous 
 

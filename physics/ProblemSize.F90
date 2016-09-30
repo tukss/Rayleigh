@@ -91,7 +91,7 @@ Contains
         !       a.) a single Chebyshev domain (normal mode)
         !       b.) a uniform set of N Chebyshev domains (original SFE mode)
         !       c.) N Chebyshev domains with differing number of polynomials
-        If (ncheby(1) .le. 0) Then
+        If ( (ncheby(1) .le. 0) .and. (n_uniform_domains .lt. 2) ) Then
             ! Case (a)
             ncheby(1) = n_r
             domain_bounds(1) = rmin
@@ -114,7 +114,12 @@ Contains
 
         If (n_uniform_domains .gt. 1) Then
             ! Case (b)
+            If (ncheby(1) .le. 0) Then
+                ncheby(1) = n_r/n_uniform_domains
+            Endif
             n_r =n_uniform_domains*ncheby(1) 
+            ncheby(1:n_uniform_domains) = ncheby(1)
+            dealias_by(1:n_uniform_domains) = dealias_by(1)
             cheby_count = n_uniform_domains
             domain_bounds(1) = rmin
             rdelta = (rmax-rmin)/DBLE(cheby_count)
@@ -135,7 +140,10 @@ Contains
         rmax = domain_bounds(bounds_count)
 
 
-
+        Write(6,*)'Check ndomains: ', ndomains
+        WRite(6,*)'     rmin,rmax: ', rmin,rmax
+        Write(6,*)'           n_r: ', n_r
+        Write(6,*)'   cheby_count: ', cheby_count
 
         shell_volume = four_pi*one_third*(rmax**3-rmin**3)
         If (l_max .le. 0) Then
@@ -316,11 +324,15 @@ Contains
                 Delta_r(r) = radius(r)-radius(r+1)
                 r = r+1
                 Do i = 2, ncheby(n)
-                    Delta_r(r) = radius(r)-radius(r-1)
+                    Delta_r(r) = radius(r-1)-radius(r)
                     r = r+1
                 Enddo
             Enddo
-
+            If (my_rank .eq. 0) Then
+                Do r = 1, n_r
+                    Write(6,*)'r, dr: ', radius(r), delta_r(r), r
+                Enddo
+            Endif
 		Else
 
 			Select Case (grid_type)
