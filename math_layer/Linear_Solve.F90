@@ -92,6 +92,7 @@ Module Linear_Solve
     End Subroutine Use_Chebyshev
     Subroutine Use_BandSolve()
         band_solve = .true.
+        write(6,*)'Band solve is turned ON'
     End Subroutine Use_BandSolve
 
 
@@ -904,12 +905,15 @@ Module Linear_Solve
 
     Subroutine Band_Arrange(equ,mode)
             Integer, Intent(In) :: equ, mode
-            Integer :: link,i
+            Integer :: link,i,nupper
             If (equation_set(mode,equ)%solvefor) Then
                 If (equ .eq. 1) Then
-                    Call Band_Load_Single(mode,equ,11)
+                    nupper = 3*cpgrid%max_npoly
+                    !Call Band_Load_Single(mode,equ,11)
+                     Call Band_Load_Single(mode,equ,nupper)
                 Else
-                    Call Band_Load_Single(mode,equ,3)
+                    nupper = cpgrid%max_npoly
+                    Call Band_Load_Single(mode,equ,nupper) ! 3
                 Endif
             
             
@@ -977,12 +981,12 @@ Module Linear_Solve
 
 
     Subroutine Band_Load_Single(j,k,n_upper)
-            !Equation_set(j,k)%LHS  j is equation, k is mode
+          !Equation_set(j,k)%LHS  j is equation, k is mode
           Real*8, Allocatable :: band_matrix(:,:), temp_rows(:,:)
           Integer :: r, i, row_diag, rput, N_Rows,j,k
           Integer :: istart, iend, n_upper, n_lower,nlinks,rind
-            nlinks = equation_set(j,k)%nlinks
-
+          nlinks = equation_set(j,k)%nlinks
+          Write(6,*)'Loading single band matrix'
             N_rows = ndim1*nlinks
           n_lower = n_upper
           row_diag = n_lower+n_upper+1
