@@ -378,9 +378,8 @@ Contains
             ! "1" denotes linking at index 1, starting in domain 2
             ! "2" denotes linking at index npoly, starting in domain 1
             Call FEContinuity(peq,lp,pvar,1,0) ! Pressure is continuous
+            Call FEContinuity(teq,lp,tvar,1,1) ! T' / S' is continuous (for ell = 0)
             Call FEContinuity(teq,lp,tvar,2,0) ! T/S is continuous
-            Call FEContinuity(teq,lp,tvar,1,1)   ! T' / S' is continuous (for ell = 0)
-
 
             !*******************************************************
             ! Entropy Boundary Conditions
@@ -757,16 +756,15 @@ Contains
                     endif                    
                 Enddo
 
+
                 j = 1
-                Do n = 2, ndomains
-                    equation_set(1,weq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
-                    equation_set(1,weq)%RHS(N_R+j  ,: , indx:indx+n_m) = 0.0d0
-                    equation_set(1,weq)%RHS(2*N_R+j,: , indx:indx+n_m) = 0.0d0
-                    if (l .ne. 0) equation_set(1,zeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                Do n = 1, ndomains-1
                     j = j+gridcp%npoly(n)
+                    equation_set(1,weq)%RHS(      j  ,:, indx:indx+n_m) = 0.0d0
+                    equation_set(1,weq)%RHS(  N_R+j  ,:, indx:indx+n_m) = 0.0d0
+                    equation_set(1,weq)%RHS(2*N_R+j  ,:, indx:indx+n_m) = 0.0d0
+                    if (l .ne. 0) equation_set(1,zeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
                 Enddo
-
-
 
                 If (Magnetism) Then
                     if (l .ne. 0) then
@@ -778,10 +776,10 @@ Contains
                         Enddo
 
                         j = 1
-                        Do n = 2, ndomains
-                            equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
-                            equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                        Do n = 1, ndomains-1
                             j = j+gridcp%npoly(n)
+                            equation_set(1,aeq)%RHS(      j,: , indx:indx+n_m) = 0.0d0
+                            equation_set(1,ceq)%RHS(      j,: , indx:indx+n_m) = 0.0d0                           
                         Enddo
                     endif
                 Endif

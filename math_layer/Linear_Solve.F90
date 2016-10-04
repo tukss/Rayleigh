@@ -1046,8 +1046,9 @@ Module Linear_Solve
 
         offleft = 0                 !Column offset for left-side domain
         offright = cpgrid%npoly(1)  !Column offset for right-side domain
-
+        !write(6,*)'rind check: ', rind, r
         Do hh = 1, nsub -1
+            !write(6,*)'rcheck 2: ', r
             ! Clear this row completely
             mpointer(r+row,:) = 0.0d0     
 
@@ -1066,7 +1067,7 @@ Module Linear_Solve
 
             !Advance row and offset indices to next subdomain
 
-            !--------------Something is off here...
+
             r = r+cpgrid%npoly(hh+1) 
             offleft = offleft+cpgrid%npoly(hh)
             offright = offright+cpgrid%npoly(hh+1)
@@ -1097,6 +1098,7 @@ Module Linear_Solve
             Enddo
             off1 = off1+npoly
         Enddo
+        !write(6,*)'Rout: ', r-1
 
     End Subroutine Load_Interior_Rows_Cheby
 

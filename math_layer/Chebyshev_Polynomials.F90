@@ -327,7 +327,8 @@ Contains
         Implicit None
         Class(Cheby_Grid) :: self
         Real*8, Intent(InOut) :: buffer(1:,1:,1:,1:)
-        Integer :: bsize(4), i,j,k,n
+        Integer :: bsize(4), i,j,k,n,offset, ind1,ind2
+
         bsize = shape(buffer)
         !do n = 1, self%domain_count
         !    WRite(6,*)'da check: ', self%rda(n), self%npoly(n)
@@ -335,8 +336,12 @@ Contains
         Do k = 1, bsize(4)
         Do j = 1, bsize(3)
         Do i = 1, bsize(2)
+        offset = 0
         Do n = 1, self%domain_count
-            buffer(self%rda(n):self%npoly(n),i,j,k) = 0.0d0
+            ind1 = self%rda(n)+offset
+            ind2 = self%npoly(n)+offset
+            buffer(ind1:ind2,i,j,k) = 0.0d0
+            offset = offset+self%npoly(n)
         Enddo
         Enddo
         Enddo
@@ -585,7 +590,7 @@ Contains
                         Do order = 2, dorder
                             hoff = 0
                             DO hh = 1, nsub
-
+                                n = self%npoly(hh)
                             !scaling = self%scaling(hh)
                             dbuffer(hoff+n-1,order,trank) = 0.0d0
                             dbuffer(hoff+n-2,order,trank) = 2.0d0*(n-1)*dbuffer(hoff+n-1,order-1,trank) !*scaling

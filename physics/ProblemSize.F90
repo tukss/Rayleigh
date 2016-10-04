@@ -323,7 +323,7 @@ Contains
             Do n = 1, ndomains
                 Delta_r(r) = radius(r)-radius(r+1)
                 r = r+1
-                Do i = 2, ncheby(n)
+                Do i = 2, gridcp%npoly(n)
                     Delta_r(r) = radius(r-1)-radius(r)
                     r = r+1
                 Enddo
