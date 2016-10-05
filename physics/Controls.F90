@@ -22,9 +22,10 @@ Module Controls
     Logical :: use_parity = .true.          ! Possibly defunct - should always be true
     Logical :: deriv_cluge = .true.         ! Use modified 2nd derivative in radius for finite-differences (leave true for stability...for now)
     Logical :: pad_alltoall = .false.       ! Normally all-to-allv is used.  Standard alltoall with zero padded buffers can be used when this flag is on.
+    Logical :: sparsesolve = .false.
 
     Namelist /Numerical_Controls_Namelist/ chebyshev, bandsolve, static_transpose, static_config, &
-            & use_parity, deriv_cluge, pad_alltoall
+            & use_parity, deriv_cluge, pad_alltoall, sparsesolve
 
     !////////////////////////////////////////////////////////////////////////////////
     ! Physical Controls

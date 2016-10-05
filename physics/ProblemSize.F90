@@ -328,11 +328,11 @@ Contains
                     r = r+1
                 Enddo
             Enddo
-            If (my_rank .eq. 0) Then
-                Do r = 1, n_r
-                    Write(6,*)'r, dr: ', radius(r), delta_r(r), r
-                Enddo
-            Endif
+            !If (my_rank .eq. 0) Then
+            !    Do r = 1, n_r
+            !        Write(6,*)'r, dr: ', radius(r), delta_r(r), r
+            !    Enddo
+            !Endif
 		Else
 
 			Select Case (grid_type)

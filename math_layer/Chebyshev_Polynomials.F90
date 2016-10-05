@@ -103,7 +103,7 @@ Contains
                     self%rda(i) = n-db+1
                 Endif
             Endif
-            Write(6,*)'dacheck 1:', self%rda(i), self%npoly(i)
+            !Write(6,*)'dacheck 1:', self%rda(i), self%npoly(i)
         Enddo
 
         Do i = 1, domain_count+1
@@ -174,6 +174,7 @@ Contains
 
         cp_nthreads = 1
         If (present(nthread)) Then
+            write(6,*)'nthreads: ', nthread
             If (nthread .gt. 1) cp_nthreads = nthread
         Endif
 
@@ -572,7 +573,7 @@ Contains
          !$OMP END PARALLEL DO
             If (dorder .gt. 1) Then 
                 Allocate(dbuffer(0:nglobal-1,1:dorder,0:cp_nthreads-1))
-            !$OMP PARALLEL PRIVATE(i,j,k,trank,order,kstart,kend,nthr,n,hh)
+            !$OMP PARALLEL PRIVATE(i,j,k,trank,order,kstart,kend,nthr,n,hh,hoff)
 #ifdef useomp
                 trank = omp_get_thread_num()
                   nthr  = omp_get_num_threads()
@@ -591,15 +592,15 @@ Contains
                             hoff = 0
                             DO hh = 1, nsub
                                 n = self%npoly(hh)
-                            !scaling = self%scaling(hh)
+
                             dbuffer(hoff+n-1,order,trank) = 0.0d0
-                            dbuffer(hoff+n-2,order,trank) = 2.0d0*(n-1)*dbuffer(hoff+n-1,order-1,trank) !*scaling
+                            dbuffer(hoff+n-2,order,trank) = 2.0d0*(n-1)*dbuffer(hoff+n-1,order-1,trank)
                             Do i = n -3, 0, -1
                                 dbuffer(hoff+i,order,trank) = dbuffer(hoff+i+2,order,trank)+ &
-                                    & 2.0d0*(i+1)*dbuffer(hoff+i+1,order-1,trank) !*scaling                        
+                                    & 2.0d0*(i+1)*dbuffer(hoff+i+1,order-1,trank)                       
                             Enddo
                             hoff = hoff+self%npoly(hh)
-                            ENDDO !hh
+                            ENDDO
                         Enddo
                         buffer(:,j,k,dind) = dbuffer(:,dorder,trank)
                     Enddo

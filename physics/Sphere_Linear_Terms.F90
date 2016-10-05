@@ -342,6 +342,18 @@ Contains
 
             Endif
             Call Set_Boundary_Conditions(lp)
+            If (sparsesolve) Then
+                !Write(6,*)'matrix: ', weq,lp, my_rank, l
+                Call Sparse_Load(weq,lp)
+                !Write(6,*)'matrix: ', zeq,lp,my_rank, l 
+                Call Sparse_Load(zeq,lp)
+                If (magnetism) Then
+                    Call Sparse_Load(aeq,lp)
+                    Call Sparse_Load(ceq,lp)
+                Endif
+            Endif
+
+
             If (bandsolve) Then
                 Call Band_Arrange(weq,lp)
                 Call Band_Arrange(zeq,lp)
