@@ -143,6 +143,7 @@ Contains
         Enddo
         Call Finalize_Equations()    
         If (bandsolve) Call Use_BandSolve()
+        If (sparsesolve) Call Use_SparseSolve()
 
     End Subroutine Initialize_Linear_System
 

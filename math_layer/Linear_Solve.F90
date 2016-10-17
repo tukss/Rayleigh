@@ -16,6 +16,7 @@ Module Linear_Solve
     real*8, Save, Private :: LHS_time_factor, RHS_time_factor    ! Forward and Backward time-weighting of the implicit scheme.
     real*8, Allocatable :: dfield(:,:,:,:)
     Logical :: band_solve = .false.
+    Logical :: sparse_solve = .false.
     Logical, Private :: chebyshev = .false.
     Real*8, Allocatable, Private :: temp_rhs(:,:,:)
     Type(Cheby_Grid), Pointer, Private :: cpgrid
@@ -55,11 +56,16 @@ Module Linear_Solve
         Integer, Allocatable :: sparse_ia(:), sparse_ja(:)
         Real*8, Allocatable :: sparse_mat(:)
         Integer*8 :: pt(64)
-        Integer :: maxfct, mnum, mtype, phase, n, nrhs, error, msglvl
-        Integer :: solver
+        Integer :: mxfct, mnum, mtype, phase, n, nrhs, error, msglvl
+        Integer :: solver, idum, nrows
         Integer :: iparm(64)
-        Real*8  :: dparm(64)
-        logical :: sparse_init = .false.
+        Real*8  :: dparm(64), ddum
+        logical :: sparse_initialized = .false.
+
+        Contains
+        Procedure :: LU_Solve_Sparse
+        Procedure :: LU_Decompose_Sparse
+
     End Type Equation
 
 
@@ -106,7 +112,10 @@ Module Linear_Solve
         band_solve = .true.
         write(6,*)'Band solve is turned ON'
     End Subroutine Use_BandSolve
-
+    Subroutine Use_SparseSolve()
+        sparse_solve = .true.
+        write(6,*)'Sparse solve is turned ON'
+    End Subroutine Use_SparseSolve
 
     Subroutine DeAllocate_Derivatives()
         Implicit None
@@ -226,11 +235,9 @@ Module Linear_Solve
         Do k = 1, n_equations
             Do j = 1, n_modes
                 If (allocated(equation_set(j,k)%lhs)) equation_set(j,k)%lhs(:,:) = 0.0d0 
-                if (band_solve ) then
+                if (band_solve .or. sparse_solve) then
                     If (allocated(equation_set(j,k)%lhs) .and. equation_set(1,k)%primary) Then
                         DeAllocate(equation_set(j,k)%lhs)
-
-
                     Endif
                 endif
 
@@ -257,14 +264,13 @@ Module Linear_Solve
     Subroutine DeAllocate_LHS(mode_ind)
         Implicit None
         Integer, Intent(In) :: mode_ind
-        Integer :: k,j, ndim
+        Integer :: k,j
     
         j = mode_ind
         Do k = 1, n_equations
             If (equation_set(j,k)%solvefor) Then        
                 ! Only DeAllocate matrix information for modes we actually solve for
                 If (equation_set(j,k)%primary) Then
-                    ndim = ndim1*equation_set(j,k)%nlinks
                     If (allocated(equation_set(j,k)%lhs)) Then
                         DeAllocate(equation_set(j,k)%lhs)
                     Endif
@@ -383,8 +389,10 @@ Module Linear_Solve
             Do j = 1, n_modes
                 If (equation_set(j,k)%primary .and. equation_set(j,k)%solvefor) Then
                     If (band_solve) Then
-                        
                         Call lu_solve_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%rhs_pointer , Equation_Set(j,k)%Pivot)
+                    Else If (sparse_solve) Then
+                        !Call LU_Solve_Sparse(j,k)
+                        Call Equation_set(j,k)%LU_Solve_Sparse()
                     Else
                         Call lu_solve_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%rhs_pointer , Equation_Set(j,k)%Pivot)
                     Endif
@@ -410,8 +418,9 @@ Module Linear_Solve
 
                         Call lu_decompose_band(Equation_set(j,k)%LHS , Equation_Set(j,k)%Pivot)
 
-                    !else if (sparse_solve) Then
-                    !    Call lu_decompose_sparse(j,k)
+                    else if (sparse_solve) Then
+                        !Call lu_decompose_sparse(j,k)
+                        Call Equation_set(j,k)%lu_decompose_sparse()
                     else
                         Call lu_decompose_full(Equation_set(j,k)%LHS , Equation_Set(j,k)%Pivot)
                     Endif
@@ -802,24 +811,111 @@ Module Linear_Solve
         
     End Subroutine Clear_Row
 
-    Subroutine LU_Decompose_Sparse(mind,eind)
+
+
+    Subroutine LU_Solve_Sparse(self)
         Implicit None
-        Integer, Intent(In) :: mind, eind
-        Integer :: error, mtype, solver
-        mtype = 11  !unsymmetric matrix
-        solver = 0  !sparse direct method
-        Call pardisoinit(equation_set(mind,eind)%pt, mtype, &
-            & solver, equation_set(mind,eind)%iparm, &
-            & equation_set(mind,eind)%dparm, error)
-            IF (error .NE. 0) THEN
-            IF (error.EQ.-10 ) WRITE(*,*) 'No license file found'
-            IF (error.EQ.-11 ) WRITE(*,*) 'License is expired'
-            IF (error.EQ.-12 ) WRITE(*,*) 'Wrong username or hostname'
-                STOP
-            ELSE
-                WRITE(*,*) '[PARDISO]: License check was successful ... '
+        Class(Equation) :: self
+
+        Integer :: error, mtype, phase, mxfct, mnum, nrows 
+        Integer :: msglvl, nrhs
+        Real*8, Allocatable :: faux_rhs(:,:), faux_x(:,:)
+        self%mtype = 11
+        phase  = 33      ! only solve
+        msglvl = 0
+
+        self%nrows = self%nlinks*ndim1    ! and these
+        self%nrhs = size(self%rhs_pointer)/(self%nrows)  ! Add these into equation structure
+        !Write(6,*)'scheck: ', shape(self%rhs), self%nrhs, self%nrows
+        !Write(6,*)'scheck2: ', size(self%sparse_mat), size(self%sparse_ia), size(self%sparse_ja)
+        !Write(6,*)'iparm: ', self%iparm(5)
+        self%mxfct = 1
+        self%mnum = 1
+        self%iparm(8) = 1
+
+        Allocate(faux_rhs(1:self%nrows,1:self%nrhs))
+        Allocate(faux_x(1:self%nrows,1:self%nrhs))
+        faux_rhs(:,:) = 0.0d0
+        faux_x(:,:) = 0.0d0
+
+        !Write(6,*)'scheck: ', self%nrows*self%nrhs, size(faux_rhs), self%nrows, self%nrhs
+        !Write(6,*)'scheck2: ', size(self%rhs_pointer), size(self%rhs_pointer)/self%nrows
+        !Write(6,*)'scheck3: ', shape(self%rhs_pointer)
+        CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+                    & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+                    & self%idum, self%nrhs, self%iparm, msglvl, self%rhs_pointer, &
+                    & faux_x, error, self%dparm)
+
+
+        IF (error .NE. 0) THEN
+            WRITE(*,*) '33:  The following ERROR was detected: ', error
+            STOP
         END IF
+        DeAllocate(faux_rhs)
+        DeAllocate(faux_x)
+    End Subroutine LU_Solve_Sparse
+
+
+
+    Subroutine LU_Decompose_Sparse(self)
+        Implicit None
+        Class(Equation) :: self
+
+        Integer :: error, mtype, solver,phase, mxfct, mnum, nrows 
+        Integer :: msglvl, nrhs
+        self%nrows = self%nlinks*ndim1
+        self%nrhs = size(self%rhs_pointer)/self%nrows
+
+        self%mtype = 11  !unsymmetric matrix
+        solver = 0  !sparse direct method
+        msglvl = 0      ! with statistical information
+        self%mxfct  = 1      ! msglvl = 1 will generate output to the screen
+        self%mnum   = 1
+
+        If (.not. self%sparse_initialized) Then
+            self%sparse_initialized = .true.
+            self%iparm(:) = 0
+            Call pardisoinit(self%pt, self%mtype, solver, self%iparm, &
+                & self%dparm, error)
+            IF (error .NE. 0) THEN
+                IF (error.EQ.-10 ) WRITE(*,*) 'No license file found'
+                IF (error.EQ.-11 ) WRITE(*,*) 'License is expired'
+                IF (error.EQ.-12 ) WRITE(*,*) 'Wrong username or hostname'
+                STOP
+            ENDIF
+
+
+
+            phase  = 11      ! only reordering and symbolic factorization
+
+            !Write(6,*)'Checkcheck: ', self%iparm(3), self%iparm(6)
+            self%iparm(3) = 1
+            self%iparm(6) = 1 
+            CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+                        & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+                        & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
+                        & self%ddum, error, self%dparm)
+            !WRITE(*,*) 'Reordering completed ... '
+
+            IF (error .NE. 0) THEN
+                WRITE(*,*) '11: The following ERROR was detected: ', error
+                STOP
+            END IF
+        Endif
+
+        phase  = 22      ! only factorization
+
+        CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+                    & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+                    & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
+                    & self%ddum, error, self%dparm)
+        IF (error .NE. 0) THEN
+            WRITE(*,*) '22:  The following ERROR was detected: ', error
+            STOP
+        END IF
+
     End Subroutine LU_Decompose_Sparse
+
 
 
     ! These last two routines are just wrappers for lapack routines  - possibly unnecessary
@@ -996,9 +1092,9 @@ Module Linear_Solve
         !Equation_set(j,k)%LHS  j is equation, k is mode
         ! Oct 5, 2016:  This version makes some assumptions concerning the structure of the matrix
         Integer, Intent(In) :: eind, mind  ! Equation and mode indices
-        Integer :: i,j, k, n, npoly, npoly2, sind1, sind2,mcind1,mcind2
+        Integer :: i,ii,j, k, n, npoly, npoly2, sind1, sind2,mcind1,mcind2
         Integer :: c_offset, s_offset, rindex !column and sparse matrix offset & row index
-        Integer :: nlinks, nsub, element_count, n_rows
+        Integer :: nlinks, nsub, element_count, n_rows, v_offset
 
         Real*8, Allocatable :: sparse_mat(:)
         Integer, Allocatable :: ia(:), ja(:)
@@ -1019,11 +1115,17 @@ Module Linear_Solve
             if (i .ne. nsub) element_count = element_count+cpgrid%npoly(i+1)
         Enddo
 
-        element_count = element_count*nlinks
+        element_count = element_count*nlinks*nlinks
         ! A little clunky, but works for now (copy into eq_set arrays at end)
-        Allocate(equation_set(mind,eind)%sparse_mat(1:element_count))
-        Allocate(equation_set(mind,eind)%sparse_ja(1:element_count))
-        Allocate(equation_set(mind,eind)%sparse_ia(1:n_rows+1))
+        If (.not. allocated(equation_set(mind,eind)%sparse_mat)) Then
+            Allocate(equation_set(mind,eind)%sparse_mat(1:element_count))
+        Endif
+        If (.not. allocated(equation_set(mind,eind)%sparse_ja)) Then
+            Allocate(equation_set(mind,eind)%sparse_ja(1:element_count))
+        Endif
+        If (.not. allocated(equation_set(mind,eind)%sparse_ia)) Then
+            Allocate(equation_set(mind,eind)%sparse_ia(1:n_rows+1))
+        Endif
 
         Allocate(sparse_mat(1:element_count))
         Allocate(ja(1:element_count))
@@ -1044,86 +1146,112 @@ Module Linear_Solve
 
                 ia(rindex) = s_offset+1
                 If (i .eq. 1) Then  ! Treat lower domain boundaries as appropriate
-                    sind1 = s_offset+1
-                    sind2 = s_offset+npoly
-                    sparse_mat(sind1:sind2) = &
-                        & Equation_set(mind,eind)%LHS(rindex,1:npoly)
-                    Do j = 1,npoly
-                        ja(s_offset+j) = j
+
+                    Do k = 1, nlinks  ! Iterate across columns associated with ALL variables
+                        v_offset = (k-1)*ndim1
+                        sind1 = s_offset+1
+                        sind2 = s_offset+npoly
+                        mcind1 = v_offset+1
+                        mcind2 = v_offset+npoly
+                        sparse_mat(sind1:sind2) = &
+                            & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
+                        Do j = 1,npoly
+                            ja(s_offset+j) = j+v_offset
+                        Enddo
+                        s_offset = s_offset+npoly
                     Enddo
-                    s_offset = s_offset+npoly
                 Else
                     npoly2 = cpgrid%npoly(i-1)
-                    sind1 = s_offset+1
-                    sind2 = s_offset+npoly+npoly2
+                    Do k = 1, nlinks
+                        v_offset = (k-1)*ndim1
+                        sind1 = s_offset+1
+                        sind2 = s_offset+npoly+npoly2
 
-                    mcind1 = c_offset-npoly2+1
-                    mcind2 = c_offset+npoly
-                    sparse_mat(sind1:sind2) = &
-                        & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
+                        mcind1 = v_offset+c_offset-npoly2+1
+                        mcind2 = v_offset+c_offset+npoly
+                        sparse_mat(sind1:sind2) = &
+                            & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
 
-                    Do j = 1,npoly+npoly2
-                        ja(s_offset+j) = mcind1-1+j
+                        Do j = 1,npoly+npoly2
+                            ja(s_offset+j) = mcind1-1+j
+                        Enddo
+
+                        s_offset = s_offset+npoly+npoly2
                     Enddo
-
-                    s_offset = s_offset+npoly+npoly2
                 Endif
                 rindex = rindex+1
-
+                ia(rindex) = s_offset+1
                 ! Next, load the interior rows   
                 Do k = 2, npoly-1
                     ia(rindex) = s_offset+1
-                    sparse_mat(s_offset+1:s_offset+npoly) = &
-                        & Equation_set(mind,eind)%LHS(rindex,c_offset+1:c_offset+npoly)
 
-                    Do j = 1,npoly
-                        ja(s_offset+j) = c_offset+j
-                    Enddo                   
-
+                    Do ii =1, nlinks
+                        v_offset = (ii-1)*ndim1
+                        mcind1 = v_offset+c_offset+1
+                        mcind2 = v_offset+c_offset+npoly
+                        sparse_mat(s_offset+1:s_offset+npoly) = &
+                            & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
+                        Do j = 1,npoly
+                            ja(s_offset+j) = mcind1-1+j
+                        Enddo                   
+                        s_offset = s_offset+npoly
+                    Enddo
                     rindex = rindex+1
-                    s_offset = s_offset+npoly
                 Enddo
 
                 ia(rindex) = s_offset+1
                 If ( i .eq. nsub) Then  ! Treat upper domain boundaries as appropriate
-                    sind1 = s_offset+1
-                    sind2 = s_offset+npoly
-                    sparse_mat(sind1:sind2) = &
-                        & Equation_set(mind,eind)%LHS(rindex,c_offset+1:c_offset+npoly)
-                    Do j = 1,npoly
-                        ja(s_offset+j) = c_offset+j
-                    Enddo    
 
+                    Do k = 1, nlinks
+                        v_offset = (k-1)*ndim1
+                        sind1 = s_offset+1
+                        sind2 = s_offset+npoly
+                        mcind1 = v_offset+c_offset+1
+                        mcind2 = v_offset+c_offset+npoly
+                        sparse_mat(sind1:sind2) = &
+                            & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
+                        Do j = 1,npoly
+                            ja(s_offset+j) = mcind1-1+j
+                        Enddo    
 
-                    s_offset = s_offset+npoly
+                        s_offset = s_offset+npoly
+                    Enddo
                 Else
                     npoly2 = cpgrid%npoly(i+1)
-                    sind1 = s_offset+1
-                    sind2 = s_offset+npoly+npoly2
+                    Do k = 1, nlinks
+                        v_offset = (k-1)*ndim1
+                        sind1 = s_offset+1
+                        sind2 = s_offset+npoly+npoly2
 
-                    mcind1 = c_offset+1
-                    mcind2 = c_offset+npoly+npoly2
+                        mcind1 = v_offset+c_offset+1
+                        mcind2 = v_offset+c_offset+npoly+npoly2
 
-                    sparse_mat(sind1:sind2) = &
-                        & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
-                    Do j = 1,npoly+npoly2
-                        ja(s_offset+j) = mcind1-1+j
-                    Enddo
+                        sparse_mat(sind1:sind2) = &
+                            & Equation_set(mind,eind)%LHS(rindex,mcind1:mcind2)
+                        Do j = 1,npoly+npoly2
+                            ja(s_offset+j) = mcind1-1+j
+                        Enddo
 
-                    s_offset = s_offset+npoly+npoly2
+                        s_offset = s_offset+npoly+npoly2
+                        Enddo
                 Endif
 
                 rindex = rindex+1
                 c_offset = c_offset+npoly
             Enddo    
         Enddo
-        
+        ia(rindex) = s_offset+1
+        !Write(6,*)'ROW CHECK: ', rindex-1, n_rows        
         if (s_offset .ne. element_count) Write(6,*)'ELEMENT COUNT INCONSISTENT', s_offset, element_count
 
+        Equation_set(mind,eind)%sparse_mat(:) = sparse_mat(:)
+        Equation_set(mind,eind)%sparse_ia(:) = ia(:)
+        Equation_set(mind,eind)%sparse_ja(:) = ja(:)
         DeAllocate(sparse_mat,ja,ia)
-        DeAllocate(equation_set(mind,eind)%sparse_mat)
-        DeAllocate(equation_set(mind,eind)%sparse_ja)
-        DeAllocate(equation_set(mind,eind)%sparse_ia)
+        DeAllocate(Equation_Set(mind,eind)%LHS)
+        !DeAllocate(equation_set(mind,eind)%sparse_mat)
+        !DeAllocate(equation_set(mind,eind)%sparse_ja)
+        !DeAllocate(equation_set(mind,eind)%sparse_ia)
         !Write(6,*)'Outside: ', eind, mind, nlinks
         Endif
     End Subroutine Sparse_Load
