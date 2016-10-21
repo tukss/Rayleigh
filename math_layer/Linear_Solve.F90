@@ -877,6 +877,7 @@ Module Linear_Solve
             self%iparm(:) = 0
             Call pardisoinit(self%pt, self%mtype, solver, self%iparm, &
                 & self%dparm, error)
+            Write(6,*)'iparm(2) = ', self%iparm(2), self%iparm(28)
             IF (error .NE. 0) THEN
                 IF (error.EQ.-10 ) WRITE(*,*) 'No license file found'
                 IF (error.EQ.-11 ) WRITE(*,*) 'License is expired'
