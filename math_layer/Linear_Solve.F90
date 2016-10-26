@@ -110,11 +110,9 @@ Module Linear_Solve
     End Subroutine Use_Chebyshev
     Subroutine Use_BandSolve()
         band_solve = .true.
-        write(6,*)'Band solve is turned ON'
     End Subroutine Use_BandSolve
     Subroutine Use_SparseSolve()
         sparse_solve = .true.
-        write(6,*)'Sparse solve is turned ON'
     End Subroutine Use_SparseSolve
 
     Subroutine DeAllocate_Derivatives()
@@ -841,10 +839,10 @@ Module Linear_Solve
         !Write(6,*)'scheck: ', self%nrows*self%nrhs, size(faux_rhs), self%nrows, self%nrhs
         !Write(6,*)'scheck2: ', size(self%rhs_pointer), size(self%rhs_pointer)/self%nrows
         !Write(6,*)'scheck3: ', shape(self%rhs_pointer)
-        CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
-                    & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
-                    & self%idum, self%nrhs, self%iparm, msglvl, self%rhs_pointer, &
-                    & faux_x, error, self%dparm)
+        !CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+        !            & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+         !           & self%idum, self%nrhs, self%iparm, msglvl, self%rhs_pointer, &
+          !          & faux_x, error, self%dparm)
 
 
         IF (error .NE. 0) THEN
@@ -875,8 +873,8 @@ Module Linear_Solve
         If (.not. self%sparse_initialized) Then
             self%sparse_initialized = .true.
             self%iparm(:) = 0
-            Call pardisoinit(self%pt, self%mtype, solver, self%iparm, &
-                & self%dparm, error)
+            !Call pardisoinit(self%pt, self%mtype, solver, self%iparm, &
+            !    & self%dparm, error)
             Write(6,*)'iparm(2) = ', self%iparm(2), self%iparm(28)
             IF (error .NE. 0) THEN
                 IF (error.EQ.-10 ) WRITE(*,*) 'No license file found'
@@ -892,10 +890,10 @@ Module Linear_Solve
             !Write(6,*)'Checkcheck: ', self%iparm(3), self%iparm(6)
             self%iparm(3) = 1
             self%iparm(6) = 1 
-            CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
-                        & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
-                        & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
-                        & self%ddum, error, self%dparm)
+            !CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+            !            & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+            !            & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
+            !            & self%ddum, error, self%dparm)
             !WRITE(*,*) 'Reordering completed ... '
 
             IF (error .NE. 0) THEN
@@ -906,10 +904,10 @@ Module Linear_Solve
 
         phase  = 22      ! only factorization
 
-        CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
-                    & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
-                    & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
-                    & self%ddum, error, self%dparm)
+        !CALL pardiso (self%pt, self%mxfct, self%mnum, self%mtype, phase, self%nrows, &
+        !            & self%sparse_mat, self%sparse_ia, self%sparse_ja, &
+        !            & self%idum, self%nrhs, self%iparm, msglvl, self%ddum, &
+        !            & self%ddum, error, self%dparm)
         IF (error .NE. 0) THEN
             WRITE(*,*) '22:  The following ERROR was detected: ', error
             STOP

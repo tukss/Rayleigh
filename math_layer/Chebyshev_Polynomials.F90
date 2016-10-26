@@ -43,7 +43,7 @@ Module Chebyshev_Polynomials
 Contains
 
     Subroutine Initialize_Cheby_Grid(self,grid,integration_weights,ndomains,npoly, & 
-                & bounds,dmax,nthread,dealias_by)
+                & bounds,dmax,nthread,dealias_by, verbose)
         Implicit None
         Class(Cheby_Grid) :: self
         Real*8, Intent(InOut) :: grid(1:), integration_weights(1:)
@@ -51,19 +51,30 @@ Contains
         Integer, Intent(In) :: ndomains, npoly(1:)
         Integer, Intent(In), Optional :: nthread, dmax
         Integer, Intent(In), Optional :: dealias_by(1:)
+        Logical, Intent(In), Optional :: verbose
 
         Real*8 :: domain_delta, scaling, upperb, lowerb, xmin,xmax
         Real*8 :: gmax, gmin, xx,int_scale
         Integer :: r, i,n, domain_count
         Integer :: ind, ind2, n_max, dmx, gindex, db,scheck
         Logical :: custom_dealiasing = .false.
+        Logical :: report
+        report = .false.
 
-        write(6,*)'Ndomains: ', ndomains
-        write(6,*)'npoly   : ', npoly(1:ndomains)
-        write(6,*)'bounds  : ', bounds(1:ndomains+1)
+        If (present(verbose)) Then
+            If (verbose) report = .true.
+        Endif
+
+        If (report) Then
+            write(6,*)'Ndomains: ', ndomains
+            write(6,*)'npoly   : ', npoly(1:ndomains)
+            write(6,*)'bounds  : ', bounds(1:ndomains+1)
+        Endif
         If (present(dealias_by)) Then
             scheck = size(dealias_by)
-            if (scheck .ge. ndomains) Write(6,*)'dealias_by: ', dealias_by(1:ndomains)
+            If ( (scheck .ge. ndomains) .and. report ) Then 
+                Write(6,*)'dealias_by: ', dealias_by(1:ndomains)
+            Endif
         Endif        
    
         !Note that bounds and npoly are assumed to be provided in ascending order
@@ -98,12 +109,12 @@ Contains
             self%rda(i) = db
             If (custom_dealiasing) Then
                 db = dealias_by(domain_count+1-i)
-                Write(6,*)'db!: ', db
+                
                 If ((db .ge. 1) .and. (db .lt. n) ) Then
                     self%rda(i) = n-db+1
                 Endif
+
             Endif
-            !Write(6,*)'dacheck 1:', self%rda(i), self%npoly(i)
         Enddo
 
         Do i = 1, domain_count+1
@@ -123,10 +134,6 @@ Contains
         Call self%gen_Tn()
         Call self%gen_Tn_Deriv_Arrays(dmx)
 
-
-        !Write(6,*)'..................'
-        !Write(6,*)self%domain_bounds
-        !Write(6,*)'..................'
         !Compute the global grid and rescale the chebyshev derivative arrays
         ind = 1
         integration_weights(:) = 0.0d0
@@ -143,7 +150,6 @@ Contains
             domain_delta = upperb-lowerb
 
             scaling = domain_delta/(xmax-xmin)
-            !write(6,*)'scaling: ', scaling, lowerb
             grid(ind:ind2) = (self%x(1:n_max,n) -xmin)*scaling +lowerb
 
 
@@ -174,7 +180,7 @@ Contains
 
         cp_nthreads = 1
         If (present(nthread)) Then
-            write(6,*)'nthreads: ', nthread
+            If (report) write(6,*)'nthreads: ', nthread
             If (nthread .gt. 1) cp_nthreads = nthread
         Endif
 

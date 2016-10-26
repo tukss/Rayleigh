@@ -45,8 +45,8 @@ Module Parallel_Framework
 		Procedure :: Init => Initialize_Parallel_Interface
         Procedure :: openmp_init
 		Procedure :: Exit => Finalize_Framework
-		Procedure ::  Spherical_Init 
-		Procedure ::  Init_Geometry
+		Procedure :: Spherical_Init 
+		Procedure :: Init_Geometry
         Procedure :: Broadcast_Intarr
 	End Type Parallel_Interface
 
@@ -259,12 +259,12 @@ Contains
 		Call m_balance(self%all_3s, self%inds_3s, self%rcomm)
 		Call LM_Load_Balance(pfi%my_3s,self%inds_3s,self%ccomm)
 		If (self%gcomm%rank .eq. -100) Then
-						unit1 = 10
-			         Open(unit1, file = 'verification/m_check', status='replace', form = 'unformatted')
-						Write(unit1) self%n3s
-						Write(unit1) (self%inds_3s(r),r=1,self%n3s)
-			
-						Close(unit1)
+            unit1 = 10
+            Open(unit1, file = 'verification/m_check', status='replace', form = 'unformatted')
+            Write(unit1) self%n3s
+            Write(unit1) (self%inds_3s(r),r=1,self%n3s)
+
+            Close(unit1)
 		Endif
 	End Subroutine Spherical_Init
 
