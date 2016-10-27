@@ -165,6 +165,7 @@ Module Linear_Solve
         maximum_deriv_order = 0
         n_modes = nmode
         n_modes_total = Sum(nsub)
+        
         Allocate(nsub_modes(1:n_modes))
         nsub_modes = nsub
         n_equations = neq
@@ -321,6 +322,7 @@ Module Linear_Solve
         ! equation object holding that RHS. Each mode's equation object points to
         ! the appropriate parts of that RHS space.  The idea is that the RHS can be
         ! accessed more efficiently when adding nonlinear and CN terms.
+        
         Do k = 1, n_equations
 
             !/// Allocation
@@ -351,6 +353,7 @@ Module Linear_Solve
             Enddo
 
         Enddo
+
     End Subroutine Allocate_RHS
 
     Subroutine DeAllocate_RHS()
@@ -575,20 +578,20 @@ Module Linear_Solve
         Integer, Intent(In) :: eqid
         Integer :: istart,iend, ind 
 
-            
+                    
+        If (n_modes .gt. 0) Then
+            !Primary equation object always has the full, allocated rhs.
+            ind = eqid
+            if (.not. equation_set(1,eqid)%primary) then
+                ind = equation_set(1,eqid)%links(1)
+            endif
+            ! Individual RHS's inhabit row ranges defined by rowblock and ndim1
+            istart = equation_set(1,eqid)%rowblock+1
+            iend = istart+ndim1-1
+        
 
-        !Primary equation object always has the full, allocated rhs.
-        ind = eqid
-        if (.not. equation_set(1,eqid)%primary) then
-            ind = equation_set(1,eqid)%links(1)
-        endif
-        ! Individual RHS's inhabit row ranges defined by rowblock and ndim1
-        istart = equation_set(1,eqid)%rowblock+1
-        iend = istart+ndim1-1
-    
-
-        equation_set(1,ind)%rhs(istart:iend,:,:) = set_to(1:ndim1,:,:)
-
+            equation_set(1,ind)%rhs(istart:iend,:,:) = set_to(1:ndim1,:,:)
+        Endif
     End Subroutine Set_RHS
 
 
@@ -597,7 +600,7 @@ Module Linear_Solve
         ! Copy equation structure RHSs to the buffer (dlink RHSs)
         Real*8, Intent(InOut) :: buffer(:,:,:,1:)
         Integer :: i, ind,istart,iend 
-
+        If (n_modes .gt. 0) Then
             Do i = 1, n_equations
                 ! Individual RHS's inhabit row ranges defined by rowblock and ndim1
                 istart = equation_set(1,i)%rowblock+1
@@ -610,6 +613,7 @@ Module Linear_Solve
 
                 buffer(1:ndim1,:,:,i) = equation_set(1,ind)%rhs(istart:iend,:,:)
             Enddo
+        Endif
     End Subroutine Get_All_RHS
 
     Subroutine Set_All_RHS(buffer)

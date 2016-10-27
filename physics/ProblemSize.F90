@@ -64,6 +64,7 @@ Module ProblemSize
     Integer, Parameter :: maxerr = 32
     Integer :: perr(1:maxerr)
     Integer :: eindex = 1
+    Logical :: grid_error = .false.
     
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
@@ -148,11 +149,9 @@ Contains
             ! Here we check that a sufficient # of domain bounds were specified.
             ! If not, we check the value of uniform_bounds
             !   case i  : True => all domains are given the same width in radius
-            !   case ii : False => code exits
+            !   case ii : False => code exits due to rmax < 0
             If (domain_bounds(cheby_count+1) .lt. 0) Then
                 If (uniform_bounds) Then
-                    Write(6,*)'PROBLEM!'
-                    Write(6,*)'Resetting n_domains'
                     n_uniform_domains = cheby_count
                     domain_bounds(1) = rmin
                     rdelta = (rmax-rmin)/DBLE(cheby_count)
@@ -160,10 +159,7 @@ Contains
                     Do i = 2,bounds_count
                         domain_bounds(i) = domain_bounds(i-1)+rdelta
                     Enddo
-                Else
-
                 Endif
-                Write(6,*)'nu: ', n_uniform_domains
             Endif
         Endif
         ndomains = cheby_count
@@ -204,24 +200,15 @@ Contains
 			l_l_plus1(l) = ell*(ell+1)
 			if (l .ne. 0) over_l_l_plus1(l) = 1.0d0/l_l_plus1(l)
 		Enddo
-		!///////////////////////////////////////
-		!  Check the command line to see if 
-		!  any processor counts were specified.
-		!  If so, these counts overwrite values
-		!  read in through main input 
 
+        !//////////////////////////////////////////////////
+        ! Check for errors in the grid input.
+        Call Consistency_Check()
+		
 
-        If (rmin .le. 0)    call add_ecode(1)
-        If (rmax .le. 0)    call add_ecode(2)
-        If (rmax .le. rmin) call add_ecode(3)
-        If (n_r .le. 0)     call add_ecode(4)
-        If (n_theta .le. 0) call add_ecode(5)
-        If ((n_theta)/3 .lt. nprow+1) call add_ecode(6)
-		
-		
+		!/////////////////////////////////////////////////////////
+		! Initialize MPI and load balancing (if no errors detected)
 		ncpu = nprow*npcol
-		!///////////////////////////////////////
-		! Initialize load balancing
 		ppars(1) = Spherical
 		ppars(2) = n_r
 		ppars(3) = n_r
@@ -233,52 +220,23 @@ Contains
 		ppars(9) = nprow
 		ppars(10) = npcol
         If (multi_run_mode) Then
-    		Call pfi%init(ppars,run_cpus)
+    		Call pfi%init(ppars,run_cpus, grid_error)
         Else
             cpu_tmp(1) = ncpu
-    		Call pfi%init(ppars,cpu_tmp)
+    		Call pfi%init(ppars,cpu_tmp,grid_error)
         Endif
 		my_rank = pfi%gcomm%rank
 		my_row_rank = pfi%rcomm%rank
 		my_column_rank = pfi%ccomm%rank
         If (my_rank .eq. 0) Then
-            Write(istr,'(i6)')n_r
             call stdout%print(" ")
             call stdout%print(" -- Initalizing Grid...")
-            Call stdout%print(" ---- Specified parameters ----")
-            call stdout%print(" ---- N_R                 : "//trim(istr))
-            Write(istr,'(i6)')n_theta
-            call stdout%print(" ---- N_THETA             : "//trim(istr))
-            Write(istr,'(i6)')l_max
-            call stdout%print(" ---- Ell_MAX             : "//trim(istr))
-            Write(dstring,dofmt)rmin
-            call stdout%print(" ---- R_MIN               : "//trim(dstring))
-            Write(dstring,dofmt)rmax
-            Call stdout%print(" ---- R_MAX               : "//trim(dstring))
-            Write(istr,'(i6)')ndomains
-            call stdout%print(" ---- Chebyshev Domains   : "//trim(istr))
-
-            Do i = 1, ndomains
-                call stdout%print(" ")
-                Write(istr,'(i6)')i
-                call stdout%print("        Domain "//&
-                     & trim(adjustl(istr)))
-                Write(istr,'(i6)')ncheby(i)
-                call stdout%print("          Grid points           :  "//trim(adjustl(istr)))
-
-                If (dealias_by(i) .eq. -1) Then
-                    Write(istr,'(i6)')(ncheby(i)*2)/3
-                Else
-                    Write(istr,'(i6)')ncheby(i)-dealias_by(i)
-                Endif
-                call stdout%print("          Dealiased Polynomials :  "//trim(adjustl(istr)))
-                Write(dstring,dofmt)domain_bounds(i)
-                call stdout%print("          Domain Lower Bound    : "//trim(dstring))
-                Write(dstring,dofmt)domain_bounds(i+1)
-                call stdout%print("          Domain Upper Bound    : "//trim(dstring))
-            Enddo
-            call stdout%print(" ")
         Endif
+
+		Call Halt_On_Error()  ! Halt the program if grid specification is erroneous
+
+        Call Report_Grid_Parameters() ! Print some grid-related info to the screen
+
 		Call Initialize_Timers()
 		Call StopWatch(init_time)%startclock()
 		Call StopWatch(walltime)%startclock()
@@ -332,7 +290,7 @@ Contains
 		ovr_repeated(my_r%delta+1:2*my_r%delta) = ovr_repeated(1:my_r%delta)
 		tnr = 2*my_r%delta
 
-		Call Check_Errors()
+
         If (my_rank .eq. 0) Then
             call stdout%print(" -- Grid initialized.")
             call stdout%print(" ")
@@ -370,9 +328,8 @@ Contains
         Allocate(Radial_Integral_Weights(1:N_R))
 
 
-        !--------------------------------------
-        ! New Multi-domain version
-        If (chebyshev) Then
+
+        If (chebyshev) Then ! No other choice at this time
             grid_type = 2
 
 			Call gridcp%Init(radius, radial_integral_weights, &
@@ -387,123 +344,105 @@ Contains
                     r = r+1
                 Enddo
             Enddo
-            !If (my_rank .eq. 0) Then
-            !    Do r = 1, n_r
-            !        Write(6,*)'r, dr: ', radius(r), delta_r(r), r
-            !    Enddo
-            !Endif
-		Else
-
-			Select Case (grid_type)
-				Case (1)	! Uniform Grid
-					Radius(N_R) = rmin	! Follow ASH convention of reversed radius
-					uniform_dr = 1.0d0/(N_R-1.0d0)*(rmax-rmin)
-					Do r=N_R,1,-1
-						Delta_r(r) = uniform_dr
-						Radius(r) = (N_R-r)*uniform_dr + rmin		
-					Enddo
-
-                Case (2)  ! Chebyshev Grid
-
-		            pi_over_N = pi/(N_r*1.0d0)
-		            arg = (0.5d0)*pi_over_N
-		            Do i = 1, N_R
-			            radius(i) = cos(arg)
-			            arg = arg+pi_over_N
-		            Enddo
-                    delta = rmax-rmin
-                    scaling = (radius(1)-radius(n_r) )/ delta
-                    radius = radius/scaling
-                    rmn = minval(radius)
-                    radius(:) = radius(:)-rmn+rmin                    
-
-                Case (3) ! Stretched Grid -  high res near boundaries
-                         ! Each cell is (1+stretch_factor) bigger than the one before it
-                         ! n_r is assumed to be even for this to work
-                    delta = rmax-rmin
-                    arg = 0.0d0
-                    radius(1) = 0.0d0
-                    r = (n_r/2)+1
-
-                    Do i = 0, r-2
-                        arg = arg + (1.0d0+stretch_factor)**i
-                    Enddo
-                    delr0 = delta/arg  ! This is the grid spacing at the outer boundary
-
-                    ! Set up the top half of the grid (1 through nr/2+1)                    
-                    Do i = 1, r-1
-                        arg = delr0*( (1.0+stretch_factor)**i )
-                        radius(i+1) = radius(i)+arg
-                    Enddo
-
-                    ! Reflect to get the other half.
-                    Do i = 1, (n_r/2)-1
-                        arg = radius(r)-radius(r-i )
-                        radius(r+i )=radius(r)+arg
-                    Enddo
-
-                    !Finally, rescale the grid
-                    rmx = maxval(radius)
-                    radius(:) = radius(:)*delta/rmx
-                    radius(:) = delta-radius(:)+rmin
-                    !If (my_rank .eq. 0) Then
-                    !    Do i = 1, n_r
-                    !       Write(6,*)'Radius : ', radius(i)
-                    !    Enddo
-                    !Endif
-
-				Case Default	! Uniform Grid - Same as case 1
-					Radius(N_R) = rmin
-					uniform_dr = 1.0d0/(N_R-1.0d0)*(rmax-rmin)
-					Do r=N_R,1,-1
-						Delta_r(r) = uniform_dr
-						Radius(r) = (N_R-r)*uniform_dr + rmin		
-					Enddo
-			End Select
-		Endif
+        Endif
 
 
-		Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
-		R_squared     = Radius**2
-      One_Over_R      = (1.0d0)/Radius
-      Two_Over_R      = (2.0d0)/Radius
-      OneOverRSquared = (1.0d0)/r_Squared
-
-
-		If (.not. chebyshev) Call Initialize_Derivatives(Radius,radial_integral_weights)
-	End Subroutine Initialize_Radial_Grid
-    Subroutine Rescale_Grid_and_Derivatives(length_scale)
-        Implicit None
-        Real*8, Intent(In) :: length_scale
-        Radius = radius/length_scale
-        R_squared       = Radius**2
+        Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
+        R_squared     = Radius**2
         One_Over_R      = (1.0d0)/Radius
         Two_Over_R      = (2.0d0)/Radius
         OneOverRSquared = (1.0d0)/r_Squared
-        ovr_repeated = ovr_repeated*length_scale
-        ovrsq_repeated = ovrsq_repeated*length_scale
-        If (chebyshev) Then
-         !   Call Rescale_Grid_CP(length_scale)
-        Else
-            Call Rescale_Grid_FD(length_scale)
+
+	End Subroutine Initialize_Radial_Grid
+
+    Subroutine Report_Grid_Parameters()
+        Implicit None
+        Integer :: i
+        Character*6 :: istr
+        Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
+        If (my_rank .eq. 0) Then
+            Write(istr,'(i6)')n_r
+            Call stdout%print(" ---- Specified parameters ----")
+            call stdout%print(" ---- N_R                 : "//trim(istr))
+            Write(istr,'(i6)')n_theta
+            call stdout%print(" ---- N_THETA             : "//trim(istr))
+            Write(istr,'(i6)')l_max
+            call stdout%print(" ---- Ell_MAX             : "//trim(istr))
+            Write(dstring,dofmt)rmin
+            call stdout%print(" ---- R_MIN               : "//trim(dstring))
+            Write(dstring,dofmt)rmax
+            Call stdout%print(" ---- R_MAX               : "//trim(dstring))
+            Write(istr,'(i6)')ndomains
+            call stdout%print(" ---- Chebyshev Domains   : "//trim(istr))
+
+            Do i = 1, ndomains
+                call stdout%print(" ")
+                Write(istr,'(i6)')i
+                call stdout%print("        Domain "//&
+                     & trim(adjustl(istr)))
+                Write(istr,'(i6)')ncheby(i)
+                call stdout%print("          Grid points           :  "//trim(adjustl(istr)))
+
+                If (dealias_by(i) .eq. -1) Then
+                    Write(istr,'(i6)')(ncheby(i)*2)/3
+                Else
+                    Write(istr,'(i6)')ncheby(i)-dealias_by(i)
+                Endif
+                call stdout%print("          Dealiased Polynomials :  "//trim(adjustl(istr)))
+                Write(dstring,dofmt)domain_bounds(i)
+                call stdout%print("          Domain Lower Bound    : "//trim(dstring))
+                Write(dstring,dofmt)domain_bounds(i+1)
+                call stdout%print("          Domain Upper Bound    : "//trim(dstring))
+            Enddo
+            call stdout%print(" ")
         Endif
-        ! We need to think about how to rescale the radial integration weights
-    End Subroutine 
+    End Subroutine Report_Grid_Parameters
+
+
 
     Subroutine Add_Ecode(ecode)
         Integer, Intent(In) :: ecode
         perr(eindex) = ecode
         eindex = eindex+1
+        grid_error = .true.
     End Subroutine Add_Ecode
 
-	Subroutine Check_Errors()
+    Subroutine Consistency_Check()
+        Implicit None
+        Integer :: tmp
+        If (rmin .le. 0)    Call Add_Ecode(1)
+        If (rmax .le. 0)    Call Add_Ecode(2)
+        If (rmax .le. rmin) Call Add_Ecode(3)
+        If (n_r .le. 0)     Call Add_Ecode(4)
+        If (n_theta .le. 0) Call Add_Ecode(5)
+        ! Check horizontal and radial load balancing
+        tmp = (l_max+1)/2+MOD(l_max+1,2)  ! max nprow based on number of spherical harmonic pairs
+        If (tmp .lt. nprow) call add_ecode(6)
+		If (npcol .gt. n_r) call add_ecode(7)
+        !Check parity
+        If (MOD(n_theta,2) .ne. 0) Call Add_Ecode(8)
+        tmp = 1
+        Do While (tmp .le. ndomains)
+            If (MOD(ncheby(tmp),2) .ne. 0) Then
+                Call Add_Ecode(9)
+                tmp = ndomains+1
+            Endif
+            tmp = tmp+1
+        Enddo
+    End Subroutine Consistency_Check
 
-        Integer :: esize, i
-        
+	Subroutine Halt_On_Error()
+
+        Integer :: esize, i,j,tmp
+        Character*6 :: istr, istr2
+        Character*12 :: dstring
+    	Character*8 :: dofmt = '(ES12.5)'
         If (maxval(perr) .gt. 0) Then
             If (my_rank .eq. 0) Then
                 Call stdout%print(' /////////////////////////////////////////////////////////////////')
-                Call stdout%print(' The following errors(s) were detected when initializing the grid: ')
+                Call stdout%print(' The following errors(s) were detected during grid initialization: ')
+                Call stdout%print(' ')
                 Do i = 1, maxerr
                     Select Case(perr(i))
                     Case(1)
@@ -514,13 +453,54 @@ Contains
                         Call stdout%print('  ERROR:  rmax must be greater than rmin.')
                     Case(4)
                         Call stdout%print('  ERROR:  n_r must be greater than zero.')
+                        Write(istr,'(i6)')n_r
+                        Call stdout%print('          current n_r   :'//trim(istr))
+
                     Case(5)
-                        Call stdout%print('  ERROR:  ntheta must be greater than zero.')
+                        Call stdout%print('  ERROR:  n_theta must be greater than zero.')
+                        Write(istr,'(i6)')n_theta
+                        Call stdout%print('          specified n_theta   :'//trim(istr))
                     Case(6)
-                        Call stdout%print('  ERROR: nprow is too large for this resolution.')
-                        Call stdout%print('         Reduce nprow so that:')
-                        Call stdout%print('         (or equivalently nprow <= n_theta/3.')
+                        Call stdout%print('  ERROR:  NPROW is too large for this resolution.')
+                        Call stdout%print('          NPROW may not be larger than:          ')
+                        Call stdout%print('          (L_MAX+1)/2 + MOD(l_max+1,2)  ')
+                        Write(istr,'(i6)')n_theta
+                        Call stdout%print('          N_THETA           :'//trim(istr))
+                        Write(istr,'(i6)')l_max
+                        Call stdout%print('          L_MAX             :'//trim(istr))
+                        tmp = (l_max+1)/2+MOD(l_max+1,2) 
+
+
+                        Write(istr,'(i6)')tmp
+                        Call stdout%print('          Max allowed NPROW :'//trim(istr))
+                        Write(istr,'(i6)')nprow
+                        Call stdout%print('          Specified NPROW   :'//trim(istr))
+                    Case(7)
+                        Call stdout%print('  ERROR:  NPCOL is too large for this resolution.')
+                        Call stdout%print('          NPCOL may not be larger than N_R.')
+                        Write(istr,'(i6)')npcol
+                        Call stdout%print('          current NPCOL :'//trim(istr))
+                        Write(istr,'(i6)')n_r
+                        Call stdout%print('          current N_R   :'//trim(istr))
+                    Case(8)
+                        Call stdout%print('  ERROR:  N_THETA must be Even.')
+                        Call stdout%print('          (Legendre transforms exploit parity).')
+                        Write(istr,'(i6)')n_theta
+                        Call stdout%print('          current N_THETA :'//trim(istr))
+                    Case(9)
+                        Call stdout%print('  ERROR:  Each Chebyshev domains must contain an')
+                        Call stdout%print('          even number of collocation points.')
+                        Call stdout%print(" ")
+                        Do j = 1, ndomains
+                            Write(istr,'(i6)')j
+                            Write(istr2,'(i6)')ncheby(j)
+                            call stdout%print("          Grid points (domain "// &
+                                &trim(adjustl(istr))// &
+                                & ")          :  "//trim(adjustl(istr2)))
+                        Enddo
+
                     End Select
+                    If (perr(i) .gt. 0) Call stdout%print(' ')
                 Enddo
                 Call stdout%print(' Exiting...')
                 Call stdout%print(' /////////////////////////////////////////////////////////////////')
@@ -529,5 +509,5 @@ Contains
             Endif
 		    Call pfi%exit()
         Endif
-	End Subroutine Check_Errors
+	End Subroutine Halt_On_Error
 End Module ProblemSize

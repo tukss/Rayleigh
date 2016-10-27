@@ -13,13 +13,13 @@ endif
 ifeq ($(RAYLEIGH_OPT1),openmp)
 	F90FLAGS = -O1 -fbounds-check -Duseomp=.true. -cpp -fbacktrace -ffixed-line-length-132 -fopenmp -I/usr/include
 else
-	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Paridso
+	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Pardiso
 endif
 
 ifeq ($(RAYLEIGH_OPT1),debug)
         F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include
 else
-        F90FLAGS = -O3 -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Paridso
+        F90FLAGS = -O3 -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Pardiso
 endif
 
 
