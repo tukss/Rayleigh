@@ -42,7 +42,7 @@ Module ProblemSize
     Real*8              :: shell_volume
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
-	Real*8, Allocatable :: ovrsq_repeated(:),ovr_repeated(:), radial_integral_weights(:)
+	Real*8, Allocatable :: radial_integral_weights(:)
     Integer :: precise_bounds = -1
     Type(Load_Config)   :: my_r
 
@@ -277,17 +277,8 @@ Contains
 			Write(101) (costheta(r),r=1,n_theta)
 			close(101)
 		endif
-		!////////////////////////////////////////
-		! Make some repeated radius arrays so we can 
-		! easily divide the real and imaginary parts
-		! of our rlm buffers
-		Allocate(ovrsq_repeated(1:2*my_r%delta))
-		ovrsq_repeated(1:my_r%delta) = 1.0d0/r_squared(my_r%min:my_r%max)
-		ovrsq_repeated(my_r%delta+1:2*my_r%delta) = ovrsq_repeated(1:my_r%delta)
 
-		Allocate(ovr_repeated(1:2*my_r%delta))
-		ovr_repeated(1:my_r%delta) = 1.0d0/radius(my_r%min:my_r%max)
-		ovr_repeated(my_r%delta+1:2*my_r%delta) = ovr_repeated(1:my_r%delta)
+
 		tnr = 2*my_r%delta
 
 
