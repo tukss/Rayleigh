@@ -74,7 +74,7 @@ Contains
 		Implicit None
 
 
-        perr(:) = 0  ! initialize the error-checking array
+        perr(:) = 0                       ! initialize the error-checking array
 
         Call Establish_Grid_Parameters()  ! Discern rmax,cheby-domain bounds, l_max, etc.
 		Call Init_Comm()                  ! Initialize the MPI and the parallel framework
@@ -87,9 +87,6 @@ Contains
         Call Report_Grid_Parameters()     ! Print some grid-related info to the screen
         Call Initialize_Horizontal_Grid() ! Init theta-grid and Legendre transforms
 		Call Initialize_Radial_Grid()     ! Init radial grid and Chebyshev transforms
-
-
-
 
         If (my_rank .eq. 0) Then
             call stdout%print(" -- Grid initialized.")
@@ -109,7 +106,7 @@ Contains
 			Write(101) (radius(r),r=1,n_r)
 			Write(101) n_theta
 			Write(101) (costheta(r),r=1,n_theta)
-			close(101)
+			Close(101)
 		Endif
     End Subroutine Write_Grid
 
@@ -163,9 +160,6 @@ Contains
             rmax = shell_depth/(1-aspect_ratio)
             rmin = rmax*aspect_ratio
         Endif
-
-
-        
 
         !////////////////////////////////////////////////////////////////////
         ! Decide how many chebyshev domains we have
@@ -332,7 +326,6 @@ Contains
                 Enddo
             Enddo
         Endif
-
 
         Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
         R_squared     = Radius**2
