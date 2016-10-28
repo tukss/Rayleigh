@@ -2,7 +2,7 @@ Module Sphere_Driver
 	Use ClockInfo
 	Use Sphere_Hybrid_Space,   Only : rlm_spacea, rlm_spaceb, hybrid_init
 	Use Sphere_Physical_Space, Only : physical_space, ohmic_heating_coeff
-	Use Sphere_Spectral_Space, Only : post_solve, post_solve_cheby, advancetime, ctemp
+	Use Sphere_Spectral_Space, Only : post_solve, advancetime, ctemp
     Use Diagnostics_Interface, Only : Reboot_Diagnostics
     Use Spherical_IO, Only : time_to_output
 	Use Checkpointing
@@ -91,17 +91,15 @@ Contains
         iteration = first_iteration
 
 
-
+        !//////////////   BEGIN MAIN LOOP
         Do while (iteration .le. last_iteration)    
             !Check here to see if this is an output iteration.
             !If so, we will want to transfer additional information within
             !The transpose buffers
             output_iteration = time_to_output(iteration)
-			If (chebyshev) Then
-				Call Post_Solve_Cheby()
-			Else
-				Call Post_Solve()	! Linear Solve configuration
-			Endif
+
+			Call Post_Solve() ! Linear Solve Configuration
+
 
 			If (my_rank .eq. 0) Then
                 Write(istr,ifmtstr)iteration
@@ -160,6 +158,8 @@ Contains
 
             iteration = iteration+1
 		Enddo
+        !///////////////////// END MAIN LOOP
+
         Call StopWatch(walltime)%increment()
 		Call StopWatch(loop_time)%Increment()
 		if (my_rank .eq. 0) Then

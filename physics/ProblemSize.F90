@@ -1,6 +1,5 @@
 Module ProblemSize
 	Use Parallel_Framework, Only : pfi, Load_Config, Spherical
-	Use Finite_Difference, Only  : Initialize_Derivatives, Rescale_Grid_FD
 	Use Legendre_Polynomials, Only : Initialize_Legendre,coloc
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
@@ -38,7 +37,6 @@ Module ProblemSize
 	Real*8              :: rmin = -1.0d0, rmax = -1.0d0, r_inner, r_outer
     Real*8              :: aspect_ratio = -1.0d0
     Real*8              :: shell_depth = -1.0d0
-    Real*8              :: stretch_factor = 0.0d0
     Real*8              :: shell_volume
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
@@ -48,8 +46,7 @@ Module ProblemSize
 
     !///////////////////////////////////////////////////////////////
     ! Radial Grid Variables Related to the Finite-Element Approach
-    Integer :: fensub = -1   !  Number of subdomains to divide N_R into
-    Integer :: fencheby = -1 ! Number of chebyshev modes per subdomain
+
     Integer, Parameter :: nsubmax = 256
     Integer :: ncheby(1:nsubmax)=-1
     Integer :: dealias_by(1:nsubmax) = -1
@@ -68,32 +65,103 @@ Module ProblemSize
     
 
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
-            &  precise_bounds,grid_type, stretch_factor, fensub,fencheby, l_max, &
+            &  precise_bounds,grid_type, l_max, &
             &  aspect_ratio, shell_depth, ncheby, domain_bounds, dealias_by, &
             &  n_uniform_domains, uniform_bounds
 Contains
 
 	Subroutine Init_ProblemSize()
 		Implicit None
-		Integer :: ppars(1:10)
-		Integer :: tmp,r, l
-		Integer, Allocatable :: m_vals(:)
-		Real*8 :: ell, rdelta
-        Character*120 :: grid_file
-        Integer :: cpu_tmp(1)
-		Character*12 :: dstring
-        Character*6  :: istr
-    	Character*8 :: dofmt = '(ES12.5)'
-        Integer :: cheby_count, bounds_count, i
-        Integer :: errors(10)  ! array that holds any errors encountered in problem size variation
 
-        perr(:) = 0  ! initialize the error array
+
+        perr(:) = 0  ! initialize the error-checking array
+
+        Call Establish_Grid_Parameters()  ! Discern rmax,cheby-domain bounds, l_max, etc.
+		Call Init_Comm()                  ! Initialize the MPI and the parallel framework
+
+        If (my_rank .eq. 0) Then
+            call stdout%print(" ")
+            call stdout%print(" -- Initalizing Grid...")
+        Endif
+
+        Call Report_Grid_Parameters()     ! Print some grid-related info to the screen
+        Call Initialize_Horizontal_Grid() ! Init theta-grid and Legendre transforms
+		Call Initialize_Radial_Grid()     ! Init radial grid and Chebyshev transforms
+
+
+
+
+        If (my_rank .eq. 0) Then
+            call stdout%print(" -- Grid initialized.")
+            call stdout%print(" ")
+        Endif
+        
+	End Subroutine Init_ProblemSize
+
+    Subroutine Write_Grid()
+        Implicit None
+        Integer :: r
+        Character*120 :: grid_file
+		If (my_rank .eq. 0) Then
+            grid_file = Trim(my_path)//'grid'
+			Open(101, file = grid_file, status='replace', form = 'unformatted')
+			Write(101) n_r
+			Write(101) (radius(r),r=1,n_r)
+			Write(101) n_theta
+			Write(101) (costheta(r),r=1,n_theta)
+			close(101)
+		Endif
+    End Subroutine Write_Grid
+
+    Subroutine Init_Comm()
+        Implicit None
+        Integer :: cpu_tmp(1)
+		Integer :: ppars(1:10)
+		!/////////////////////////////////////////////////////////
+		! Initialize MPI and load balancing (if no errors detected)
+		ncpu = nprow*npcol
+		ppars(1) = Spherical
+		ppars(2) = n_r
+		ppars(3) = n_r
+		ppars(4) = n_theta
+		ppars(5) = n_l
+		ppars(6) = n_phi
+		ppars(7) = n_m		
+		ppars(8) = ncpu
+		ppars(9) = nprow
+		ppars(10) = npcol
+        If (multi_run_mode) Then
+    		Call pfi%init(ppars,run_cpus, grid_error)
+        Else
+            cpu_tmp(1) = ncpu
+    		Call pfi%init(ppars,cpu_tmp,grid_error)
+        Endif
+		my_rank = pfi%gcomm%rank
+		my_row_rank = pfi%rcomm%rank
+		my_column_rank = pfi%ccomm%rank
+
+
+		my_mp    = pfi%my_3s
+		my_r     = pfi%my_1p
+		my_theta = pfi%my_2p
+
+        tnr = 2*my_r%delta
+        ! Once MPI has been initialized, we can start timing
+		Call Initialize_Timers()
+		Call StopWatch(init_time)%startclock()
+		Call StopWatch(walltime)%startclock()
+    End Subroutine Init_Comm
+
+    Subroutine Establish_Grid_Parameters()
+        Implicit None
+        Integer :: cheby_count, bounds_count, i,r
+        Real*8 :: rdelta
+        !Initialize everything related to grid resolution and domain bounds.
 
         If ((aspect_ratio .gt. 0.0d0) .and. (shell_depth .gt. 0.0d0) ) Then
             ! Set the bounds based on the aspect ratio and shell depth
             rmax = shell_depth/(1-aspect_ratio)
             rmin = rmax*aspect_ratio
-
         Endif
 
 
@@ -191,60 +259,21 @@ Contains
 		m_max = l_max
 		n_l = l_max+1
 		n_m = m_max+1
+        Call Consistency_Check()  ! Identify issues related to the grid setup
 
-		Allocate(l_l_plus1(0:l_max))
-		Allocate(over_l_l_plus1(0:l_max))
-		over_l_l_plus1(0) = 1.0d0 ! This keeps us from having to worry about dividing by zero
-		Do l = 0, l_max
-			ell = l*1.0d0
-			l_l_plus1(l) = ell*(ell+1)
-			if (l .ne. 0) over_l_l_plus1(l) = 1.0d0/l_l_plus1(l)
-		Enddo
-
-        !//////////////////////////////////////////////////
-        ! Check for errors in the grid input.
-        Call Consistency_Check()
-		
-
-		!/////////////////////////////////////////////////////////
-		! Initialize MPI and load balancing (if no errors detected)
-		ncpu = nprow*npcol
-		ppars(1) = Spherical
-		ppars(2) = n_r
-		ppars(3) = n_r
-		ppars(4) = n_theta
-		ppars(5) = n_l
-		ppars(6) = n_phi
-		ppars(7) = n_m		
-		ppars(8) = ncpu
-		ppars(9) = nprow
-		ppars(10) = npcol
-        If (multi_run_mode) Then
-    		Call pfi%init(ppars,run_cpus, grid_error)
-        Else
-            cpu_tmp(1) = ncpu
-    		Call pfi%init(ppars,cpu_tmp,grid_error)
-        Endif
-		my_rank = pfi%gcomm%rank
-		my_row_rank = pfi%rcomm%rank
-		my_column_rank = pfi%ccomm%rank
-        If (my_rank .eq. 0) Then
-            call stdout%print(" ")
-            call stdout%print(" -- Initalizing Grid...")
-        Endif
-
-		Call Halt_On_Error()  ! Halt the program if grid specification is erroneous
-
-        Call Report_Grid_Parameters() ! Print some grid-related info to the screen
-
-		Call Initialize_Timers()
-		Call StopWatch(init_time)%startclock()
-		Call StopWatch(walltime)%startclock()
-		Call Map_Indices()
+    End Subroutine Establish_Grid_Parameters
 
 
+    Subroutine Initialize_Horizontal_Grid()
+        Implicit None
+        Integer :: tmp, l
+		Integer, Allocatable :: m_vals(:)
+        Real*8 :: ell
 		!//////////////////////////////////////////////////
 		! Intialize Legendre Transforms & Horizontal Grid
+		Allocate(m_values(1:n_m))
+		m_values = pfi%inds_3s
+
 		tmp = my_mp%delta
 		allocate(m_vals(1:tmp))
 		m_vals(:) = m_values(my_mp%min:my_mp%max)
@@ -265,53 +294,20 @@ Contains
 		csctheta = 1/sintheta
 		cottheta = costheta/sintheta
 
-		Call Initialize_Radial_Grid()
-		r_inner = rmin
-		r_outer = rmax
-		if (pfi%gcomm%rank .eq. 0) then
-            grid_file = Trim(my_path)//'grid'
-			Open(101, file = grid_file, status='replace', form = 'unformatted')
-			Write(101) n_r
-			Write(101) (radius(r),r=1,n_r)
-			Write(101) n_theta
-			Write(101) (costheta(r),r=1,n_theta)
-			close(101)
-		endif
+		Allocate(l_l_plus1(0:l_max))
+		Allocate(over_l_l_plus1(0:l_max))
+		over_l_l_plus1(0) = 1.0d0 ! Prevent compiler warnings related to dividing by zero
+		Do l = 0, l_max
+			ell = l*1.0d0
+			l_l_plus1(l) = ell*(ell+1)
+			if (l .ne. 0) over_l_l_plus1(l) = 1.0d0/l_l_plus1(l)
+		Enddo
 
-
-		tnr = 2*my_r%delta
-
-
-        If (my_rank .eq. 0) Then
-            call stdout%print(" -- Grid initialized.")
-            call stdout%print(" ")
-        Endif
-        
-	End Subroutine Init_ProblemSize
-
-	Subroutine Map_Indices()
-		Implicit None
-		Allocate(m_values(1:n_m))
-		my_mp    = pfi%my_3s
-		my_r     = pfi%my_1p
-		my_theta = pfi%my_2p
-		m_values = pfi%inds_3s
-
-	End Subroutine Map_Indices
+    End Subroutine Initialize_Horizontal_Grid
 
 	Subroutine Initialize_Radial_Grid()
 		Implicit None
-		Integer :: r, nthr,i,j ,n
-		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
-        real*8 :: delr0
-
-
-        !////////////////////////////////////////
-        ! Variables for FE approach
-        Real*8, Allocatable :: xtemp(:), weight_temp(:)
-        Real*8 :: dsub, offset, xmax, xmin
-        Integer :: istart, iend
-
+		Integer :: r, nthr,i ,n
 
 		nthr = pfi%nthreads
 		Allocate(Delta_r(1:N_R))
@@ -343,7 +339,8 @@ Contains
         One_Over_R      = (1.0d0)/Radius
         Two_Over_R      = (2.0d0)/Radius
         OneOverRSquared = (1.0d0)/r_Squared
-
+		r_inner = rmin
+		r_outer = rmax
 	End Subroutine Initialize_Radial_Grid
 
     Subroutine Report_Grid_Parameters()
@@ -352,6 +349,8 @@ Contains
         Character*6 :: istr
         Character*12 :: dstring
     	Character*8 :: dofmt = '(ES12.5)'
+
+        Call Halt_On_Error()  ! Halt the program if errors were found in the consistency check
         If (my_rank .eq. 0) Then
             Write(istr,'(i6)')n_r
             Call stdout%print(" ---- Specified parameters ----")
