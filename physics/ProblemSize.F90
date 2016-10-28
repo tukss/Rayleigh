@@ -173,7 +173,7 @@ Contains
         !       a.) a single Chebyshev domain (normal mode)
         !       b.) a uniform set of N Chebyshev domains (original SFE mode)
         !       c.) N Chebyshev domains with differing number of polynomials
-        If (ncheby(1) .le. 0 ) Then ! .or. (n_uniform_domains .lt. 2) ) Then
+        If ((ncheby(1) .le. 0 ) .and. (n_uniform_domains .lt. 2) ) Then
             ! Case (a)
             ncheby(1) = n_r
             domain_bounds(1) = rmin
