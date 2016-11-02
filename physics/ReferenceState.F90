@@ -151,7 +151,7 @@ Contains
 		Character*12 :: dstring
     	Character*8 :: dofmt = '(ES12.5)'
         Dimensional_Reference = .false.
-        viscous_heating = .false.  ! Turn this off for now until I find appropriate non-dimensionalization
+        viscous_heating = .false.  ! Turn this off for Boussinesq runs
         If (my_rank .eq. 0) Then
             Call stdout%print(" ---- Reference type           : "//trim(" Boussinesq (Non-dimensional)"))
             Write(dstring,dofmt)Rayleigh_Number
@@ -166,15 +166,15 @@ Contains
             Endif
         Endif
 
-        ref%density = 1.0d0
-        ref%dlnrho = 0.0d0
-        ref%d2lnrho = 0.0d0
-        ref%pressure = 1.0d0
-        ref%temperature = 1.0d0
-        ref%dlnT = 0.0d0
-        ref%dsdr = 0.0d0
-        ref%pressure = 1.0d0
-        ref%gravity = 0.0d0 ! Not used with constant reference right now
+        ref%density      = 1.0d0
+        ref%dlnrho       = 0.0d0
+        ref%d2lnrho      = 0.0d0
+        ref%pressure     = 1.0d0
+        ref%temperature  = 1.0d0
+        ref%dlnT         = 0.0d0
+        ref%dsdr         = 0.0d0
+        ref%pressure     = 1.0d0
+        ref%gravity      = 0.0d0 ! Not used with constant reference right now
 
         amp = Rayleigh_Number/Prandtl_Number
 
@@ -194,19 +194,20 @@ Contains
                 s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
             Enddo
         Endif
+
         !Define the various equation coefficients
-        ref%dpdr_w_term(:) = ref%density
+        ref%dpdr_w_term(:)        =  ref%density
         ref%pressure_dwdr_term(:) = -1.0d0*ref%density
-        ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+        ref%Coriolis_Coeff        =  2.0d0/Ekman_Number          
 
 
-        ref%script_N_top       = Prandtl_Number
-        ref%script_K_top       = 1.0d0
+        ref%script_N_top       = 1.0d0
+        ref%script_K_top       = 1.0d0/Prandtl_Number
         ref%viscous_amp(1:N_R) = 2.0d0
 
         If (magnetism) Then
-            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
-            ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
+            ref%Lorentz_Coeff    = 1.0d0/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_Top     = 1.0d0/Magnetic_Prandtl_Number
             ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
         Else
             ref%Lorentz_Coeff    = 0.0d0
