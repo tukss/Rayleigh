@@ -146,7 +146,7 @@ Contains
     Subroutine Constant_Reference()
         Implicit None
         Integer :: i
-        Real*8 :: r_outer, r_inner, prefactor, amp
+        Real*8 :: r_outer, r_inner, prefactor, amp, pscaling
         Character*6  :: istr
 		Character*12 :: dstring
     	Character*8 :: dofmt = '(ES12.5)'
@@ -195,9 +195,15 @@ Contains
             Enddo
         Endif
 
+        If (.not. rotation) Then
+            pscaling = 1.0d0
+        Else
+            pscaling = 1.0d0/Ekman_Number
+        Endif
+
         !Define the various equation coefficients
-        ref%dpdr_w_term(:)        =  ref%density
-        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
+        ref%dpdr_w_term(:)        =  ref%density*pscaling
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density*pscaling
         ref%Coriolis_Coeff        =  2.0d0/Ekman_Number          
 
 
