@@ -45,8 +45,8 @@ Module Parallel_Framework
 		Procedure :: Init => Initialize_Parallel_Interface
         Procedure :: openmp_init
 		Procedure :: Exit => Finalize_Framework
-		Procedure ::  Spherical_Init 
-		Procedure ::  Init_Geometry
+		Procedure :: Spherical_Init 
+		Procedure :: Init_Geometry
         Procedure :: Broadcast_Intarr
 	End Type Parallel_Interface
 
@@ -90,13 +90,14 @@ Contains
     End Subroutine Init_World_Comm
 
 
-	Subroutine Initialize_Parallel_Interface(self, pars,ncpus)
+	Subroutine Initialize_Parallel_Interface(self, pars,ncpus,init_only)
         Implicit None
 		Integer, Intent(In) ::  pars(1:)
         Integer, Intent(In) :: ncpus(1:)
 		Integer :: pcheck, error
         Integer :: ierr
         Character*6 :: istr
+        Logical, Intent(In) :: init_only
 		Class(Parallel_Interface) :: self	
 		self%geometry = pars(1)
 		self%n1p = pars(2)
@@ -139,6 +140,21 @@ Contains
             Write(istr,'(i6)')self%npcol
             call stdout%print(" ---- NPCOL : "//trim(istr))
         Endif
+        If (self%nprow .le. 0) Then
+            If (self%gcomm%rank .eq. 0) Then
+                Call stdout%print('........................................................')
+			    Call stdout%print(' --- Error:  nprow must be at least 1.  Exiting...')
+            Endif
+            Call self%exit()
+        Endif
+
+        If (self%npcol .le. 0) Then
+            If (self%gcomm%rank .eq. 0) Then
+                Call stdout%print('........................................................')
+			    Call stdout%print(' --- Error:  npcol must be at least 1.  Exiting...')
+            Endif
+            Call self%exit()
+        Endif
 		if (self%gcomm%np .ne. self%npe) Then
 			If (self%gcomm%rank .eq. 0) Then
                 Call stdout%print('........................................................')
@@ -153,27 +169,19 @@ Contains
 			Call self%exit()
 		Endif
 
-		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,error)
-		Call self%Init_Geometry()	
+
+    		Call rowcolsplit(self%gcomm,self%rcomm,self%ccomm,self%nprow,error)
+        If (.not. init_only) Then
+            !Load balancing does not HAVE to be initialized (though it usually is)
+    		Call self%Init_Geometry()	
+        Endif
 
         Call self%openmp_init()
         If (self%gcomm%rank .eq. 0) Then
             call stdout%print(" -- MPI initialized.")
             call stdout%print(" ")
         Endif
-		If (self%gcomm%rank .eq. -1) Then
-			Write(6,*)"/////////////////////////////////////////////////////////////////////"
-			Write(6,*)"//                                                                 //"
-			Write(6,*)"//            Rayleigh's Parallel framework is initialized.        //"
-			Write(6,*)"//                                                                 //"
-			Write(6,*)"//                                                                 //"
-			Write(6,*)"//       We are all our hands and holders                          //"
-			Write(6,*)"//                  beneath this bold and brilliant Sun!           //"
-			Write(6,*)"//                                                                 //"
-			Write(6,*)"//                              - The Decemberists                 //"
-			Write(6,*)"//                                                                 //"
-			Write(6,*)"/////////////////////////////////////////////////////////////////////"
-		Endif
+
 	End Subroutine Initialize_Parallel_Interface
     Subroutine Broadcast_Intarr(self,intarr,src,comm_option)
         Implicit None
@@ -259,12 +267,12 @@ Contains
 		Call m_balance(self%all_3s, self%inds_3s, self%rcomm)
 		Call LM_Load_Balance(pfi%my_3s,self%inds_3s,self%ccomm)
 		If (self%gcomm%rank .eq. -100) Then
-						unit1 = 10
-			         Open(unit1, file = 'verification/m_check', status='replace', form = 'unformatted')
-						Write(unit1) self%n3s
-						Write(unit1) (self%inds_3s(r),r=1,self%n3s)
-			
-						Close(unit1)
+            unit1 = 10
+            Open(unit1, file = 'verification/m_check', status='replace', form = 'unformatted')
+            Write(unit1) self%n3s
+            Write(unit1) (self%inds_3s(r),r=1,self%n3s)
+
+            Close(unit1)
 		Endif
 	End Subroutine Spherical_Init
 

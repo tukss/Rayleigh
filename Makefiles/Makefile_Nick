@@ -6,20 +6,20 @@ CC = gcc
 ifeq ($(RAYLEIGH_OPT1),openmp)
 	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3_threads -lfftw3 -lm -L/usr/lib -lblas -llapack -lstdc++
 else
-	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3 -L/usr/lib -lblas -llapack -lstdc++
+	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3 -L/usr/lib -lblas -llapack -lstdc++ -L/home/nick/Pardiso/ -lpardiso500-GNU481-X86-64
 endif
 
 
 ifeq ($(RAYLEIGH_OPT1),openmp)
 	F90FLAGS = -O1 -fbounds-check -Duseomp=.true. -cpp -fbacktrace -ffixed-line-length-132 -fopenmp -I/usr/include
 else
-	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
+	F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Pardiso
 endif
 
 ifeq ($(RAYLEIGH_OPT1),debug)
-        F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -I/usr/include
+        F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include
 else
-        F90FLAGS = -O3 -ffixed-line-length-132  -I/usr/include
+        F90FLAGS = -O3 -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Pardiso
 endif
 
 

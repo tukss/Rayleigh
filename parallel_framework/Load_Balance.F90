@@ -333,46 +333,60 @@ Contains
         my_num_lm = num_lm(my_radial_rank)
 
 
+
+
         !===============================
         !  Identify the index range within the lm values that I own
         my_lm_min = -1
         my_lm_max = -1
-        If (my_radial_rank .eq. 0) Then
-            my_lm_min = 1
-        Else
-            my_lm_min = SUM(num_lm(0:my_radial_rank-1))+1
+        If (my_num_lm .gt. 0) Then
+            If (my_radial_rank .eq. 0) Then
+                my_lm_min = 1
+            Else
+                my_lm_min = SUM(num_lm(0:my_radial_rank-1))+1
+            Endif
+            If (num_lm(my_radial_rank) .gt. 0) Then
+                my_lm_max = my_lm_min+num_lm(my_radial_rank)-1
+            Endif
         Endif
-        If (num_lm(my_radial_rank) .gt. 0) my_lm_max = my_lm_min+num_lm(my_radial_rank)-1
-
-
 
 
         !=====================================
         ! Discern the range of l-values I have been assigned.
         ! Create an array of unique l-values
-        ind = 0
-        l_lm_min = l_lm_values(my_lm_min)
-        l_lm_max = l_lm_values(my_lm_max)
-        my_nl_lm = l_lm_max-l_lm_min+1
-        Allocate(my_lm_lval(1:my_nl_lm))
-        Do i = 1, my_nl_lm
-            my_lm_lval(i) = l_lm_min+(i-1)
-        Enddo
 
+        If (my_num_lm .gt. 0) Then
 
-        !==================================
-        ! Count the m-values I own for each l-value
-        Allocate(my_nm_lm(1:my_nl_lm))
-        my_nm_lm(:) = 0
-        Do i = 1, my_nl_lm
-            l = my_lm_lval(i)
-            Do ind = my_lm_min, my_lm_max
-                If (l_lm_values(ind) .eq. l) Then
-                    my_nm_lm(i) = my_nm_lm(i)+1
-                Endif
+            ind = 0
+            l_lm_min = l_lm_values(my_lm_min)
+            l_lm_max = l_lm_values(my_lm_max)
+            my_nl_lm = l_lm_max-l_lm_min+1
+
+            Allocate(my_lm_lval(1:my_nl_lm))
+            Do i = 1, my_nl_lm
+                my_lm_lval(i) = l_lm_min+(i-1)
             Enddo
-        Enddo
 
+
+            !==================================
+            ! Count the m-values I own for each l-value
+            Allocate(my_nm_lm(1:my_nl_lm))
+            my_nm_lm(:) = 0
+            Do i = 1, my_nl_lm
+                l = my_lm_lval(i)
+                Do ind = my_lm_min, my_lm_max
+                    If (l_lm_values(ind) .eq. l) Then
+                        my_nm_lm(i) = my_nm_lm(i)+1
+                    Endif
+                Enddo
+            Enddo
+        Else
+            ! I own nothing - initialize arrays to reflect
+            Allocate(my_lm_lval(1:1))
+            my_lm_lval(1) = -1
+            Allocate(my_nm_lm(1:1))
+            my_nm_lm(1) = 0
+        Endif
 
     End Subroutine LM_load_balance
 

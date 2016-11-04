@@ -9,7 +9,7 @@ Module Checkpointing
 	Use Controls
 	Use MPI_BASE
     Use Chebyshev_Polynomials_Alt
-    Use Chebyshev_Polynomials, Only : cheby_from_Spectral
+
     Use BufferedOutput
 	! Simple Checkpointing Module
 	! Uses MPI-IO to split writing of files amongst rank zero processes from each row
@@ -682,7 +682,7 @@ Contains
  
                     Call chktmp2%construct('p1b')                  
                     !Normal transform(p1a,p1b)
-                    Call Cheby_From_Spectral(chktmp2%p1a,chktmp2%p1b)
+                    Call gridcp%From_Spectral(chktmp2%p1a,chktmp2%p1b)
 
                     abterms(:,:,:,1:numfields) = chktmp2%p1b(:,:,:,1:numfields)
                     Call cheby_info%destroy()

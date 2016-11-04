@@ -27,7 +27,7 @@ Module Spherical_IO
   
     Integer, Parameter :: shellslice_version = 3
     Integer, Parameter :: azavg_version = 3
-    Integer, Parameter :: shellavg_version = 3
+    Integer, Parameter :: shellavg_version = 4
     Integer, Parameter :: globalavg_version = 3
     Integer, Parameter :: shellspectra_version = 3
     Integer, Parameter :: full3d_version = 3    !currently unused
@@ -2441,8 +2441,9 @@ Contains
             Enddo
         Enddo
 
+        !This next line was erroneous.  inbuff has already been averaged in phi
         ! Turn phi-integration into an average
-        tmp_buffer(:,:) = tmp_buffer(:,:)*over_nphi_double
+        !tmp_buffer(:,:) = tmp_buffer(:,:)*over_nphi_double
 
         ! Complete the averaging process in theta
         Call DALLSUM2D(tmp_buffer, outbuff, pfi%rcomm)

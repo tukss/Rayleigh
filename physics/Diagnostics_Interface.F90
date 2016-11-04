@@ -220,7 +220,7 @@ Contains
 
         Allocate(rweights(1:n_r))
 
-        If (chebyshev .or. finite_element) Then
+        If (chebyshev) Then
             rweights = radial_integral_weights
 
         Else

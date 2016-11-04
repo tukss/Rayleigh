@@ -5,7 +5,7 @@ Module Initial_Conditions
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform 
     Use SendReceive
-    Use Chebyshev_Polynomials, Only : Cheby_To_Spectral, Cheby_To_SpectralFE
+
     Use Checkpointing, Only : read_checkpoint, read_checkpoint_alt
     Use Controls
     Use Timers
@@ -392,11 +392,9 @@ Contains
         If (chebyshev) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
-            If (finite_element) Then
-                Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
-            Else
-                Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            Endif
+
+            Call gridcp%To_Spectral(tempfield%p1b,tempfield%p1a)
+
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
@@ -530,14 +528,12 @@ Contains
         DeAllocate(rfunc1,rfunc2)
 
         Call tempfield%reform() ! goes to p1b
-        If (chebyshev .or. finite_element) Then
+        If (chebyshev) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
-            If (finite_element) Then
-                Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
-            Else
-                Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            Endif
+
+            Call gridcp%To_Spectral(tempfield%p1b,tempfield%p1a)
+
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
@@ -628,13 +624,7 @@ Contains
         If (chebyshev) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
-            Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
-            Call tempfield%deconstruct('p1a')
-        Endif
-        If (finite_element) Then
-            Call tempfield%construct('p1a')
-            Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
+            Call gridcp%to_Spectral(tempfield%p1b,tempfield%p1a)
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
@@ -694,11 +684,9 @@ Contains
         If (chebyshev) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
-            If (finite_element) Then
-                Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
-            Else
-                Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            Endif
+
+            Call gridcp%To_Spectral(tempfield%p1b,tempfield%p1a)
+
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif
@@ -759,15 +747,13 @@ Contains
         DeAllocate(rfunc1,rfunc2)
 
         Call tempfield%reform() ! goes to p1b
-        If (chebyshev .or. finite_element) Then
+        If (chebyshev) Then
             ! we need to load the chebyshev coefficients, and not the physical representation into the RHS
             Call tempfield%construct('p1a')
-            If (finite_element) Then
-                !write(6,*)'I am in the right routine'
-                Call Cheby_To_SpectralFE(tempfield%p1b,tempfield%p1a)
-            Else
-                Call Cheby_To_Spectral(tempfield%p1b,tempfield%p1a)
-            Endif
+
+
+            Call gridcp%to_Spectral(tempfield%p1b,tempfield%p1a)
+
             tempfield%p1b(:,:,:,:) = tempfield%p1a(:,:,:,:)
             Call tempfield%deconstruct('p1a')
         Endif

@@ -11,8 +11,6 @@ Module ReferenceState
     Use Math_Constants
     Use Math_Utility
     Use General_MPI, Only : BCAST2D
-    Use Chebyshev_Polynomials, Only : cheby_to_spectral, cheby_from_spectral, d_by_dr_cp, &
-        & cheby_to_spectralFE, cheby_from_spectralFE, d_by_dr_cpFE
     Implicit None
     Type ReferenceInfo
         Real*8, Allocatable :: Density(:)
@@ -148,12 +146,12 @@ Contains
     Subroutine Constant_Reference()
         Implicit None
         Integer :: i
-        Real*8 :: r_outer, r_inner, prefactor, amp
+        Real*8 :: r_outer, r_inner, prefactor, amp, pscaling
         Character*6  :: istr
 		Character*12 :: dstring
     	Character*8 :: dofmt = '(ES12.5)'
         Dimensional_Reference = .false.
-        viscous_heating = .false.  ! Turn this off for now until I find appropriate non-dimensionalization
+        viscous_heating = .false.  ! Turn this off for Boussinesq runs
         If (my_rank .eq. 0) Then
             Call stdout%print(" ---- Reference type           : "//trim(" Boussinesq (Non-dimensional)"))
             Write(dstring,dofmt)Rayleigh_Number
@@ -168,15 +166,15 @@ Contains
             Endif
         Endif
 
-        ref%density = 1.0d0
-        ref%dlnrho = 0.0d0
-        ref%d2lnrho = 0.0d0
-        ref%pressure = 1.0d0
-        ref%temperature = 1.0d0
-        ref%dlnT = 0.0d0
-        ref%dsdr = 0.0d0
-        ref%pressure = 1.0d0
-        ref%gravity = 0.0d0 ! Not used with constant reference right now
+        ref%density      = 1.0d0
+        ref%dlnrho       = 0.0d0
+        ref%d2lnrho      = 0.0d0
+        ref%pressure     = 1.0d0
+        ref%temperature  = 1.0d0
+        ref%dlnT         = 0.0d0
+        ref%dsdr         = 0.0d0
+        ref%pressure     = 1.0d0
+        ref%gravity      = 0.0d0 ! Not used with constant reference right now
 
         amp = Rayleigh_Number/Prandtl_Number
 
@@ -196,19 +194,26 @@ Contains
                 s_conductive(i) = prefactor*(1.0d0/r_outer-1.0d0/radius(i))
             Enddo
         Endif
+
+        If (.not. rotation) Then
+            pscaling = 1.0d0
+        Else
+            pscaling = 1.0d0/Ekman_Number
+        Endif
+
         !Define the various equation coefficients
-        ref%dpdr_w_term(:) = ref%density
-        ref%pressure_dwdr_term(:) = -1.0d0*ref%density
-        ref%Coriolis_Coeff = 2.0d0/Ekman_Number*Prandtl_Number            
+        ref%dpdr_w_term(:)        =  ref%density*pscaling
+        ref%pressure_dwdr_term(:) = -1.0d0*ref%density*pscaling
+        ref%Coriolis_Coeff        =  2.0d0/Ekman_Number          
 
 
-        ref%script_N_top       = Prandtl_Number
-        ref%script_K_top       = 1.0d0
+        ref%script_N_top       = 1.0d0
+        ref%script_K_top       = 1.0d0/Prandtl_Number
         ref%viscous_amp(1:N_R) = 2.0d0
 
         If (magnetism) Then
-            ref%Lorentz_Coeff    = Prandtl_Number/(Magnetic_Prandtl_Number*Ekman_Number)
-            ref%script_H_Top     = Prandtl_Number/Magnetic_Prandtl_Number
+            ref%Lorentz_Coeff    = 1.0d0/(Magnetic_Prandtl_Number*Ekman_Number)
+            ref%script_H_Top     = 1.0d0/Magnetic_Prandtl_Number
             ref%ohmic_amp(1:N_R) = ref%lorentz_coeff 
         Else
             ref%Lorentz_Coeff    = 0.0d0
@@ -757,14 +762,14 @@ Contains
         dtemp(:,1,1,1) = ref%dlnrho(:)
 
         ! transform to spectral
-        Call Cheby_To_Spectral(dtemp,dtemp2)
+        Call gridcp%to_Spectral(dtemp,dtemp2)
         !Take derivative of 4th dimension, index 1 of dtemp2 (first 1)
         ! store it in 4th dimension, index 2
         ! Take a first derivative (second 1)
-        Call d_by_dr_cp(1,2,dtemp2,1)
+        Call gridcp%d_by_dr_cp(1,2,dtemp2,1)
         !dtemp2((n_r*2)/3:n_r,1,1,2) = 0.0d0  ! de-alias
         !transform back to physical
-        Call Cheby_From_Spectral(dtemp2,dtemp)
+        Call gridcp%from_Spectral(dtemp2,dtemp)
 
         ref%d2lnrho(:) = dtemp(:,1,1,2)        
 
