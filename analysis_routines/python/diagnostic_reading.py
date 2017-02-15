@@ -560,6 +560,8 @@ class ShellSpectra:
     self.inds[0:nr-1]                             : radial indices of the shell slices output
     self.vals[0:lmax,0:mmax,0:nr-1,0:nq-1,0:niter-1] 
                                                   : The complex spectra of the shells output 
+    self.lpower[0:lmax,0:nr-1,0:nq-1,0:niter-1,3]    : The power as a function of ell, integrated over m
+                                                     :  index indicates (0:total,1:m=0, 2:total-m=0 power)
     self.iters[0:niter-1]                         : The time step numbers stored in this output file
     self.time[0:niter-1]                          : The simulation time corresponding to each time step
     self.version                                  : The version code for this particular output (internal use)
@@ -620,8 +622,8 @@ class ShellSpectra:
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
         self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
         self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
-
-        self.vals  = np.zeros((nm,nell,nr,nq,nrec),dtype='complex128')
+        self.vals  = np.zeros((nell,nm,nr,nq,nrec),dtype='complex128')
+        
         self.iters = np.zeros(nrec,dtype='int32')
         self.time  = np.zeros(nrec,dtype='float64')
         self.version = version
@@ -635,12 +637,41 @@ class ShellSpectra:
 
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        if (self.version < 4):
+            # The m>0 --power-- is too high by a factor of 2
+            # We divide the --complex amplitude-- by sqrt(2)
+            sqrttwo = np.sqrt(2)
+            for k in range(nrec):
+                for q in range(nq):
+                    for j in range(nr):
+                        for m in range(1,nm):
+                            self.vals[:,m,j,q,k] = self.vals[:,m,j,q,k]/sqrttwo
+
         maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
         for i,q in enumerate(self.qv):
             self.lut[q] = i
         fd.close()
+
+        self.lpower  = np.zeros((nell,nr,nq,nrec,3),dtype='float64')
+        #!Finally, we create the power
+        for k in range(nrec):
+            for q in range(nq):
+                for j in range(nr):
+                    # Load the m=0 power
+                    self.lpower[:,j,q,k,1] = self.lpower[:,j,q,k,1]+np.real(self.vals[:,0,j,q,k])**2 +np.imag(self.vals[:,0,j,q,k])**2
+
+                    # m !=0 (convective) power
+
+                    for m in range(1,nm):
+                        self.lpower[:,j,q,k,2] = self.lpower[:,j,q,k,2]+np.real(self.vals[:,m,j,q,k])**2 +np.imag(self.vals[:,m,j,q,k])**2
+
+
+                    self.lpower[:,j,q,k,0] = self.lpower[:,j,q,k,2]+self.lpower[:,j,q,k,1] # total power
+
+
 class PowerSpectrum():
     """Rayleigh Power Spectrum Structure
     ----------------------------------
@@ -772,15 +803,19 @@ class PowerSpectrum():
 
         for k in range(nt):
             for j in range(nr):
+                # Load the m=0 power
                 power[:,j,k,1] = power[:,j,k,1]+np.real(vrc[:,0,j,k])**2 +np.imag(vrc[:,0,j,k])**2
                 power[:,j,k,1] = power[:,j,k,1]+np.real(vtc[:,0,j,k])**2 +np.imag(vtc[:,0,j,k])**2
                 power[:,j,k,1] = power[:,j,k,1]+np.real(vpc[:,0,j,k])**2 +np.imag(vpc[:,0,j,k])**2
-                for m in range(a.nm):
-                    power[:,j,k,0] = power[:,j,k,0]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
-                    power[:,j,k,0] = power[:,j,k,0]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
-                    power[:,j,k,0] = power[:,j,k,0]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
-                power[1:a.nm,j,k,0] = power[1:a.nm,j,k,0]*0.5 # m > 0 POWER is too high by 2 due to normalization
-                power[:,j,k,2] = power[:,j,k,0]-power[:,j,k,1]
+
+                # m !=0 (convective) power
+
+                for m in range(1,a.nm):
+                    power[:,j,k,2] = power[:,j,k,2]+np.real(vrc[:,m,j,k])**2 +np.imag(vrc[:,m,j,k])**2
+                    power[:,j,k,2] = power[:,j,k,2]+np.real(vtc[:,m,j,k])**2 +np.imag(vtc[:,m,j,k])**2
+                    power[:,j,k,2] = power[:,j,k,2]+np.real(vpc[:,m,j,k])**2 +np.imag(vpc[:,m,j,k])**2
+
+                power[:,j,k,0] = power[:,j,k,2]+power[:,j,k,1] # total power
 
         self.power = power
 

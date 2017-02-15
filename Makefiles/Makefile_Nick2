@@ -2,11 +2,13 @@ F90  = /usr/local/mpich2-1.0.7/bin/mpif90
 F90 = mpif90
 CC = gcc
 #   Flags for the LAPack Libraries
+FFTW_LIB = /home/nick/MYLIB/fftw-3.3.5/lib
+FFTW_INC = /home/nick/MYLIB/fftw-3.3.5/include
 
 ifeq ($(RAYLEIGH_OPT1),openmp)
 	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3_threads -lfftw3 -lm -L/usr/lib -lblas -llapack -lstdc++
 else
-	LIBFLAGS = -L/usr/lib/x86_64-linux-gnu -lfftw3 -L/usr/lib -lblas -llapack -lstdc++ -L/home/nick/Pardiso/ -lpardiso500-GNU481-X86-64
+	LIBFLAGS = -L/$(FFTW_LIB) -lfftw3 -L/usr/lib -lblas -llapack -lstdc++
 endif
 
 
@@ -17,9 +19,11 @@ else
 endif
 
 ifeq ($(RAYLEIGH_OPT1),debug)
-        F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include
+        ##F90FLAGS = -O1 -fbounds-check -fbacktrace -ffixed-line-length-132  -fopenmp -I/usr/include
+        F90FLAGS = -O0 -fbounds-check -fbacktrace -ffixed-line-length-132 -I/usr/include -I$(FFTW_INC)
+
 else
-        F90FLAGS = -O3 -ffixed-line-length-132  -fopenmp -I/usr/include -I/home/nick/Pardiso
+        F90FLAGS = -O3 -mavx -ffixed-line-length-132 -I/usr/include -I$(FFTW_INC)
 endif
 
 
@@ -35,6 +39,6 @@ $(PROG) :$(DSOBJ) $(PFOBJ) $(MOBJ) $(IOOBJ) $(POBJ) $(TOBJ) $(MAINOBJ)
 .cc.o:
 	$(CC) $(CFLAGS) -c *.cc
 clean : 
-	rm -f *.o *.mod pseudo
+	rm -f *.o *.mod rayleigh
 ready :
 
