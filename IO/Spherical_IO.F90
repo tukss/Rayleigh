@@ -15,12 +15,14 @@ Module Spherical_IO
 	! 4. Volume averages over sphere
     ! 5. 3-D Output on Spherical grid
     ! 6. Spectra on slices of the sphere
-    ! 7. PDFs taken on slices of the sphere
+    ! 7. Sampled via individual spherical harmonic modes
+    ! 8. Meridional Slices
+    ! 9. Equatorial Slices
 
 	!////////////////////////////////////////////
-    Integer, Parameter :: nqmax=800, nshellmax=100
+    Integer, Parameter :: nqmax=800, nshellmax=100, nmeridmax=100, nmodemax=100
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
-
+    Integer, Parameter :: reallybig = 90000000
     !Each diagnostic type has an associated version number that is written to the file
     !following the endian tag.  Hopefully, reading routines can be backward compatible if
     !significant changes are made to the output structure (and reflected in the version number)
@@ -30,6 +32,9 @@ Module Spherical_IO
     Integer, Parameter :: shellavg_version = 4
     Integer, Parameter :: globalavg_version = 3
     Integer, Parameter :: shellspectra_version = 3
+    Integer, Parameter :: equslice_version = 1  
+    Integer, Parameter :: meridslice_version = 1
+    Integer, Parameter :: sphmode_version =1
     Integer, Parameter :: full3d_version = 3    !currently unused
     Type, Public :: DiagnosticInfo
         ! Need to see if we can make these allocatable, but for now..
@@ -48,7 +53,7 @@ Module Spherical_IO
 
         Integer, Allocatable :: oqvals(:)   ! Array of size nq used by I/O process to record output ordering of diagnostics
 
-        Integer :: frequency = 90000000 ! How often we write this diagnostic type
+        Integer :: frequency = reallybig ! How often we write this diagnostic type
         Integer :: rec_per_file =1     ! How many of these records we write to a file
         Integer :: current_rec = 1       ! Which record we are on within a file
         Integer :: file_header_size =0 ! Size of file header in bytes
@@ -72,6 +77,14 @@ Module Spherical_IO
         Integer, Allocatable :: my_shell_levs(:), have_shell(:), my_shell_ind(:)
         Integer, Allocatable :: shell_r_ids(:), nshells_at_rid(:)
         Integer :: nshell_r_ids
+
+        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ! Variables used for management of SPH_Mode_Samples output
+        INTEGER, Allocatable :: l_values(:), m_values(:)
+
+        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ! Variables used for management of Meridional Slices
+
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
@@ -100,6 +113,8 @@ Module Spherical_IO
     End Type DiagnosticInfo
 
     Type(DiagnosticInfo) :: Shell_Averages, Shell_Slices, Global_Averages, AZ_Averages, Full_3D, Shell_Spectra
+    Type(DiagnosticInfo) :: Equatorial_Slices, Meridional_Slices, SPH_Mode_Samples
+
 
     Integer :: current_averaging_level = 0
     Integer :: current_qval = 0
@@ -109,14 +124,19 @@ Module Spherical_IO
     Integer :: shellslice_values(1:nqmax) =-1, shellslice_levels(1:nshellmax)=-1, azavg_values(1:nqmax)=-1
     Integer :: full3d_values(1:nqmax) = -1, shellspectra_values(1:nqmax)=-1, shellspectra_levels(1:nshellmax)=-1
     Integer :: histo_values(1:nqmax) = -1, histo_levels(1:nshellmax)=-1
+    Integer :: equatorial_values(1:nqmax) = -1, meridional_values(1:nqmax) = -1, meridional_indices(1:nmeridmax) = -1
+    Integer :: SPH_Mode_Values(1:nqmax), SPH_Mode_ell(1:nmodemax), SPH_Mode_m(1:nmodemax)
+
 
     Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1, shellspectra_nrec =1
+    Integer :: equatorial_nrec = 1, meridional_nrec=1, sph_mode_nrec
 
-    Integer :: globalavg_frequency = 90000000, shellavg_frequency = 90000000
-    Integer :: azavg_frequency = 90000000, shellslice_frequency = 90000000
-    Integer :: shellspectra_frequency=90000000
+    Integer :: globalavg_frequency = reallybig, shellavg_frequency = reallybig
+    Integer :: azavg_frequency = reallybig, shellslice_frequency = reallybig
+    Integer :: shellspectra_frequency=reallybig, equatorial_frequency = reallybig
+    Integer :: meridional_frequency=reallybig, sph_mode_frequency = reallybig
 
-    Integer :: full3d_frequency= 90000000
+    Integer :: full3d_frequency= reallybig
     Character*120 :: local_file_path=''
     Logical :: mem_friendly = .false.
 
@@ -126,20 +146,27 @@ Module Spherical_IO
         & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
         & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency, &
         & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values, &
-        & mem_friendly 
-
-
+        & mem_friendly , equatorial_values, equatorial_frequency, equatorial_nrec, meridional_frequency, &
+        & meridional_nrec, meridional_values, sph_mode_frequency, sph_mode_nrec, sph_mode_values, &
+        & sph_mode_ell, sph_mode_m
 
 
     Integer :: integer_zero = 0
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
     Real*8, Private, Allocatable :: shellav_outputs(:,:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
-    type(SphericalBuffer) :: spectra_buffer
+    Type(SphericalBuffer) :: spectra_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
     Character*6, Public :: i_ofmt = '(i8.8)', i_pfmt = '(i5.5)'
     integer :: output_ireq(1), output_status(1)
+
+    !//////////////////////////////////////////////////////////////////////
+    ! *****           Equatorial Slice Output Variables
+    REAL*8, ALLOCATABLE :: equslice_outputs(:,:,:)
+    INTEGER :: th1_owner = -1, th2_owner = -1 ! Angular ranks of the owners of ntheta/2 and ntheta/2+1 
+    INTEGER :: my_nth_owned = -1
+
 
     !////////////////////////////////////////////////////////////////////
     Logical :: start_az_average, start_shell_average  !, start_shell_slice
@@ -178,6 +205,9 @@ Contains
         Call AZ_Averages%reset()
         Call Shell_Slices%reset()
         Call Shell_Spectra%reset()
+        Call Equatorial_Slices%reset()
+        Call Meridional_Slices%reset()
+        Call SPH_Mode_Samples%reset()
 
         Allocate(f_of_r_theta(my_rmin:my_rmax,my_theta_min:my_theta_max))
         Allocate(f_of_r(my_rmin:my_rmax))
@@ -194,6 +224,7 @@ Contains
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in,file_path)
 		Implicit None
 		Integer :: k, fcount(3,2), ntot, fcnt, master_rank
+        Integer :: thmax, thmin, nth1, nth2, nn
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
         Character*120, Intent(In) :: file_path
@@ -259,6 +290,15 @@ Contains
         Call       Shell_Spectra%Init(averaging_level,compute_q,myid, &
             & 59,values = shellspectra_values, levels = shellspectra_levels)
 
+        Call       Equatorial_Slices%Init(averaging_level,compute_q,myid, &
+            & 60,values = equatorial_values)
+
+        Call       Meridional_Slices%Init(averaging_level,compute_q,myid, &
+            & 61,values = meridional_values)
+
+        Call       SPH_Mode_Samples%Init(averaging_level,compute_q,myid, &
+            & 62,values = sph_mode_values)
+
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
@@ -270,7 +310,8 @@ Contains
                 Call Shell_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) ! For parallel IO
             Endif
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
-
+            Call Equatorial_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
+            Call Meridional_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
             If (Shell_Spectra%nshell_r_ids .gt. 0) Then
                 master_rank = shell_spectra%shell_r_ids(1)
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
@@ -290,6 +331,29 @@ Contains
            		Call spectra_buffer%init(field_count = fcount, config = 'p3b')		
             Endif	
         Endif 
+
+        !/////////////////////////////////////////////////
+        !Some BookKeeping for Equatorial Slices
+        nth1 = ntheta/2   ! These two points bracket the equator
+        nth2 = ntheta/2+1
+        Do nn = 0, nproc2-1
+
+			thmax = pfi%all_2p(nn)%max
+			thmin = pfi%all_2p(nn)%min
+
+            If ( (nth1 .ge. thmin) .and. (nth1 .le. thmax) ) Then
+                th1_owner = nn
+            Endif
+            If ( (nth2 .ge. thmin) .and. (nth2 .le. thmax) ) Then
+                th2_owner = nn
+            Endif
+
+        Enddo
+        my_nth_owned = 0
+        If (my_row_rank .eq. th1_owner) my_nth_owned = 1
+        If (my_row_rank .eq. th2_owner) my_nth_owned = my_nth_owned+1
+        !//////////////////////////////////////////////////
+
         !Next, provide the file directory, frequency info, output versions etc.
 
         ! Global Averages
@@ -312,6 +376,16 @@ Contains
         fdir = 'Shell_Spectra/'
         Call Shell_Spectra%set_file_info(shellspectra_version,shellspectra_nrec,shellspectra_frequency,fdir) 
 
+        ! Equatorial Slices
+        fdir = 'Equatorial_Slices/'
+        Call Equatorial_Slices%set_file_info(equslice_version,equatorial_nrec,equatorial_frequency,fdir) 
+
+        ! Meridional Slices
+        fdir = 'Meridional_Slices/'
+        Call Meridional_Slices%set_file_info(meridslice_version,meridional_nrec,meridional_frequency,fdir) 
+
+        fdir = 'SPH_Mode_Samples/'
+        Call SPH_Mode_Samples%set_file_info(sphmode_version,sph_mode_nrec,sph_mode_frequency,fdir) 
 
         ! Full 3D (special because it only cares about the frequency, not nrec)
         fdir = 'Spherical_3D/'
@@ -320,7 +394,266 @@ Contains
         !Write(6,*)'Shell F: ', Shell_Slices%frequency
    End Subroutine Initialize_Spherical_IO
 
+    Subroutine Get_Meridional_Slice(qty)
+        Implicit None
+        REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
+ 
 
+        IF (Meridional_Slices%begin_output) THEN
+            If (myid .eq. 0) Write(6,*)'I would be grabbing a meridional slice now...'
+        ENDIF
+
+
+        Call Meridional_Slices%AdvanceInd()
+    End Subroutine Get_Meridional_Slice
+
+    Subroutine Write_Meridional_Slices(this_iter, simtime)
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+
+        integer :: sizecheck, responsible, current_rec, buffsize
+        INTEGER :: nq_merid, merid_tag, funit, error, dims(3), i, ierr
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, qdisp, new_disp, my_rdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        Real*8, Allocatable :: buff(:,:,:)
+
+        sizecheck = sizeof(disp)
+        IF (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that files are effectively limited to 2 GB in size."
+            Endif
+        ENDIF 
+		responsible = 0
+        nq_merid   = Meridional_Slices%nq
+        merid_tag  = Meridional_Slices%mpi_tag
+        funit    = Meridional_Slices%file_unit
+
+        If (my_row_rank .eq. 0) Then
+            responsible = 1
+        Endif
+
+        !////////////////////////////////////////
+        ! Communication down-row
+        If (responsible .eq. 1) Then
+
+            ! May n eed to rethink this striping
+            ALLOCATE(buff(my_rmin:my_rmax,1:ntheta,1:nq_merid))
+            buff = 0
+            !This is where we would receive
+        Else    
+            ! this is where we would send
+        Endif
+
+
+        !/////////////////////////////////////////
+        ! Parallel Write amongst all processes in column 0
+        If (responsible .eq. 1) Then
+
+            CALL Meridional_Slices%OpenFile_Par(this_iter, error)
+
+            current_rec = Meridional_Slices%current_rec
+            funit = Meridional_Slices%file_unit
+            IF ( (my_column_rank .eq. 0) .and. (current_rec .eq. 1) ) THEN
+                dims(1) =  nphi
+                dims(2) =  nr
+                dims(3) =  nq_merid
+                buffsize = 3
+                CALL MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_merid
+                CALL MPI_FILE_WRITE(funit,Meridional_Slices%oqvals, buffsize, &
+                    & MPI_INTEGER, mstatus, ierr) 
+
+                buffsize = nr
+                CALL MPI_FILE_WRITE(funit, radius, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+            ENDIF
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_merid*4 ! nq
+            hdisp = hdisp+nr*8  ! The radius array
+
+            qdisp = nphi*nr*8
+            full_disp = qdisp*nq_merid+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(current_rec-1)
+            
+            buffsize = my_nr*nphi
+            ! The file is striped with time step slowest, followed by q
+
+            my_rdisp = (my_rmin-1)*nphi*8
+            Do i = 1, nq_merid
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, buff(1,my_rmin,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+
+            disp = hdisp+full_disp*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+            If (my_column_rank .eq. 0) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+            Call Meridional_Slices%closefile_par()
+            DEALLOCATE(buff)
+        Endif
+        
+
+        !//////////////////////////////////////////////
+        ! DeAllocation
+        If (my_nth_owned .gt. 0) Then
+            DEALLOCATE( equslice_outputs)
+        Endif
+
+
+    End Subroutine Write_Meridional_Slices
+
+
+    Subroutine Get_SPH_Modes(qty)
+        Implicit None
+        REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
+ 
+
+        IF (SPH_Mode_Samples%begin_output) THEN
+            If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+        ENDIF
+
+
+        Call SPH_Mode_Samples%AdvanceInd()
+    End Subroutine Get_SPH_Modes
+
+
+    Subroutine Get_Equatorial_Slice(qty)
+        Implicit None
+        REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
+ 
+        IF (my_nth_owned .gt. 0) THEN
+            IF (Equatorial_Slices%begin_output) THEN
+                ALLOCATE( equslice_outputs(1:nphi, my_rmin:my_rmax, 1:Equatorial_Slices%nq) )
+                equslice_outputs(:,:,:) = 0.0d0
+            ENDIF
+        ENDIF
+
+        Call Equatorial_Slices%AdvanceInd()
+    End Subroutine Get_Equatorial_Slice
+
+    Subroutine Write_Equatorial_Slices(this_iter, simtime)
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+
+        integer :: sizecheck, responsible, current_rec, buffsize
+        INTEGER :: nq_eqs, eqs_tag, funit, error, dims(3), i, ierr
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, qdisp, new_disp, my_rdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        Real*8, Allocatable :: buff(:,:,:)
+
+        sizecheck = sizeof(disp)
+        IF (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that files are effectively limited to 2 GB in size."
+            Endif
+        ENDIF 
+		responsible = 0
+        nq_eqs   = Equatorial_Slices%nq
+        eqs_tag  = Equatorial_Slices%mpi_tag
+        funit    = Equatorial_Slices%file_unit
+
+        If (my_row_rank .eq. 0) Then
+            responsible = 1
+        Endif
+
+        !////////////////////////////////////////
+        ! Communication down-row
+        If (responsible .eq. 1) Then
+
+            ALLOCATE(buff(1:nphi,my_rmin:my_rmax,1:nq_eqs))
+            buff = 0
+            !This is where we would receive
+        Else    
+            ! this is where we would send
+        Endif
+
+
+        !/////////////////////////////////////////
+        ! Parallel Write amongst all processes in column 0
+        If (responsible .eq. 1) Then
+
+            CALL Equatorial_Slices%OpenFile_Par(this_iter, error)
+
+            current_rec = Equatorial_Slices%current_rec
+            funit = Equatorial_Slices%file_unit
+            IF ( (my_column_rank .eq. 0) .and. (current_rec .eq. 1) ) THEN
+                dims(1) =  nphi
+                dims(2) =  nr
+                dims(3) =  nq_eqs
+                buffsize = 3
+                CALL MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_eqs
+                CALL MPI_FILE_WRITE(funit,Equatorial_Slices%oqvals, buffsize, &
+                    & MPI_INTEGER, mstatus, ierr) 
+
+                buffsize = nr
+                CALL MPI_FILE_WRITE(funit, radius, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+            ENDIF
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_eqs*4 ! nq
+            hdisp = hdisp+nr*8  ! The radius array
+
+            qdisp = nphi*nr*8
+            full_disp = qdisp*nq_eqs+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(current_rec-1)
+            
+            buffsize = my_nr*nphi
+            ! The file is striped with time step slowest, followed by q
+
+            my_rdisp = (my_rmin-1)*nphi*8
+            Do i = 1, nq_eqs
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, buff(1,my_rmin,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+
+            disp = hdisp+full_disp*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+            If (my_column_rank .eq. 0) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+            Call Equatorial_Slices%closefile_par()
+            DEALLOCATE(buff)
+        Endif
+        
+
+        !//////////////////////////////////////////////
+        ! DeAllocation
+        If (my_nth_owned .gt. 0) Then
+            DEALLOCATE( equslice_outputs)
+        Endif
+
+
+    End Subroutine Write_Equatorial_Slices
 
 
 	Subroutine Get_Shell_Slice(qty)
@@ -1399,6 +1732,11 @@ Contains
                 ! While doing so, we modify the averaging level
                 Call Full_3D%getq_now(yesno)
                 Call Shell_Slices%getq_now(yesno)
+                Call Equatorial_Slices%getq_now(yesno)
+
+                Call Meridional_Slices%getq_now(yesno)
+
+                Call SPH_Mode_Samples%getq_now(yesno)
                 Call Shell_Spectra%getq_now(yesno)
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
@@ -1417,9 +1755,15 @@ Contains
          If (Mod(iter,Global_Averages%Frequency) .eq. 0) yesno = .true.
          If (Mod(iter,Shell_Averages%Frequency) .eq. 0) yesno = .true.        
          If (Mod(iter,Shell_Spectra%Frequency) .eq. 0) yesno = .true.            
+         If (Mod(iter,Equatorial_Slices%Frequency) .eq. 0) yesno = .true. 
+
+         If (Mod(iter,Meridional_Slices%Frequency) .eq. 0) yesno = .true. 
+
+         If (Mod(iter,SPH_Mode_Samples%Frequency) .eq. 0) yesno = .true. 
          If (Mod(iter,AZ_Averages%Frequency) .eq. 0) yesno = .true.
          If (Mod(iter,Shell_Slices%Frequency) .eq. 0) yesno = .true. 
          If (Mod(iter,Full_3D%Frequency) .eq. 0) yesno = .true.
+
     End function Time_To_Output
 
     Subroutine Finalize_Averages()
@@ -1442,14 +1786,16 @@ Contains
             Endif
         Else
 
-		    If (Shell_Slices%grab_this_q) Call get_shell_slice(qty)
-		    If (Shell_Spectra%grab_this_q) Call get_shell_spectra(qty)
-            Call Get_Averages(qty)
+            If (Equatorial_Slices%grab_this_q) Call Get_Equatorial_Slice(qty)
+            If (Meridional_Slices%grab_this_q) Call Get_Meridional_Slice(qty)
+            If (SPH_Mode_Samples%grab_this_q)  Call Get_SPH_Modes(qty)
+		    If (Shell_Slices%grab_this_q)      Call Get_shell_slice(qty)
+		    If (Shell_Spectra%grab_this_q)     Call Get_shell_spectra(qty)
+
+            Call Get_Averages(qty)  ! -> Global Averages, Shell Averages, Azimuthal Averages
 
 		    If (full_3d%grab_this_q) Call write_full_3d(qty)
         Endif
-		
-
 
 
 	End Subroutine	Add_Quantity
@@ -1471,6 +1817,17 @@ Contains
             else
                 Call Write_Shell_Spectra(iter,sim_time)
             Endif
+        Endif
+	    If (Mod(iter,Equatorial_Slices%frequency) .eq. 0 ) Then
+
+            Call Write_Equatorial_Slices(iter,sim_time)
+
+        Endif
+	    If (Mod(iter,Meridional_Slices%frequency) .eq. 0 ) Then
+            If (myid .eq. 0) Write(6,*)'I would be writing meridional slices...'
+        Endif
+	    If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
+            If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
         Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
@@ -2568,7 +2925,7 @@ Contains
         self%file_prefix = 'None'
         If (Allocated(self%oqvals))  DeAllocate(self%oqvals)
 
-        self%frequency = 90000000 
+        self%frequency = reallybig 
         self%rec_per_file =1     
         self%current_rec = 1       
         self%file_header_size =0 
@@ -2617,13 +2974,13 @@ Contains
         shellslice_nrec =1
         shellspectra_nrec =1
 
-        globalavg_frequency = 90000000
-        shellavg_frequency = 90000000
-        azavg_frequency = 90000000
-        shellslice_frequency = 90000000
-        shellspectra_frequency=90000000
+        globalavg_frequency = reallybig
+        shellavg_frequency = reallybig
+        azavg_frequency = reallybig
+        shellslice_frequency = reallybig
+        shellspectra_frequency=reallybig
 
-        full3d_frequency= 90000000
+        full3d_frequency= reallybig
         local_file_path=''
 
         integer_zero = 0

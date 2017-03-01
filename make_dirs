@@ -8,3 +8,6 @@ mkdir Timings
 mkdir Spherical_3D
 mkdir Shell_Spectra
 mkdir Benchmark_Reports
+mkdir Equatorial_Slices
+mkdir Meridional_Slices
+mkdir SPH_Mode_Samples
