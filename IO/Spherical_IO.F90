@@ -535,14 +535,23 @@ Contains
     Subroutine Get_Equatorial_Slice(qty)
         Implicit None
         REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
- 
+        INTEGER :: eq_ind 
+        eq_ind = Equatorial_Slices%ind
         IF (my_nth_owned .gt. 0) THEN
             IF (Equatorial_Slices%begin_output) THEN
                 ALLOCATE( equslice_outputs(1:nphi, my_rmin:my_rmax, 1:Equatorial_Slices%nq) )
                 equslice_outputs(:,:,:) = 0.0d0
             ENDIF
-        ENDIF
+            IF (th1_owner .eq. my_row_rank) THEN
+                equslice_outputs(:,:,eq_ind) = 0.5d0*qty(:,:,ntheta/2)
+            ENDIF
+            IF (th2_owner .eq. my_row_rank) THEN
+                equslice_outputs(:,:,eq_ind) = equslice_outputs(:,:,eq_ind)+0.5d0*qty(:,:,ntheta/2+1)
+            ENDIF
 
+            Equatorial_Slices%oqvals(eq_ind) = current_qval
+        ENDIF
+        Equatorial_Slices%oqvals(eq_ind) = current_qval
         Call Equatorial_Slices%AdvanceInd()
     End Subroutine Get_Equatorial_Slice
 
@@ -554,7 +563,8 @@ Contains
         INTEGER :: nq_eqs, eqs_tag, funit, error, dims(3), i, ierr
 		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, qdisp, new_disp, my_rdisp, full_disp
 		Integer :: mstatus(MPI_STATUS_SIZE)
-        Real*8, Allocatable :: buff(:,:,:)
+        Real*8, Allocatable :: buff(:,:,:), tbuff(:,:,:)
+        INTEGER :: rirq1, rirq2, sirq, nelem
 
         sizecheck = sizeof(disp)
         IF (sizecheck .lt. 8) Then
@@ -575,14 +585,63 @@ Contains
 
         !////////////////////////////////////////
         ! Communication down-row
+        nelem = my_nr*nphi*nq_eqs
         If (responsible .eq. 1) Then
-
+            ! We average over latitudes that bracket the equator.
+            ! The 0.5 factor was already taken into account when
+            ! the equatorial slices were sampled.
             ALLOCATE(buff(1:nphi,my_rmin:my_rmax,1:nq_eqs))
-            buff = 0
+            
+            IF (th1_owner .eq. th2_owner) THEN
+                IF (th1_owner .eq. my_row_rank) THEN
+                    IF (my_column_rank .eq. 0) Write(6,*)'I own both'
+                    buff(:,:,:) = equslice_outputs(:,:,:)
+                ELSE
+                     IF (my_column_rank .eq. 0) Write(6,*)'I own neither'
+                    Call IReceive(buff, rirq1,n_elements = nelem, &
+                        &  source= th1_owner,tag = eqs_tag, grp = pfi%rcomm)	
+                    Call IWait(rirq1) 
+                ENDIF
+
+            ELSE
+                Allocate(tbuff(1:nphi,my_rmin:my_rmax,1:nq_eqs))
+                IF (th1_owner .eq. my_row_rank) THEN
+                    IF (my_column_rank .eq. 0) Write(6,*)'I own nth1'
+                    buff(:,:,:) = equslice_outputs(:,:,:)
+                ELSE
+                    IF (my_column_rank .eq. 0) Write(6,*)'I do not own nth1'
+                    Call IReceive(buff, rirq1,n_elements = nelem, &
+                        &  source= th1_owner,tag = eqs_tag, grp = pfi%rcomm)	
+                    Call IWait(rirq1) 
+                ENDIF
+                IF (th2_owner .eq. my_row_rank) THEN
+                     IF (my_column_rank .eq. 0) Write(6,*)'I own nth2'
+                    tbuff(:,:,:) = equslice_outputs(:,:,:)
+                ELSE
+                     IF (my_column_rank .eq. 0) Write(6,*)'I do not own nth2'
+                    Call IReceive(tbuff, rirq2,n_elements = nelem, &
+                        &  source= th2_owner,tag = eqs_tag, grp = pfi%rcomm)	
+                    Call IWait(rirq2) 
+                ENDIF
+                buff(:,:,:) = buff(:,:,:)+tbuff(:,:,:)
+                DEALLOCATE(tbuff)
+            ENDIF
+            
+            
+            
             !This is where we would receive
         Else    
-            ! this is where we would send
+            IF ((th1_owner .eq. my_row_rank) .or. &
+                & (th2_owner .eq. my_row_rank)) THEN
+			    !  Rest of the row sends to process 0 within the row
+
+                Call ISend(equslice_outputs, sirq,n_elements = nelem, dest = 0, tag = eqs_tag, & 
+                    grp = pfi%rcomm)
+                Call IWait(sirq)                
+            
+            ENDIF
         Endif
+
 
 
         !/////////////////////////////////////////

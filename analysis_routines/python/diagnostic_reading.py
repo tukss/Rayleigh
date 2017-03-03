@@ -354,6 +354,72 @@ class AzAverage:
             self.lut[q] = i
         fd.close()
 
+class Equatorial_Slice:
+    """Rayleigh Equatorial Slice Structure
+    ----------------------------------
+    self.niter                                    : number of time steps
+    self.nq                                       : number of diagnostic quantities output
+    self.nr                                       : number of radial points
+    self.nphi                                     : number of phi points
+    self.qv[0:nq-1]                               : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                           : radial grid
+    self.vals[0:phi-1,0:nr-1,0:nq-1,0:niter-1]    : The equatorial_slices
+    self.phi[0:nphi-1]                            : phi values (in radians)
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.version                                  : The version code for this particular output (internal use)
+    self.lut                                      : Lookup table for the different diagnostics output
+    """
+
+
+    def __init__(self,filename='none',path='Equatorial_Slices/'):
+        """filename  : The reference state file to read.
+           path      : The directory where the file is located (if full path not in filename
+        """
+        if (filename == 'none'):
+            the_file = path+'00000001'
+        else:
+            the_file = path+filename
+        fd = open(the_file,'rb')
+        # We read an integer to assess which endian the file was written in...
+        bs = check_endian(fd,314,'int32')
+        version = swapread(fd,dtype='int32',count=1,swap=bs)
+        nrec = swapread(fd,dtype='int32',count=1,swap=bs)
+        nphi = swapread(fd,dtype='int32',count=1,swap=bs)
+        nr= swapread(fd,dtype='int32',count=1,swap=bs)
+        nq = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        self.version = version
+        self.niter = nrec
+        self.nq = nq
+        self.nr = nr
+        self.nphi= nphi
+
+
+        self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
+        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        self.vals  = np.zeros((nphi,nr,nq,nrec),dtype='float64')
+        self.iters = np.zeros(nrec,dtype='int32')
+        self.time  = np.zeros(nrec,dtype='float64')
+
+        self.phi = np.zeros(nphi,dtype='float64')
+        dphi = 2.0*np.pi/(nphi)
+        for i in range(nphi):
+            self.phi[i] = i*dphi
+
+        for i in range(nrec):
+            tmp = np.reshape(swapread(fd,dtype='float64',count=nq*nr*nphi,swap=bs),(nphi,nr,nq), order = 'F')
+            self.vals[:,:,:,i] = tmp
+            self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
+            self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+        maxq = 801
+        lut = np.zeros(maxq)+int(1000)
+        self.lut = lut.astype('int32')
+        for i,q in enumerate(self.qv):
+            self.lut[q] = i
+        fd.close()
+
+
 class ShellSlice:
     """Rayleigh Shell Slice Structure
     ----------------------------------
