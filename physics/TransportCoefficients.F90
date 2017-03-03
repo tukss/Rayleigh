@@ -107,7 +107,7 @@ Contains
         Endif
 
 		If (magnetism) Then
-            eta_top   = ref%script_H_top
+            If (.not. Dimensional_Reference) eta_top   = ref%script_H_top
             Call Initialize_Eta()	! Magnetic Diffusivity
             If (ohmic_heating) Then
                 Allocate(ohmic_heating_coeff(1:N_R))
