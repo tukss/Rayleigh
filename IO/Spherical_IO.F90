@@ -84,7 +84,7 @@ Module Spherical_IO
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! Variables used for management of Meridional Slices
-
+        INTEGER, Allocatable :: phi_indices(:), nphi_indices
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
@@ -148,13 +148,14 @@ Module Spherical_IO
         & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values, &
         & mem_friendly , equatorial_values, equatorial_frequency, equatorial_nrec, meridional_frequency, &
         & meridional_nrec, meridional_values, sph_mode_frequency, sph_mode_nrec, sph_mode_values, &
-        & sph_mode_ell, sph_mode_m
+        & sph_mode_ell, sph_mode_m, meridional_indices
 
 
     Integer :: integer_zero = 0
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
     Real*8, Private, Allocatable :: shellav_outputs(:,:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
+    Real*8, Private, Allocatable :: meridional_outputs(:,:,:,:)
     Type(SphericalBuffer) :: spectra_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
@@ -294,7 +295,7 @@ Contains
             & 60,values = equatorial_values)
 
         Call       Meridional_Slices%Init(averaging_level,compute_q,myid, &
-            & 61,values = meridional_values)
+            & 61,values = meridional_values, phi_inds = meridional_indices)
 
         Call       SPH_Mode_Samples%Init(averaging_level,compute_q,myid, &
             & 62,values = sph_mode_values)
@@ -396,18 +397,213 @@ Contains
 
     Subroutine Get_Meridional_Slice(qty)
         Implicit None
-        REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
- 
-
+        REAL*8, INTENT(IN) :: qty(:,my_rmin:,my_theta_min:)
+        INTEGER :: nphi_grab, mer_ind
+        INTEGER :: tind, pind, rind
+        nphi_grab = Meridional_Slices%nphi_indices
         IF (Meridional_Slices%begin_output) THEN
-            If (myid .eq. 0) Write(6,*)'I would be grabbing a meridional slice now...'
+            ! Stripe with theta-index slowest, so data is ordered for row-communication
+			Allocate(meridional_outputs(my_rmin:my_rmax,1:nphi_grab,&
+                1:Meridional_Slices%nq, my_theta_min:my_theta_max))
         ENDIF
 
 
+        mer_ind = Meridional_Slices%ind
+        Do tind = my_theta_min, my_theta_max
+            DO pind = 1,nphi_grab
+                DO rind = my_rmin, my_rmax
+                    meridional_outputs(rind,pind,mer_ind,tind) = &
+                        qty(meridional_slices%phi_indices(pind),rind,tind)
+                ENDDO
+            ENDDO
+        ENDDO    
+        Meridional_Slices%oqvals(mer_ind) = current_qval
         Call Meridional_Slices%AdvanceInd()
+
     End Subroutine Get_Meridional_Slice
 
-    Subroutine Write_Meridional_Slices(this_iter, simtime)
+	Subroutine Write_Meridional_Slices(this_iter,simtime)
+        USE MPI_BASE
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:), all_slices(:,:,:,:)
+		Integer :: responsible, current_rec, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, p, sizecheck, ii
+		Integer :: n, nn, this_nshell, nq_merid, merid_tag,nphi_grab
+		Integer :: your_theta_min, your_theta_max, your_ntheta
+		Integer :: nelem, buffsize
+        Integer :: file_pos, funit, error, dims(1:4)
+        Integer :: inds(4), nirq,sirq
+        Integer, Allocatable :: rirqs(:)
+        
+        integer :: ierr, rcount
+		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
+		Integer :: mstatus(MPI_STATUS_SIZE)
+        sizecheck = sizeof(disp)
+        if (sizecheck .lt. 8) Then
+            if (myid .eq. 0) Then
+            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
+            Write(6,*)"Your size (in bytes) is: ", sizecheck
+            Write(6,*)"A size of 4 bytes means that shell slices files are effectively limited to 2 GB in size."
+            Endif
+        endif 
+
+
+		responsible = 0
+        nq_merid     = Meridional_Slices%nq
+        merid_tag    = Meridional_Slices%mpi_tag
+        nphi_grab    = Meridional_Slices%nphi_indices
+        funit        = Meridional_Slices%file_unit
+        
+
+		If (my_row_rank .eq. 0) Then
+                responsible = 1
+        Endif
+
+        
+		If (responsible .eq. 1) Then
+			! Rank 0 in reach row receives from all other row members
+		
+			Allocate(all_slices(my_rmin:my_rmax,1:nphi_grab,1:nq_merid, 1:ntheta))
+			all_slices(:,:,:,:) = 0.0d0
+
+            nirq = nproc2-1
+            Allocate(rirqs(1:nirq))
+
+            Do nn = 1, nproc2-1
+
+				your_ntheta    = pfi%all_2p(nn)%delta
+				your_theta_min = pfi%all_2p(nn)%min
+				your_theta_max = pfi%all_2p(nn)%max
+                inds(1) = 1
+                inds(2) = 1
+                inds(3) = 1
+                inds(4) = your_theta_min
+                nelem = your_ntheta*my_nr*nq_merid*nphi_grab
+
+                Call IReceive(all_slices, rirqs(nn),n_elements = nelem, &
+                            &  source= nn,tag = merid_tag, grp = pfi%rcomm,indstart = inds)				
+			Enddo
+
+            all_slices(my_rmin:my_rmax, 1:nphi_grab, 1:nq_merid,my_theta_min:my_theta_max) = &
+               meridional_outputs(my_rmin:my_rmax, 1:nphi_grab, 1:nq_merid,my_theta_min:my_theta_max)
+
+            Call IWaitAll(nirq, rirqs)
+            DeAllocate(rirqs)
+		Else
+			!  Rest of the row sends to process 0 within the row
+            inds(1) = 1 !my_rmin
+            inds(2) = 1
+            inds(3) = 1
+            inds(4) = 1 
+            nelem = my_nr*my_ntheta*nq_merid*nphi_grab
+            Call ISend(meridional_outputs, sirq,n_elements = nelem, dest = 0, tag = merid_tag, & 
+                grp = pfi%rcomm, indstart = inds)
+            Call IWait(sirq)
+		Endif
+        DeAllocate(meridional_outputs)
+
+        ! Communication is complete.  Now we open the file using MPI-IO
+        
+
+      
+
+        If (responsible .eq. 1) Then   
+            Call Meridional_Slices%OpenFile_Par(this_iter, error)
+            current_rec = Meridional_Slices%current_rec
+            funit = Meridional_Slices%file_unit
+            ! before we do anything else, we need to restripe the data so
+            ! that q-index is the slowest
+
+            Allocate(buff(1:nphi_grab, 1:ntheta,my_rmin:my_rmax, 1:nq_merid))
+            Do k = 1, ntheta
+                Do j = 1, nq_merid
+                    DO ii = 1, nphi_grab
+                    Do i = my_rmin, my_rmax    
+                        buff(ii,k,i,j) = all_slices(i,ii,j,k)
+                    Enddo
+                    ENDDO
+                Enddo
+            Enddo        
+            DeAllocate(all_slices)
+            
+
+            If ((my_column_rank .eq. 0) .and. (current_rec .eq. 1) ) Then            
+                ! Rank 0 in column and row writes the header
+                dims(1) =  nr
+                dims(2) =  ntheta
+                dims(3) =  nphi_grab
+                dims(4) =  nq_merid
+                buffsize = 4
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_merid
+                call MPI_FILE_WRITE(funit,Meridional_Slices%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nr
+                call MPI_FILE_WRITE(funit, radius, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+                buffsize = ntheta
+                call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+
+                buffsize = nphi_grab
+                call MPI_FILE_WRITE(funit, Meridional_Slices%phi_indices, buffsize, &
+                    MPI_INTEGER, mstatus, ierr) 
+
+            Endif
+
+
+            hdisp = 28 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_merid*4 ! nq
+            hdisp = hdisp+nr*8  ! The radius array
+            hdisp = hdisp+ ntheta*8  ! costheta
+            hdisp = hdisp+ nphi_grab*4  ! phi indices
+
+            qdisp = ntheta*nr*nphi_grab*8
+            full_disp = qdisp*nq_merid+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(current_rec-1)
+            
+            buffsize = my_nr*ntheta*nphi_grab
+            ! The file is striped with time step slowest, followed by q
+
+            my_rdisp = (my_rmin-1)*ntheta*nphi_grab*8
+
+            Do i = 1, nq_merid
+                new_disp = disp+qdisp*(i-1)+my_rdisp                
+                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                
+                Call MPI_FILE_WRITE(funit, buff(1,1,my_rmin,i), buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Enddo
+
+            disp = hdisp+full_disp*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+            If (my_column_rank .eq. 0) Then
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+			DeAllocate(buff)
+            Call Meridional_Slices%closefile_par()
+        Endif  ! Responsible
+
+	End Subroutine Write_Meridional_slices
+
+
+
+
+    Subroutine Write_Meridional_Slices0(this_iter, simtime)
 		Real*8, Intent(in) :: simtime
 		Integer, Intent(in) :: this_iter
 
@@ -515,7 +711,7 @@ Contains
         Endif
 
 
-    End Subroutine Write_Meridional_Slices
+    End Subroutine Write_Meridional_Slices0
 
 
     Subroutine Get_SPH_Modes(qty)
@@ -594,10 +790,8 @@ Contains
             
             IF (th1_owner .eq. th2_owner) THEN
                 IF (th1_owner .eq. my_row_rank) THEN
-                    IF (my_column_rank .eq. 0) Write(6,*)'I own both'
                     buff(:,:,:) = equslice_outputs(:,:,:)
                 ELSE
-                     IF (my_column_rank .eq. 0) Write(6,*)'I own neither'
                     Call IReceive(buff, rirq1,n_elements = nelem, &
                         &  source= th1_owner,tag = eqs_tag, grp = pfi%rcomm)	
                     Call IWait(rirq1) 
@@ -606,19 +800,15 @@ Contains
             ELSE
                 Allocate(tbuff(1:nphi,my_rmin:my_rmax,1:nq_eqs))
                 IF (th1_owner .eq. my_row_rank) THEN
-                    IF (my_column_rank .eq. 0) Write(6,*)'I own nth1'
                     buff(:,:,:) = equslice_outputs(:,:,:)
                 ELSE
-                    IF (my_column_rank .eq. 0) Write(6,*)'I do not own nth1'
                     Call IReceive(buff, rirq1,n_elements = nelem, &
                         &  source= th1_owner,tag = eqs_tag, grp = pfi%rcomm)	
                     Call IWait(rirq1) 
                 ENDIF
                 IF (th2_owner .eq. my_row_rank) THEN
-                     IF (my_column_rank .eq. 0) Write(6,*)'I own nth2'
                     tbuff(:,:,:) = equslice_outputs(:,:,:)
                 ELSE
-                     IF (my_column_rank .eq. 0) Write(6,*)'I do not own nth2'
                     Call IReceive(tbuff, rirq2,n_elements = nelem, &
                         &  source= th2_owner,tag = eqs_tag, grp = pfi%rcomm)	
                     Call IWait(rirq2) 
@@ -1883,7 +2073,7 @@ Contains
 
         Endif
 	    If (Mod(iter,Meridional_Slices%frequency) .eq. 0 ) Then
-            If (myid .eq. 0) Write(6,*)'I would be writing meridional slices...'
+            Call Write_Meridional_Slices(iter,sim_time)
         Endif
 	    If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
             If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
@@ -2432,13 +2622,15 @@ Contains
     !////////////////////////////////////////////////////////////////////////////////////////////////////////////
     !       Diagnostic Class Methods
 
-    Subroutine Initialize_Diagnostic_Info(self,avg_levels,computes,pid,mpi_tag,avg_level,values, levels)
+    Subroutine Initialize_Diagnostic_Info(self,avg_levels,computes,pid,mpi_tag,avg_level,values, &
+            levels, phi_inds)
         Implicit None
         Integer :: i,ind
         Integer, Intent(In) :: pid, mpi_tag
         Integer, Optional, Intent(In) :: avg_level
         Integer, Optional, Intent(In) :: values(1:)
         Integer, Optional, Intent(In) :: levels(1:)
+        Integer, Optional, Intent(In) :: phi_inds(1:)
         Integer, Intent(InOut) :: computes(1:), avg_levels(1:)
         Class(DiagnosticInfo) :: self 
         If (present(avg_level)) Then
@@ -2469,6 +2661,26 @@ Contains
                     self%nlevels = self%nlevels+1
                 Endif
             Enddo
+        Endif
+
+        If (present(phi_inds)) Then
+            self%nphi_indices = 0
+            Do i=1,nmeridmax
+                IF (meridional_indices(i) .gt. 0) THEN
+                    IF (meridional_indices(i) .le. nphi) THEN
+                        self%nphi_indices = self%nphi_indices+1
+                    ENDIf
+                ENDIF
+            Enddo
+            IF (self%nphi_indices .gt. 0) THEN
+                ALLOCATE(self%phi_indices(1:self%nphi_indices))
+                DO i = 1, self%nphi_indices
+                    IF (meridional_indices(i) .le. nphi) THEN
+                        self%phi_indices(i) = meridional_indices(i)
+                    ENDIf
+                ENDDO
+
+            ENDIF
         Endif
 
         !if (pid .eq. 0) Then

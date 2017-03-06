@@ -22,7 +22,7 @@ from diagnostic_reading import Equatorial_Slice
 import numpy as np
 import matplotlib.pyplot as plt
 
-timestep = '00000006'
+timestep = '00005000'
 quantity_code = 64  # read in temperature
 remove_mean = True  # remove the m=0 mean
 tindex = 0          # Display the first timestep from the file
