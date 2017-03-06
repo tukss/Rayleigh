@@ -255,6 +255,7 @@ Contains
             mag_amp = 1.0d0
             temp_amp = 1.0d1
             temp_w = 0.01d4
+            conductive_profile=.true.
 
             If ( (init_remember .eq. -1) .or. (minit_remember .eq. -1) ) Then 
                  ! Allow for restarts (assume hydro and mhd are both restarted)

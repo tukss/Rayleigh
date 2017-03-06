@@ -34,14 +34,30 @@
 &io_controls_namelist
 /
 &output_namelist
+
+! New equatorial slices output
+equatorial_values    = 3,64  ! phi component of velocity and temperature
+equatorial_frequency = 500
+equatorial_nrec      = 10
+
+!New meridional slices output.  You must also specify the number of phi-indices
+!Valid values range from 1 through nphi = 2*n_theta
+!The indices below range from phi = 0 up to phi = pi 
+meridional_values    = 1,2, 64 ! radial and phi components of velocity; temperature
+meridional_frequency = 500
+meridional_nrec      = 10
+meridional_indices = 1, 16, 32, 48, 64
+
+
+
 shellslice_levels    = 16,17
 shellslice_values    = 1,2,3, 64 ! velocity and temperature
-shellslice_frequency = 10
+shellslice_frequency = 1000
 shellslice_nrec      = 5
 
 shellspectra_levels    = 16,32,48,64
 shellspectra_values    = 1,2,3, 64  ! velocity and temperature
-shellspectra_frequency = 100000000
+shellspectra_frequency = 1000
 shellspectra_nrec      = 5
 
 azavg_values = 1,2,3,64,55,56 ! same as above + r- and theta- mass flux
