@@ -84,7 +84,8 @@ Module Spherical_IO
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! Variables used for management of Meridional Slices
-        INTEGER, Allocatable :: phi_indices(:), nphi_indices
+        INTEGER, Allocatable :: phi_indices(:)
+        INTEGER :: nphi_indices
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
