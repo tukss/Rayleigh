@@ -48,6 +48,12 @@ meridional_frequency = 500
 meridional_nrec      = 10
 meridional_indices = 1, 16, 32, 48, 64
 
+point_probe_values = 1,2,3,64,65
+point_probe_frequency = 2
+point_probe_nrec = 4
+point_probe_r     = 1,-4
+point_probe_theta = 8,-11
+point_probe_phi   = 64,-70
 
 
 shellslice_levels    = 16,17
