@@ -7,6 +7,7 @@ Module Spherical_IO
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform
     Use BufferedOutput
+    Use Math_Constants
 	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
@@ -159,6 +160,14 @@ Module Spherical_IO
     Character*120 :: local_file_path=''
     Logical :: mem_friendly = .false.
 
+    REAL*8 ::   shellslice_levels_nrm(1:nshellmax) = -3.0d0
+    REAL*8 :: shellspectra_levels_nrm(1:nshellmax) = -3.0d0
+    REAL*8 ::  meridional_indices_nrm(1:nmeridmax) = -3.0d0
+
+    REAL*8 ::     point_probe_r_nrm(1:nprobemax)  = -3.0d0
+    REAL*8 :: point_probe_theta_nrm(1:nprobemax)  = -3.0d0
+    REAL*8 ::   point_probe_phi_nrm(1:nprobemax)  = -3.0d0
+
     Namelist /output_namelist/ mem_friendly, &
         ! All output types require that a minimal set of information is specified 
           meridional_values,   meridional_frequency,     meridional_nrec, &
@@ -174,9 +183,10 @@ Module Spherical_IO
         !Some outputs have additional information that needs to be specified
          meridional_indices,      shellslice_levels, shellspectra_levels, &
               point_probe_r,      point_probe_theta,     point_probe_phi, &
-               sph_mode_ell,             sph_mode_m
+               sph_mode_ell,             sph_mode_m,                      &
 
-
+        shellslice_levels_nrm, shellspectra_levels_nrm, meridional_indices_nrm, &
+        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm
 
 
     Integer :: integer_zero = 0
@@ -287,6 +297,8 @@ Contains
 
 		Allocate(sintheta(1:ntheta))
 		Allocate(costheta(1:ntheta))
+
+
 		sintheta(:) = sintheta_in(:)
 		costheta(:) = costheta_in(:)
 		Allocate(radius(1:nr))
@@ -297,6 +309,13 @@ Contains
 
         r_integration_weights(:) = rw_in(:)
         theta_integration_weights(:) = tw_in(:)		
+
+        ! Before initializing the different output types, we check to see if
+        ! the user has specified shell-slice levels etc. using normalized
+        ! physical coordinates or negative-index shorthand
+
+
+        Call Process_Coordinates()
 
 
         ! Map the various quantity lists etc. into their associated diagnostic structures
@@ -2923,6 +2942,7 @@ Contains
         Class(DiagnosticInfo) :: self
         INQUIRE(UNIT=self%file_unit, POS=self%file_position)
     End Subroutine Update_Position
+
     Subroutine getq_now(self,yesno)
         Implicit None
         Logical, Intent(InOut) :: yesno
@@ -3238,23 +3258,123 @@ Contains
 
     End Subroutine CleanUP_Spherical_IO
 
-
-    Subroutine Parse_Inds(indices_in, indices_out,indcount)
+    SUBROUTINE nrm_to_index(nrm_coords, coord_arr, indices, rev_inds)
+        ! Converts a list of normalized coordinations (nrm_coords)
+        ! into grid indices (indices) based on the indicated
+        ! coordinate axes (coord_arr; e.g. radius)
+        !
+        ! nrm_coords and coord_arr are assumed to be in ascending order
+        ! If necessary, the indices can be reversed using rev_inds.  
+        ! This is mostly here to deal with the "reversed" radius array.
         IMPLICIT NONE
-        INTEGER, INTENT(IN) :: indices_in(:)
-        INTEGER, INTENT(InOut) :: indices_out(:), indcount
+        REAL*8, Intent(In)  :: nrm_coords(:)
+        REAL*8, Intent(In)  :: coord_arr(:)
+        INTEGER, Intent(Out) :: indices(:)
+        INTEGER, ALLOCATABLE :: ind_copy(:)
+        LOGICAL, INTENT(In), Optional :: rev_inds
+        INTEGER :: nnorm_coord, nbase_coord, numi
+        INTEGER :: i,j,k, ind, last_index
+        REAL*8 :: cdel, del1,del2, ccheck
+        REAL*8 :: nrmc, cmin, tolchk = 2.0d0
+
+        ! User-specified normalized coordinates are assumed to
+        ! be in ascending order, but rayleigh's grids are striped in
+        ! in descending order.  We need to reverse the user-defined
+        ! normalized coordinates in order for the coordinate-to-index
+        ! mapping to work properly.
+        !
+        ! This also means we need to account for the use of negative
+        ! number to indicate a range in coordinates (hence the if/else below)
+
+        cmin = MINVAL(coord_arr)
+        cdel = MAXVAL(coord_arr)-cmin 
+
+        indices(:) = -1   ! Set to the default index value
+        nnorm_coord = SIZE(nrm_coords)
+        nbase_coord = SIZE(coord_arr)
+
+        last_index = 0  ! The user might inadvertantly specify redundant coordinates.
+                        ! This can happen if resolution is low.
+                        ! We make sure that no redundant coordinates are output.
+        numi = 0 ! number of valid coordinates specified
+        DO i = 1, nnorm_coord
+
+            IF (i .ne. 1) last_index = abs(indices(i-1))
+
+            ccheck = nrm_coords(i)  
+
+            IF (ABS(ccheck) .lt. tolchk) THEN
+                numi = numi+1
+                ! This is a valid normalized-coordinate value.
+                ! Translate it into a grid-based index.
+                ! Find the index within coord_arr that
+                ! corresponds to the
+                indices(i) = 1
+                IF (ccheck .lt. 0) indices(i) = -1
+                nrmc = (coord_arr(1)-cmin)/cdel
+                del1 = ABS(nrmc-abs(ccheck))
+
+                DO j = 2, nbase_coord
+                    nrmc = (coord_arr(j)-cmin)/cdel
+                    del2 = ABS(nrmc-abs(ccheck))
+                    If ( (del2 .lt. del1) .and. (j .ne. last_index) ) THEN
+                        indices(i) = j
+                        If (ccheck .lt. 0) indices(i) = -j
+                        del1 = del2
+                    ENDIF
+                ENDDO
+
+            ENDIF
+
+
+        ENDDO
+
+        IF (PRESENT(rev_inds)) THEN
+           IF (rev_inds) THEN ! in case someone specified rev_inds = .false. ...
+
+                i = 1
+                DO WHILE(i .le. numi)
+                    IF (indices(i) .lt. 0) THEN
+                        indices(i) = -indices(i)
+                        indices(i-1) = -indices(i-1)
+                        !i = i+1
+                    ENDIF
+                    i = i+1
+                ENDDO
+                ALLOCATE(ind_copy(1:numi))
+                ind_copy(1:numi) = indices(1:numi)
+
+                ! Second pass:  rearrange indices in ascending order
+                DO i = 1, numi
+                    indices(i) = ind_copy(numi-i+1)
+                ENDDO
+
+                DEALLOCATE(ind_copy)
+           ENDIF 
+        ENDIF
+
+    END SUBROUTINE nrm_to_index
+
+
+    Subroutine Parse_Inds(indices_inout, indcount)
+        IMPLICIT NONE
+        INTEGER, INTENT(InOut) :: indices_inout(:)
+        INTEGER, INTENT(InOut), Optional :: indcount
+        INTEGER, ALLOCATABLE :: indices_out(:)
         INTEGER :: i, j,ind,ni, jmin, jmax
-        !Support routine for Scattered_Balance below
+        !Converts index lists of the form [1,-4] to [1,2,3,4]
         i = 1
         ind = 1
-        ni = size(indices_in)
-        DO WHILE( (indices_in(i) .gt. -1) .and. (i .le. ni))
-            indices_out(ind) = indices_in(i)
+        ni = size(indices_inout)
+        ALLOCATE(indices_out(1:ni))
+        indices_out(:) = -1
+        DO WHILE( (indices_inout(i) .gt. -1) .and. (i .le. ni))
+            indices_out(ind) = indices_inout(i)
             ind = ind+1
-            IF ( indices_in(i+1) .lt. -1) THEN
+            IF ( indices_inout(i+1) .lt. -1) THEN
                 ! User has specified a sub-range in this coordinate
-                jmax = -indices_in(i+1) 
-                jmin =  indices_in(i)+1
+                jmax = -indices_inout(i+1) 
+                jmin =  indices_inout(i)+1
                 Do j = jmin,jmax
                     indices_out(ind) = j
                     ind = ind+1
@@ -3263,67 +3383,133 @@ Contains
             ENDIF
             i = i + 1
         ENDDO
-        indcount = ind-1
-
+        indices_inout(1:ni) = indices_out(1:ni)
+        DEALLOCATE(indices_out)
+        IF (present(indcount)) indcount = ind-1        
     End Subroutine Parse_Inds
+
 
     Subroutine Scattered_Balance(self, rinds, tinds, pinds)
         IMPLICIT NONE
         CLASS(DiagnosticInfo) :: self
-        INTEGER, INTENT(IN) :: rinds(:), tinds(:), pinds(:)
+        INTEGER, INTENT(INOUT) :: rinds(:), tinds(:), pinds(:)
         INTEGER, ALLOCATABLE :: tmp(:)
         INTEGER :: i, j,k, ind
         INTEGER :: rcount, tcount, pcount, ntmp
         INTEGER :: error_code = 0
         ! Few steps here:
-        ! Identify the probe coordinates/ distinguish between regions and point-net
-        ! Handle load-balancing
 
+        ! First, find out how many indices we need to output...
 
-        ! First, we make sure a consistent set of coorindates
-        ! has been specified
+        rcount = size(rinds)
+        i = 1
+        DO WHILE ( i .le. rcount )
+            IF (rinds(i) .lt. 0) THEN
+                rcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
 
+        tcount = size(tinds)
+        i = 1
+        DO WHILE ( i .le. tcount )
+            IF (tinds(i) .lt. 0) THEN
+                tcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
 
-            ! The user has specified a range(s) of indices
+        pcount = size(pinds)
+        i = 1
+        DO WHILE ( i .le. pcount )
+            IF (pinds(i) .lt. 0) THEN
+                pcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
 
-        ntmp = MAX(nr,ntheta)
-        ntmp = MAX(ntmp,nphi)
-        ALLOCATE(tmp(1:ntmp))
-        Call Parse_Inds(rinds,tmp,rcount)
         IF (rcount .gt. 0) THEN
             Allocate(self%probe_r_global(1:rcount))
-            self%probe_r_global(1:rcount) = tmp(1:rcount)
+            self%probe_r_global(1:rcount) = rinds(1:rcount)
         ENDIF
-
-
-
-        Call Parse_Inds(tinds,tmp,tcount)
         IF (tcount .gt. 0) THEN
             Allocate(self%probe_t_global(1:tcount))
-            self%probe_t_global(1:tcount) = tmp(1:tcount)
+            self%probe_t_global(1:tcount) = tinds(1:tcount)
         ENDIF
-
-        Call Parse_Inds(pinds,tmp,pcount)
         IF (pcount .gt. 0) THEN
             Allocate(self%probe_p_global(1:pcount))
-            self%probe_p_global(1:pcount) = tmp(1:pcount)
+            self%probe_p_global(1:pcount) = pinds(1:pcount)
         ENDIF
 
-        IF ( ( rcount .gt. 0) .and. (tcount .gt. 0) .and. (pcount .gt. 0) ) THEN
-            IF (myid .eq. 0) THEN
-                WRITE(6,*)'Probes specified (phi,theta,r) :  '
-                DO k = 1, rcount
-                    DO j = 1, tcount
-                        DO i = 1, pcount
-                            Write(6,*)self%probe_p_global(i), self%probe_t_global(j), self%probe_r_global(k)
-                        ENDDO
-                    ENDDO
-                ENDDO
-            ENDIF
-        ELSE
-            WRITE(6,*)'No probes specified.'
-            error_code = 1
-        ENDIF
+        ! The indexing seems to be working, but let's leave this code around for a bit
+        ! just in case.
+        !IF ( ( rcount .gt. 0) .and. (tcount .gt. 0) .and. (pcount .gt. 0) ) THEN
+        !    IF (myid .eq. 0) THEN
+        !        WRITE(6,*)'Probes specified (phi,theta,r) :  '
+        !        DO k = 1, rcount
+        !            DO j = 1, tcount
+        !                DO i = 1, pcount
+        !                    Write(6,*)self%probe_p_global(i), self%probe_t_global(j), self%probe_r_global(k)
+        !                ENDDO
+        !            ENDDO
+        !        ENDDO
+        !    ENDIF
+        !ELSE
+        !    WRITE(6,*)'No probes specified.'
+        !    error_code = 1
+        !ENDIF
     End Subroutine Scattered_Balance
+
+    SUBROUTINE PROCESS_COORDINATES()
+        IMPLICIT NONE
+        INTEGER :: i
+        Real*8, Allocatable :: tmp_theta(:), tmp_phi(:)
+        ALLOCATE(tmp_theta(1:ntheta), tmp_phi(1:nphi))
+
+
+        ! We want theta instead of costheta
+        DO i = 1, ntheta
+            tmp_theta(i) = ACOS(costheta(i))
+        ENDDO
+
+        DO i = 1, nphi
+            tmp_phi(i) = i*two_pi/DBLE(nphi)
+        ENDDO
+
+
+        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r, revg =.true.)
+        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,revg=.true.)
+        CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
+        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels, revg=.true.)
+        CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
+        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices,revg=.true.)
+
+        DeALLOCATE(tmp_theta,tmp_phi)
+    END SUBROUTINE PROCESS_COORDINATES
+
+    SUBROUTINE Interpret_Indices(indices_nrm, coord_grid, indices, revg)
+        IMPLICIT NONE
+        INTEGER, INTENT(InOut) :: indices(:)
+        REAL*8, INTENT(InOut) :: coord_grid(:), indices_nrm(:)
+        LOGICAL, INTENT(In), Optional :: revg
+        LOGICAL :: reverse_grid = .false.
+        IF (present(revg)) THEN
+            IF (revg) reverse_grid = .true.
+        ENDIF
+
+        ! If needed, convert normalized coordinates to indices
+        ! e.g., map [0.1, 0.25, 0.5] to [4, 15, 32]  
+        IF (maxval(indices_nrm) .gt. -2.9d0) THEN
+            CALL nrm_to_index(indices_nrm, coord_grid, indices, rev_inds =reverse_grid)
+        ENDIF
+
+        ! Next, interpret any range shorthand used.
+        ! e.g., convert [1,-4,8] to [1,2,3,4,8]
+        Call Parse_Inds(indices)
+    END SUBROUTINE Interpret_Indices
+
+
+
+
 
 End Module Spherical_IO
