@@ -11,3 +11,4 @@ mkdir Benchmark_Reports
 mkdir Equatorial_Slices
 mkdir Meridional_Slices
 mkdir SPH_Mode_Samples
+mkdir Point_Probes

@@ -668,7 +668,7 @@ Contains
  
 
         IF (Point_Probes%begin_output) THEN
-            If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
         ENDIF
 
 
@@ -682,7 +682,7 @@ Contains
  
 
         IF (SPH_Mode_Samples%begin_output) THEN
-            If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
         ENDIF
 
 
@@ -2040,12 +2040,12 @@ Contains
 	    If (Mod(iter,Meridional_Slices%frequency) .eq. 0 ) Then
             Call Write_Meridional_Slices(iter,sim_time)
         Endif
-	    If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
-            If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
-        Endif
-	    If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
-            If (myid .eq. 0) Write(6,*)'I would be writing Point Probes...'
-        Endif
+	    !If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
+        !    If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
+        !Endif
+	    !If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
+        !    If (myid .eq. 0) Write(6,*)'I would be writing Point Probes...'
+        !Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
 	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
