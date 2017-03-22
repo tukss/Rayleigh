@@ -7,6 +7,7 @@ Module Spherical_IO
     Use Fourier_Transform
     Use Legendre_Transforms, Only : Legendre_Transform
     Use BufferedOutput
+    Use Math_Constants
 	Implicit None
 	! This module contains routines for outputing spherical data as:
 	! 1. Slices of sphere
@@ -21,12 +22,15 @@ Module Spherical_IO
 
 	!////////////////////////////////////////////
     Integer, Parameter :: nqmax=800, nshellmax=100, nmeridmax=100, nmodemax=100
+    Integer, Parameter :: nprobemax=1000
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
     Integer, Parameter :: reallybig = 90000000
-    !Each diagnostic type has an associated version number that is written to the file
-    !following the endian tag.  Hopefully, reading routines can be backward compatible if
-    !significant changes are made to the output structure (and reflected in the version number)
-  
+    ! Each diagnostic type has an associated version number that is written to the file
+    ! following the endian tag.  Hopefully, reading routines can be backward compatible if
+    ! significant changes are made to the output structure (and reflected in the version number)
+    ! Version numbers are not assumed to be in sync.  Instead, they reflect how many times
+    ! a particular output has been modified substantially.
+
     Integer, Parameter :: shellslice_version = 3
     Integer, Parameter :: azavg_version = 3
     Integer, Parameter :: shellavg_version = 4
@@ -35,6 +39,7 @@ Module Spherical_IO
     Integer, Parameter :: equslice_version = 1  
     Integer, Parameter :: meridslice_version = 1
     Integer, Parameter :: sphmode_version =1
+    INTEGER, PARAMETER :: probe_version = 1
     Integer, Parameter :: full3d_version = 3    !currently unused
     Type, Public :: DiagnosticInfo
         ! Need to see if we can make these allocatable, but for now..
@@ -88,6 +93,16 @@ Module Spherical_IO
         INTEGER :: nphi_indices
 
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        ! Point-probe Variables
+        INTEGER, ALLOCATABLE :: probe_p_global(:)  !phi-indces (phi is in-process at I/O time) 
+        INTEGER, ALLOCATABLE :: probe_r_global(:), probe_r_local(:) ! global/local r-indices
+        INTEGER, ALLOCATABLE :: probe_t_global(:), probe_t_local(:) ! " " theta-indices
+        INTEGER :: probe_nr_local, probe_nr_global  !number of local/global r-indices
+        INTEGER :: probe_nt_local, probe_nt_global, probe_np_global !" " theta-indices & phi-indices
+        INTEGER, ALLOCATABLE :: probe_nr_atrank(:)  ! Number of radial indices held by each column rank
+        INTEGER, ALLOCATABLE :: probe_nt_atrank(:)  ! Number of theta indices held by each theta rank
+
+        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
         Integer :: ocomm, orank, onp
         Logical :: master = .false.
@@ -98,6 +113,7 @@ Module Spherical_IO
         Procedure :: AdvanceInd
         Procedure :: reset => diagnostic_output_reset
         Procedure :: Shell_Balance
+        Procedure :: Scattered_Balance
         Procedure :: OpenFile
         Procedure :: OpenFile_Par
         Procedure :: Set_File_Info
@@ -114,7 +130,7 @@ Module Spherical_IO
     End Type DiagnosticInfo
 
     Type(DiagnosticInfo) :: Shell_Averages, Shell_Slices, Global_Averages, AZ_Averages, Full_3D, Shell_Spectra
-    Type(DiagnosticInfo) :: Equatorial_Slices, Meridional_Slices, SPH_Mode_Samples
+    Type(DiagnosticInfo) :: Equatorial_Slices, Meridional_Slices, SPH_Mode_Samples, Point_Probes
 
 
     Integer :: current_averaging_level = 0
@@ -127,29 +143,50 @@ Module Spherical_IO
     Integer :: histo_values(1:nqmax) = -1, histo_levels(1:nshellmax)=-1
     Integer :: equatorial_values(1:nqmax) = -1, meridional_values(1:nqmax) = -1, meridional_indices(1:nmeridmax) = -1
     Integer :: SPH_Mode_Values(1:nqmax), SPH_Mode_ell(1:nmodemax), SPH_Mode_m(1:nmodemax)
+    INTEGER :: point_probe_values(1:nqmax)
 
+    INTEGER :: point_probe_r(1:nprobemax) = -1, point_probe_theta(1:nprobemax) = -1, point_probe_phi(1:nprobemax) = -1
 
     Integer :: globalavg_nrec = 1, shellavg_nrec = 1, azavg_nrec = 1, shellslice_nrec =1, shellspectra_nrec =1
-    Integer :: equatorial_nrec = 1, meridional_nrec=1, sph_mode_nrec
+    Integer :: equatorial_nrec = 1, meridional_nrec=1, sph_mode_nrec, point_probe_nrec =1
 
     Integer :: globalavg_frequency = reallybig, shellavg_frequency = reallybig
     Integer :: azavg_frequency = reallybig, shellslice_frequency = reallybig
     Integer :: shellspectra_frequency=reallybig, equatorial_frequency = reallybig
     Integer :: meridional_frequency=reallybig, sph_mode_frequency = reallybig
+    Integer :: point_probe_frequency = reallybig
 
     Integer :: full3d_frequency= reallybig
     Character*120 :: local_file_path=''
     Logical :: mem_friendly = .false.
 
-    Namelist /output_namelist/shellavg_values, globalavg_values, &
-        & shellslice_values, shellslice_levels, azavg_values, &
-        & full3d_values, &
-        & full3d_frequency, globalavg_nrec, shellavg_nrec, azavg_nrec, shellslice_nrec, &
-        & globalavg_frequency, shellavg_frequency, azavg_frequency, shellslice_frequency, &
-        & shellspectra_nrec, shellspectra_frequency, shellspectra_levels, shellspectra_values, &
-        & mem_friendly , equatorial_values, equatorial_frequency, equatorial_nrec, meridional_frequency, &
-        & meridional_nrec, meridional_values, sph_mode_frequency, sph_mode_nrec, sph_mode_values, &
-        & sph_mode_ell, sph_mode_m, meridional_indices
+    REAL*8 ::   shellslice_levels_nrm(1:nshellmax) = -3.0d0
+    REAL*8 :: shellspectra_levels_nrm(1:nshellmax) = -3.0d0
+    REAL*8 ::  meridional_indices_nrm(1:nmeridmax) = -3.0d0
+
+    REAL*8 ::     point_probe_r_nrm(1:nprobemax)  = -3.0d0
+    REAL*8 :: point_probe_theta_nrm(1:nprobemax)  = -3.0d0
+    REAL*8 ::   point_probe_phi_nrm(1:nprobemax)  = -3.0d0
+
+    Namelist /output_namelist/ mem_friendly, &
+        ! All output types require that a minimal set of information is specified 
+          meridional_values,   meridional_frequency,     meridional_nrec, &
+          equatorial_values,   equatorial_frequency,     equatorial_nrec, &
+          shellslice_values,   shellslice_frequency,     shellslice_nrec, &
+        shellspectra_values, shellspectra_frequency,   shellspectra_nrec, &      
+               azavg_values,        azavg_frequency,          azavg_nrec, &
+            shellavg_values,     shellavg_frequency,       shellavg_nrec, &
+           globalavg_values,    globalavg_frequency,      globalavg_nrec, &
+            sph_mode_values,     sph_mode_frequency,       sph_mode_nrec, &
+         point_probe_values,  point_probe_frequency,    point_probe_nrec, &
+              full3d_values,       full3d_frequency,                      &
+        !Some outputs have additional information that needs to be specified
+         meridional_indices,      shellslice_levels, shellspectra_levels, &
+              point_probe_r,      point_probe_theta,     point_probe_phi, &
+               sph_mode_ell,             sph_mode_m,                      &
+
+        shellslice_levels_nrm, shellspectra_levels_nrm, meridional_indices_nrm, &
+        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm
 
 
     Integer :: integer_zero = 0
@@ -157,6 +194,7 @@ Module Spherical_IO
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
     Real*8, Private, Allocatable :: shellav_outputs(:,:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
     Real*8, Private, Allocatable :: meridional_outputs(:,:,:,:)
+
     Type(SphericalBuffer) :: spectra_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
@@ -202,14 +240,15 @@ Contains
 		  Integer, Intent(In) :: iter
 		  current_iteration = iter
 
-        Call Global_Averages%reset()
-        Call Shell_Averages%reset()
-        Call AZ_Averages%reset()
-        Call Shell_Slices%reset()
-        Call Shell_Spectra%reset()
+        Call   Global_Averages%reset()
+        Call    Shell_Averages%reset()
+        Call       AZ_Averages%reset()
+        Call      Shell_Slices%reset()
+        Call     Shell_Spectra%reset()
         Call Equatorial_Slices%reset()
         Call Meridional_Slices%reset()
-        Call SPH_Mode_Samples%reset()
+        Call  SPH_Mode_Samples%reset()
+        Call      Point_Probes%reset()
 
         Allocate(f_of_r_theta(my_rmin:my_rmax,my_theta_min:my_theta_max))
         Allocate(f_of_r(my_rmin:my_rmax))
@@ -258,6 +297,8 @@ Contains
 
 		Allocate(sintheta(1:ntheta))
 		Allocate(costheta(1:ntheta))
+
+
 		sintheta(:) = sintheta_in(:)
 		costheta(:) = costheta_in(:)
 		Allocate(radius(1:nr))
@@ -268,6 +309,13 @@ Contains
 
         r_integration_weights(:) = rw_in(:)
         theta_integration_weights(:) = tw_in(:)		
+
+        ! Before initializing the different output types, we check to see if
+        ! the user has specified shell-slice levels etc. using normalized
+        ! physical coordinates or negative-index shorthand
+
+
+        Call Process_Coordinates()
 
 
         ! Map the various quantity lists etc. into their associated diagnostic structures
@@ -301,10 +349,16 @@ Contains
         Call       SPH_Mode_Samples%Init(averaging_level,compute_q,myid, &
             & 62,values = sph_mode_values)
 
+        Call       Point_Probes%Init(averaging_level,compute_q,myid, &
+            & 63,values = point_probe_values)
+
+
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
         Call Shell_Spectra%Shell_Balance()
+        Call Point_Probes%Scattered_Balance(point_probe_r, point_probe_theta, &
+            & point_probe_phi)
         if (my_row_rank .eq. 0) Then
 
             If (Shell_Slices%nshell_r_ids .gt. 0) Then
@@ -314,6 +368,7 @@ Contains
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
             Call Equatorial_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
             Call Meridional_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
+            Call Point_Probes%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
             If (Shell_Spectra%nshell_r_ids .gt. 0) Then
                 master_rank = shell_spectra%shell_r_ids(1)
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
@@ -388,6 +443,11 @@ Contains
 
         fdir = 'SPH_Mode_Samples/'
         Call SPH_Mode_Samples%set_file_info(sphmode_version,sph_mode_nrec,sph_mode_frequency,fdir) 
+
+        !Point-wise Probes
+        fdir = 'Point_Probes/'
+        Call Point_Probes%set_file_info(probe_version,point_probe_nrec, &
+                point_probe_frequency,fdir) 
 
         ! Full 3D (special because it only cares about the frequency, not nrec)
         fdir = 'Spherical_3D/'
@@ -602,117 +662,18 @@ Contains
 	End Subroutine Write_Meridional_slices
 
 
+    Subroutine Get_Point_Probes(qty)
+        Implicit None
+        REAL*8, INTENT(IN) :: qty(:,my_rmin:,my_theta_min:)
+ 
+
+        IF (Point_Probes%begin_output) THEN
+        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+        ENDIF
 
 
-    Subroutine Write_Meridional_Slices0(this_iter, simtime)
-		Real*8, Intent(in) :: simtime
-		Integer, Intent(in) :: this_iter
-
-        integer :: sizecheck, responsible, current_rec, buffsize
-        INTEGER :: nq_merid, merid_tag, funit, error, dims(3), i, ierr
-		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, qdisp, new_disp, my_rdisp, full_disp
-		Integer :: mstatus(MPI_STATUS_SIZE)
-        Real*8, Allocatable :: buff(:,:,:)
-
-        sizecheck = sizeof(disp)
-        IF (sizecheck .lt. 8) Then
-            if (myid .eq. 0) Then
-            Write(6,*)"Warning, MPI_OFFSET_KIND is less than 8 bytes on your system."
-            Write(6,*)"Your size (in bytes) is: ", sizecheck
-            Write(6,*)"A size of 4 bytes means that files are effectively limited to 2 GB in size."
-            Endif
-        ENDIF 
-		responsible = 0
-        nq_merid   = Meridional_Slices%nq
-        merid_tag  = Meridional_Slices%mpi_tag
-        funit    = Meridional_Slices%file_unit
-
-        If (my_row_rank .eq. 0) Then
-            responsible = 1
-        Endif
-
-        !////////////////////////////////////////
-        ! Communication down-row
-        If (responsible .eq. 1) Then
-
-            ! May n eed to rethink this striping
-            ALLOCATE(buff(my_rmin:my_rmax,1:ntheta,1:nq_merid))
-            buff = 0
-            !This is where we would receive
-        Else    
-            ! this is where we would send
-        Endif
-
-
-        !/////////////////////////////////////////
-        ! Parallel Write amongst all processes in column 0
-        If (responsible .eq. 1) Then
-
-            CALL Meridional_Slices%OpenFile_Par(this_iter, error)
-
-            current_rec = Meridional_Slices%current_rec
-            funit = Meridional_Slices%file_unit
-            IF ( (my_column_rank .eq. 0) .and. (current_rec .eq. 1) ) THEN
-                dims(1) =  nphi
-                dims(2) =  nr
-                dims(3) =  nq_merid
-                buffsize = 3
-                CALL MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
-                    mstatus, ierr) 
-
-                buffsize = nq_merid
-                CALL MPI_FILE_WRITE(funit,Meridional_Slices%oqvals, buffsize, &
-                    & MPI_INTEGER, mstatus, ierr) 
-
-                buffsize = nr
-                CALL MPI_FILE_WRITE(funit, radius, buffsize, MPI_DOUBLE_PRECISION, & 
-                    mstatus, ierr) 
-
-            ENDIF
-            hdisp = 24 ! dimensions+endian+version+record count
-            hdisp = hdisp+nq_merid*4 ! nq
-            hdisp = hdisp+nr*8  ! The radius array
-
-            qdisp = nphi*nr*8
-            full_disp = qdisp*nq_merid+12  ! 12 is for the simtime+iteration at the end
-            disp = hdisp+full_disp*(current_rec-1)
-            
-            buffsize = my_nr*nphi
-            ! The file is striped with time step slowest, followed by q
-
-            my_rdisp = (my_rmin-1)*nphi*8
-            Do i = 1, nq_merid
-                new_disp = disp+qdisp*(i-1)+my_rdisp                
-                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
-                
-                Call MPI_FILE_WRITE(funit, buff(1,my_rmin,i), buffsize, & 
-                       MPI_DOUBLE_PRECISION, mstatus, ierr)
-            Enddo
-
-            disp = hdisp+full_disp*current_rec
-            disp = disp-12
-            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
-
-            If (my_column_rank .eq. 0) Then
-                buffsize = 1
-                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
-                       MPI_DOUBLE_PRECISION, mstatus, ierr)
-                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
-                       MPI_INTEGER, mstatus, ierr)
-            Endif
-            Call Meridional_Slices%closefile_par()
-            DEALLOCATE(buff)
-        Endif
-        
-
-        !//////////////////////////////////////////////
-        ! DeAllocation
-        If (my_nth_owned .gt. 0) Then
-            DEALLOCATE( equslice_outputs)
-        Endif
-
-
-    End Subroutine Write_Meridional_Slices0
+        Call Point_Probes%AdvanceInd()
+    End Subroutine Get_Point_Probes
 
 
     Subroutine Get_SPH_Modes(qty)
@@ -721,7 +682,7 @@ Contains
  
 
         IF (SPH_Mode_Samples%begin_output) THEN
-            If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
         ENDIF
 
 
@@ -1987,6 +1948,7 @@ Contains
                 Call Meridional_Slices%getq_now(yesno)
 
                 Call SPH_Mode_Samples%getq_now(yesno)
+                Call Point_Probes%getq_now(yesno)
                 Call Shell_Spectra%getq_now(yesno)
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
@@ -2010,6 +1972,7 @@ Contains
          If (Mod(iter,Meridional_Slices%Frequency) .eq. 0) yesno = .true. 
 
          If (Mod(iter,SPH_Mode_Samples%Frequency) .eq. 0) yesno = .true. 
+         If (Mod(iter,Point_Probes%Frequency) .eq. 0) yesno = .true. 
          If (Mod(iter,AZ_Averages%Frequency) .eq. 0) yesno = .true.
          If (Mod(iter,Shell_Slices%Frequency) .eq. 0) yesno = .true. 
          If (Mod(iter,Full_3D%Frequency) .eq. 0) yesno = .true.
@@ -2039,6 +2002,7 @@ Contains
             If (Equatorial_Slices%grab_this_q) Call Get_Equatorial_Slice(qty)
             If (Meridional_Slices%grab_this_q) Call Get_Meridional_Slice(qty)
             If (SPH_Mode_Samples%grab_this_q)  Call Get_SPH_Modes(qty)
+            If (Point_Probes%grab_this_q)      Call Get_Point_Probes(qty)
 		    If (Shell_Slices%grab_this_q)      Call Get_shell_slice(qty)
 		    If (Shell_Spectra%grab_this_q)     Call Get_shell_spectra(qty)
 
@@ -2076,9 +2040,12 @@ Contains
 	    If (Mod(iter,Meridional_Slices%frequency) .eq. 0 ) Then
             Call Write_Meridional_Slices(iter,sim_time)
         Endif
-	    If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
-            If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
-        Endif
+	    !If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
+        !    If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
+        !Endif
+	    !If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
+        !    If (myid .eq. 0) Write(6,*)'I would be writing Point Probes...'
+        !Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
 	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
@@ -2975,6 +2942,7 @@ Contains
         Class(DiagnosticInfo) :: self
         INQUIRE(UNIT=self%file_unit, POS=self%file_position)
     End Subroutine Update_Position
+
     Subroutine getq_now(self,yesno)
         Implicit None
         Logical, Intent(InOut) :: yesno
@@ -3285,9 +3253,261 @@ Contains
         Call Shell_Averages%cleanup
         Call Shell_Slices%cleanup
         Call Shell_Spectra%cleanup
+        Call Point_Probes%cleanup
         !Call spectra_buffer%cleanup
 
     End Subroutine CleanUP_Spherical_IO
+
+    SUBROUTINE nrm_to_index(nrm_coords, coord_arr, indices, rev_inds)
+        ! Converts a list of normalized coordinations (nrm_coords)
+        ! into grid indices (indices) based on the indicated
+        ! coordinate axes (coord_arr; e.g. radius)
+        !
+        ! nrm_coords and coord_arr are assumed to be in ascending order
+        ! If necessary, the indices can be reversed using rev_inds.  
+        ! This is mostly here to deal with the "reversed" radius array.
+        IMPLICIT NONE
+        REAL*8, Intent(In)  :: nrm_coords(:)
+        REAL*8, Intent(In)  :: coord_arr(:)
+        INTEGER, Intent(Out) :: indices(:)
+        INTEGER, ALLOCATABLE :: ind_copy(:)
+        LOGICAL, INTENT(In), Optional :: rev_inds
+        INTEGER :: nnorm_coord, nbase_coord, numi
+        INTEGER :: i,j,k, ind, last_index
+        REAL*8 :: cdel, del1,del2, ccheck
+        REAL*8 :: nrmc, cmin, tolchk = 2.0d0
+
+        ! User-specified normalized coordinates are assumed to
+        ! be in ascending order, but rayleigh's grids are striped in
+        ! in descending order.  We need to reverse the user-defined
+        ! normalized coordinates in order for the coordinate-to-index
+        ! mapping to work properly.
+        !
+        ! This also means we need to account for the use of negative
+        ! number to indicate a range in coordinates (hence the if/else below)
+
+        cmin = MINVAL(coord_arr)
+        cdel = MAXVAL(coord_arr)-cmin 
+
+        indices(:) = -1   ! Set to the default index value
+        nnorm_coord = SIZE(nrm_coords)
+        nbase_coord = SIZE(coord_arr)
+
+        last_index = 0  ! The user might inadvertantly specify redundant coordinates.
+                        ! This can happen if resolution is low.
+                        ! We make sure that no redundant coordinates are output.
+        numi = 0 ! number of valid coordinates specified
+        DO i = 1, nnorm_coord
+
+            IF (i .ne. 1) last_index = abs(indices(i-1))
+
+            ccheck = nrm_coords(i)  
+
+            IF (ABS(ccheck) .lt. tolchk) THEN
+                numi = numi+1
+                ! This is a valid normalized-coordinate value.
+                ! Translate it into a grid-based index.
+                ! Find the index within coord_arr that
+                ! corresponds to the
+                indices(i) = 1
+                IF (ccheck .lt. 0) indices(i) = -1
+                nrmc = (coord_arr(1)-cmin)/cdel
+                del1 = ABS(nrmc-abs(ccheck))
+
+                DO j = 2, nbase_coord
+                    nrmc = (coord_arr(j)-cmin)/cdel
+                    del2 = ABS(nrmc-abs(ccheck))
+                    If ( (del2 .lt. del1) .and. (j .ne. last_index) ) THEN
+                        indices(i) = j
+                        If (ccheck .lt. 0) indices(i) = -j
+                        del1 = del2
+                    ENDIF
+                ENDDO
+
+            ENDIF
+
+
+        ENDDO
+
+        IF (PRESENT(rev_inds)) THEN
+           IF (rev_inds) THEN ! in case someone specified rev_inds = .false. ...
+
+                i = 1
+                DO WHILE(i .le. numi)
+                    IF (indices(i) .lt. 0) THEN
+                        indices(i) = -indices(i)
+                        indices(i-1) = -indices(i-1)
+                        !i = i+1
+                    ENDIF
+                    i = i+1
+                ENDDO
+                ALLOCATE(ind_copy(1:numi))
+                ind_copy(1:numi) = indices(1:numi)
+
+                ! Second pass:  rearrange indices in ascending order
+                DO i = 1, numi
+                    indices(i) = ind_copy(numi-i+1)
+                ENDDO
+
+                DEALLOCATE(ind_copy)
+           ENDIF 
+        ENDIF
+
+    END SUBROUTINE nrm_to_index
+
+
+    Subroutine Parse_Inds(indices_inout, indcount)
+        IMPLICIT NONE
+        INTEGER, INTENT(InOut) :: indices_inout(:)
+        INTEGER, INTENT(InOut), Optional :: indcount
+        INTEGER, ALLOCATABLE :: indices_out(:)
+        INTEGER :: i, j,ind,ni, jmin, jmax
+        !Converts index lists of the form [1,-4] to [1,2,3,4]
+        i = 1
+        ind = 1
+        ni = size(indices_inout)
+        ALLOCATE(indices_out(1:ni))
+        indices_out(:) = -1
+        DO WHILE( (indices_inout(i) .gt. -1) .and. (i .le. ni))
+            indices_out(ind) = indices_inout(i)
+            ind = ind+1
+            IF ( indices_inout(i+1) .lt. -1) THEN
+                ! User has specified a sub-range in this coordinate
+                jmax = -indices_inout(i+1) 
+                jmin =  indices_inout(i)+1
+                Do j = jmin,jmax
+                    indices_out(ind) = j
+                    ind = ind+1
+                ENDDO
+                i = i + 1  ! We increment an extra time here to skip the next negative number
+            ENDIF
+            i = i + 1
+        ENDDO
+        indices_inout(1:ni) = indices_out(1:ni)
+        DEALLOCATE(indices_out)
+        IF (present(indcount)) indcount = ind-1        
+    End Subroutine Parse_Inds
+
+
+    Subroutine Scattered_Balance(self, rinds, tinds, pinds)
+        IMPLICIT NONE
+        CLASS(DiagnosticInfo) :: self
+        INTEGER, INTENT(INOUT) :: rinds(:), tinds(:), pinds(:)
+        INTEGER, ALLOCATABLE :: tmp(:)
+        INTEGER :: i, j,k, ind
+        INTEGER :: rcount, tcount, pcount, ntmp
+        INTEGER :: error_code = 0
+        ! Few steps here:
+
+        ! First, find out how many indices we need to output...
+
+        rcount = size(rinds)
+        i = 1
+        DO WHILE ( i .le. rcount )
+            IF (rinds(i) .lt. 0) THEN
+                rcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
+
+        tcount = size(tinds)
+        i = 1
+        DO WHILE ( i .le. tcount )
+            IF (tinds(i) .lt. 0) THEN
+                tcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
+
+        pcount = size(pinds)
+        i = 1
+        DO WHILE ( i .le. pcount )
+            IF (pinds(i) .lt. 0) THEN
+                pcount = i-1
+            ENDIF
+            i = i+1
+        ENDDO
+
+        IF (rcount .gt. 0) THEN
+            Allocate(self%probe_r_global(1:rcount))
+            self%probe_r_global(1:rcount) = rinds(1:rcount)
+        ENDIF
+        IF (tcount .gt. 0) THEN
+            Allocate(self%probe_t_global(1:tcount))
+            self%probe_t_global(1:tcount) = tinds(1:tcount)
+        ENDIF
+        IF (pcount .gt. 0) THEN
+            Allocate(self%probe_p_global(1:pcount))
+            self%probe_p_global(1:pcount) = pinds(1:pcount)
+        ENDIF
+
+        ! The indexing seems to be working, but let's leave this code around for a bit
+        ! just in case.
+        !IF ( ( rcount .gt. 0) .and. (tcount .gt. 0) .and. (pcount .gt. 0) ) THEN
+        !    IF (myid .eq. 0) THEN
+        !        WRITE(6,*)'Probes specified (phi,theta,r) :  '
+        !        DO k = 1, rcount
+        !            DO j = 1, tcount
+        !                DO i = 1, pcount
+        !                    Write(6,*)self%probe_p_global(i), self%probe_t_global(j), self%probe_r_global(k)
+        !                ENDDO
+        !            ENDDO
+        !        ENDDO
+        !    ENDIF
+        !ELSE
+        !    WRITE(6,*)'No probes specified.'
+        !    error_code = 1
+        !ENDIF
+    End Subroutine Scattered_Balance
+
+    SUBROUTINE PROCESS_COORDINATES()
+        IMPLICIT NONE
+        INTEGER :: i
+        Real*8, Allocatable :: tmp_theta(:), tmp_phi(:)
+        ALLOCATE(tmp_theta(1:ntheta), tmp_phi(1:nphi))
+
+
+        ! We want theta instead of costheta
+        DO i = 1, ntheta
+            tmp_theta(i) = ACOS(costheta(i))
+        ENDDO
+
+        DO i = 1, nphi
+            tmp_phi(i) = i*two_pi/DBLE(nphi)
+        ENDDO
+
+
+        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r, revg =.true.)
+        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,revg=.true.)
+        CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
+        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels, revg=.true.)
+        CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
+        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices,revg=.true.)
+
+        DeALLOCATE(tmp_theta,tmp_phi)
+    END SUBROUTINE PROCESS_COORDINATES
+
+    SUBROUTINE Interpret_Indices(indices_nrm, coord_grid, indices, revg)
+        IMPLICIT NONE
+        INTEGER, INTENT(InOut) :: indices(:)
+        REAL*8, INTENT(InOut) :: coord_grid(:), indices_nrm(:)
+        LOGICAL, INTENT(In), Optional :: revg
+        LOGICAL :: reverse_grid = .false.
+        IF (present(revg)) THEN
+            IF (revg) reverse_grid = .true.
+        ENDIF
+
+        ! If needed, convert normalized coordinates to indices
+        ! e.g., map [0.1, 0.25, 0.5] to [4, 15, 32]  
+        IF (maxval(indices_nrm) .gt. -2.9d0) THEN
+            CALL nrm_to_index(indices_nrm, coord_grid, indices, rev_inds =reverse_grid)
+        ENDIF
+
+        ! Next, interpret any range shorthand used.
+        ! e.g., convert [1,-4,8] to [1,2,3,4,8]
+        Call Parse_Inds(indices)
+    END SUBROUTINE Interpret_Indices
+
 
 
 

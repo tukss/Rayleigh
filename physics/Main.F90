@@ -86,7 +86,8 @@ Contains
             Call Make_Directory(Trim(my_path)//'Benchmark_Reports',ecode)
             Call Make_Directory(Trim(my_path)//'Equatorial_Slices',ecode)
             Call Make_Directory(Trim(my_path)//'Meridional_Slices',ecode)
-            !Call Make_Directory(Trim(my_path)//'SPH_Mode_Samples',ecode)
+            Call Make_Directory(Trim(my_path)//'SPH_Mode_Samples',ecode)
+            Call Make_Directory(Trim(my_path)//'Point_Probes',ecode)
         Endif
     End Subroutine Initialize_Directory_Structure
 
