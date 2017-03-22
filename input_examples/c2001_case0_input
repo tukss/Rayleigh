@@ -1,5 +1,5 @@
 &problemsize_namelist
- n_r = 64
+ n_r = 48
  n_theta = 64
  nprow = 2
  npcol = 2
@@ -44,32 +44,21 @@ equatorial_nrec      = 10
 !Valid values range from 1 through nphi = 2*n_theta
 !The indices below range from phi = 0 up to phi = pi 
 meridional_values    = 1,2, 64 ! radial and phi components of velocity; temperature
-meridional_frequency = 1
-meridional_nrec      = 2
+meridional_frequency = 500
+meridional_nrec      = 10
 meridional_indices = 1, 16, 32, 48, 64
-meridional_indices_nrm = 0.25,0.5,0.75
-
-point_probe_values = 1,2,3,64,65
-point_probe_frequency = 2
-point_probe_nrec = 4
-!point_probe_r     = 7,16,-33,42
-point_probe_r_nrm = 0.9, -1.1d0
-point_probe_theta = 8
-point_probe_phi   = 64
-!point_probe_phi_nrm   = 0.0d0, -0.1d0
-point_probe_theta_nrm   = 0.0d0, -0.1d0, 0.9, -1.0d0
 
 
-shellslice_levels    = 16,17, -23
+
+shellslice_levels    = 16,17
 shellslice_values    = 1,2,3, 64 ! velocity and temperature
-shellslice_frequency = 1
-shellslice_nrec      = 2
+shellslice_frequency = 1000
+shellslice_nrec      = 5
 
-shellspectra_levels    = 16,32,48,-64
-shellspectra_levels_nrm = 0.05,0.4,-0.5,0.9, -1.0
+shellspectra_levels    = 16,32,48,64
 shellspectra_values    = 1,2,3, 64  ! velocity and temperature
-shellspectra_frequency = 1
-shellspectra_nrec      = 2
+shellspectra_frequency = 1000
+shellspectra_nrec      = 5
 
 azavg_values = 1,2,3,64,55,56 ! same as above + r- and theta- mass flux
 azavg_frequency = 4100000
