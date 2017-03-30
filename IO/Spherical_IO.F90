@@ -92,6 +92,13 @@ Module Spherical_IO
         INTEGER, Allocatable :: phi_indices(:)
         INTEGER :: nphi_indices
 
+        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        !  Variables used for cached output (currently only used for point probes)
+        INTEGER :: cache_size = 1
+        INTEGER :: cache_ind = 1
+        INTEGER, ALLOCATABLE :: iter_save(:)
+        REAL*8 , ALLOCATABLE :: time_save(:)
+
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! Point-probe Variables
         INTEGER, ALLOCATABLE :: probe_p_global(:)  !phi-indces (phi is in-process at I/O time) 
@@ -101,7 +108,8 @@ Module Spherical_IO
         INTEGER :: probe_nt_local, probe_nt_global, probe_np_global !" " theta-indices & phi-indices
         INTEGER, ALLOCATABLE :: probe_nr_atrank(:)  ! Number of radial indices held by each column rank
         INTEGER, ALLOCATABLE :: probe_nt_atrank(:)  ! Number of theta indices held by each theta rank
-
+        INTEGER, ALLOCATABLE :: npts_at_colrank(:)  ! Number of points contained on a given row
+        INTEGER, ALLOCATABLE :: npts_at_rowrank(:)  ! Number of points contained at a given rank within a
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
         Integer :: ocomm, orank, onp
@@ -2591,10 +2599,10 @@ Contains
     !       Diagnostic Class Methods
 
     Subroutine Initialize_Diagnostic_Info(self,avg_levels,computes,pid,mpi_tag,avg_level,values, &
-            levels, phi_inds)
+            levels, phi_inds, cache_size)
         Implicit None
         Integer :: i,ind
-        Integer, Intent(In) :: pid, mpi_tag
+        Integer, Intent(In) :: pid, mpi_tag, cache_size
         Integer, Optional, Intent(In) :: avg_level
         Integer, Optional, Intent(In) :: values(1:)
         Integer, Optional, Intent(In) :: levels(1:)
@@ -2606,6 +2614,15 @@ Contains
         Endif
         self%mpi_tag = mpi_tag
         self%nq = 0
+        IF (present(cache_size)) THEN
+            IF (cache_size .ge. 1) THEN
+                self%cache_size = cache_size
+            ENDIF
+        ENDIF
+        Allocate(self%iter_save(1:self%cache_size))
+        Allocate(self%time_save(1:self%cache_size))
+
+
         If (present(values)) Then
             self%values(:) = values(:)  ! This is clunky - will look into getting the object attributes directly into a namelist later
             
@@ -2657,12 +2674,22 @@ Contains
             self%oqvals(:) = nqmax+100
         !Endif
     End Subroutine Initialize_Diagnostic_Info
+
     Subroutine AdvanceInd(self)
         Implicit None
         Class(DiagnosticInfo) :: self
         self%ind = self%ind+1
         self%begin_output = .false.
     End Subroutine AdvanceInd
+
+    Subroutine AdvanceCC(self)
+        !Advances the cache counter
+        Implicit None
+        Class(DiagnosticInfo) :: self
+        self%cc = self%cc+1
+        self%cc = MOD(self%cc,self%cache_size)+1
+    End Subroutine AdvanceCC
+
     Subroutine Diagnostic_Output_Reset(self)
         Implicit None
         Class(DiagnosticInfo) :: self
@@ -3394,7 +3421,7 @@ Contains
         CLASS(DiagnosticInfo) :: self
         INTEGER, INTENT(INOUT) :: rinds(:), tinds(:), pinds(:)
         INTEGER, ALLOCATABLE :: tmp(:)
-        INTEGER :: i, j,k, ind
+        INTEGER :: i, j,k, ind, this_min, this_max
         INTEGER :: rcount, tcount, pcount, ntmp
         INTEGER :: error_code = 0
         ! Few steps here:
@@ -3441,10 +3468,84 @@ Contains
             self%probe_p_global(1:pcount) = pinds(1:pcount)
         ENDIF
 
+        !probe_nr_atrank(:)
+		!my_theta_min = pfi%my_2p%min
+		!my_theta_max = pfi%my_2p%max
+		!my_rmin = pfi%my_1p%min
+		!my_rmax = pfi%my_1p%max
+        !nproc1 => processes per column
+        !nproc2 => processes per row
+        Allocate(self%probe_nr_atrank(0:nproc1-1))
+        Allocate(self%probe_nt_atrank(0:nproc2-1))
+        ALLOCATE(self%npts_at_colrank(0:nproc1-1))
+        ALLOCATE(self%npts_at_rowrank(0:nproc1-1))
+        self%probe_nr_atrank(:) = 0
+        self%probe_nr_local     = 0
+        self%probe_nt_atrank(:) = 0
+        self%probe_nt_local     = 0
+
+        Do i = 0, nproc1-1 
+            this_min = pfi%all_1p(i)%min
+            this_max = pfi%all_1p(i)%max
+            Do j = 1, rcount
+                IF ( (rinds(j) .le. this_max) .and. (rinds(j) .ge. this_min) ) THEN
+                    self%probe_nr_atrank(i) = self%probe_nr_atrank(i)+1
+                ENDIF
+            Enddo
+        Enddo
+
+        self%probe_nr_local = self%probe_nr_atrank(my_column_rank)
+        Allocate(self%probe_r_local(1:self%probe_nr_local))
+        ind = 1
+        Do j = 1, rcount
+            IF ( (rinds(j) .le. my_rmax) .and. (rinds(j) .ge. my_rmin) ) THEN
+               self%probe_r_local(ind) = rinds(j) 
+               ind = ind+1
+            ENDIF
+        Enddo       
+
+
+        Do j = 1, tcount
+            Do i = 0, nproc2-1 
+                this_min = pfi%all_2p(i)%min
+                this_max = pfi%all_2p(i)%max
+                IF ( (tinds(j) .le. this_max) .and. (tinds(j) .ge. this_min) ) THEN
+                    self%probe_nt_atrank(i) = self%probe_nt_atrank(i)+1
+                ENDIF
+            Enddo
+        Enddo
+
+        self%probe_nt_local = self%probe_nt_atrank(my_row_rank)
+        Allocate(self%probe_t_local(1:self%probe_nt_local))
+        ind = 1
+        Do j = 1, tcount
+            IF ( (tinds(j) .le. my_theta_max) .and. (rinds(j) .ge. my_theta_min) ) THEN
+               self%probe_t_local(ind) = tinds(j) 
+               ind = ind+1
+            ENDIF
+        Enddo 
+
+
+        ! Calculate how many points are located on rank 0 of each row (just prior to parallel write)
+        Do i = 0, nproc1-1
+            self%npts_at_colrank(i) = self%probe_nr_atrank(i)*self%probe_nt_global*&
+                self%probe_np_global
+        Enddo
+
+        ! Calculate how many points are located at each rank within a row
+        Do i = 0, nproc2-1
+            self%npts_at_rowrank(i) = self%probe_nr_atrank(my_column_rank)* &
+                self%probe_nt_atrank(i)*self%probe_np_global
+        Enddo
+
+
+
+        !Write(6,*)'INITIALIZED!'
+
         ! The indexing seems to be working, but let's leave this code around for a bit
         ! just in case.
         !IF ( ( rcount .gt. 0) .and. (tcount .gt. 0) .and. (pcount .gt. 0) ) THEN
-        !    IF (myid .eq. 0) THEN
+        !    IF (myid .eq. 0) THEN0
         !        WRITE(6,*)'Probes specified (phi,theta,r) :  '
         !        DO k = 1, rcount
         !            DO j = 1, tcount
