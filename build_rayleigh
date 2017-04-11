@@ -63,7 +63,6 @@ cp ../Makefiles/object_list .
 echo ${MACHINE}
 MACHINEFILE=machine.${MACHINE}
 cp ../Makefiles/${MACHINEFILE} Machine_Definitions
-make clean_exec
 echo " "
 make ${TARGET}  
 #MACHINEFILE=${MACHINEFILE}

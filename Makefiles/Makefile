@@ -26,6 +26,7 @@ ifeq ($(GOALCHECK), $(MAKECMDGOALS))
     # Make will then proceed to execute the $(VERSION) 
     # recipe below.
     VERSION=$(VCHECK)
+    VV := $(FFLAGS_$(VERSION))
   endif
 else
   #If the goal is invalid, print out some explanatory information.
@@ -48,6 +49,7 @@ all:
 	done
 
 rayleigh_exec: $(OBJ)
+	echo 'FLAGS2: ' $(FFLAGS)
 	$(FC) $(FFLAGS) -o  $(PROG) $(OBJ) $(LIB)
 
 $(VERSION):
@@ -57,8 +59,7 @@ $(VERSION):
 	@echo ' '
 
 	@$(MAKENP) clean_obj
-	@echo ' '
-	@$(MAKENP) rayleigh_exec FFLAGS="$(FFLAGS_$(VERSION))" PROG="rayleigh.$(VERSION)" LIB="$(LIB_$(VERSION))"
+	$(MAKENP) rayleigh_exec FFLAGS="$(FFLAGS_$(VERSION))" PROG="rayleigh.$(VERSION)" LIB="$(LIB_$(VERSION))"
 
 .F90.o :
 	$(FC) $(FFLAGS) -c $<
