@@ -2,7 +2,7 @@
 # I. Specify the fortran compiler (FC) and the c compiler (CC)
 
 FC = mpif90    # FORTRAN Compiler (must be FORTRAN 2003-compliant)
-CC  = gcc      # C compiler       (pretty much anything will work here...)
+CC  = gcc -w      # C compiler    (-w suppresses warnings associated with the single, small file compiled via gcc)
 
 ################################################################################
 # II.   Create names for the different ways in which rayleigh should be built.
@@ -19,8 +19,8 @@ CC  = gcc      # C compiler       (pretty much anything will work here...)
 #       If the user executes "./build_rayleigh MACHINE" without any addition options,
 #       an exectuable named rayleigh.$(DEFAULT) will be built.
 
-DEFAULT = opt
-DEBUG   = dbg
+DEFAULT = opt  
+DEBUG   = dbg  
 
 
 
@@ -62,4 +62,7 @@ LIB_$(DEFAULT)       = -L$(FFTW_LIB) -lfftw3 -L$(BLAS_LIB) -lblas -L$(LAPACK_LIB
 FFLAGS_$(DEBUG) = -O0 -fbounds-check -fbacktrace -ffixed-line-length-132  -I$(FFTW_INC)
 LIB_$(DEBUG)   = $(LIB_$(DEFAULT))   # Note that this is how we copy the value of LIB_$(DEFAULT) into LIB_$(DEBUG)
 
-
+###################################################################################
+# VI.  (Optional)  Add a description of each version. The description will be displayed when that version is built.
+DESC_$(DEFAULT) = "Description:  GFORTRAN with optimization flags"
+DESC_$(DEBUG) = "Description:  GFORTRAN with debugging flags"

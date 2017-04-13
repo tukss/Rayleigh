@@ -57,9 +57,10 @@ $(VERSION):
 	@echo '******************************************************************** ' 
 	@echo '                 Now Compiling: rayleigh'.$(VERSION) 
 	@echo ' '
-
+	@echo '                 '$(DESC_$(VERSION))	
+	@echo ' '
 	@$(MAKENP) clean_obj
-	$(MAKENP) rayleigh_exec FFLAGS="$(FFLAGS_$(VERSION))" PROG="rayleigh.$(VERSION)" LIB="$(LIB_$(VERSION))"
+	@$(MAKENP) rayleigh_exec FFLAGS="$(FFLAGS_$(VERSION))" PROG="rayleigh.$(VERSION)" LIB="$(LIB_$(VERSION))"
 
 .F90.o :
 	$(FC) $(FFLAGS) -c $<
