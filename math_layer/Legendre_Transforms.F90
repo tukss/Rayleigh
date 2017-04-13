@@ -131,7 +131,7 @@ Subroutine Test_Legendre
 
 
 
-103 format(d7.2)
+103 format(d11.2)
 		
 	DeAllocate(theta)
 	DeAllocate(ylm)

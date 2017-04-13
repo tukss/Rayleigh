@@ -49,7 +49,6 @@ all:
 	done
 
 rayleigh_exec: $(OBJ)
-	echo 'FLAGS2: ' $(FFLAGS)
 	$(FC) $(FFLAGS) -o  $(PROG) $(OBJ) $(LIB)
 
 $(VERSION):
