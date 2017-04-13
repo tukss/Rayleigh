@@ -721,23 +721,30 @@ Contains
 		Integer :: n, nn, this_nshell, nq, mpi_tag
 		Integer :: your_theta_min, your_theta_max, your_ntheta, your_id
 		Integer :: nelem, buffsize, sirq, nrirqs, inds(1:4)
-        Integer :: file_pos, funit, error, dims(1:3), first_shell_rank
+        Integer :: file_pos, funit, error, dims(1:4), first_shell_rank
         Real*8, Allocatable :: out_radii(:)
         Integer, Allocatable :: level_inds(:), rirqs(:)
         
         integer :: ierr, rcount
 		integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp, qdisp, full_disp
 		Integer :: mstatus(MPI_STATUS_SIZE)
-        INTEGER :: npts_this_row, this_nr, this_np, irqc, ncache
+        INTEGER :: npts_this_row, this_nr, nphi_probe, irqc, ncache
+        INTEGER :: probe_nr, probe_nt, probe_np
+        INTEGER, Allocatable :: probe_rvals(:), probe_tvals(:), probe_pvals(:)
 
-        nq = Point_Probes%nq
-        ncache = Point_Probes%cache_size
+
+        nq      = Point_Probes%nq
+        ncache  = Point_Probes%cache_size
         mpi_tag = Point_Probes%mpi_tag
-        funit = Point_Probes%file_unit
+        funit   = Point_Probes%file_unit
+
+        probe_nr = Point_Probes%probe_nr_global
+        probe_nt = Point_Probes%probe_nt_global
+        probe_np = Point_Probes%probe_np_global
 
         ! Initially, we carry out communication down-row, but only if our row has points
 		responsible = 0
-        npts_this_row = Point_Probes%npts_at_colrank
+        npts_this_row = Point_Probes%npts_at_colrank(my_column_rank)
 		If (my_row_rank .eq. 0) Then
             If (npts_this_row .gt. 0) Then
                 responsible = 1
@@ -751,11 +758,11 @@ Contains
 
 		If (responsible .eq. 1) Then
             this_nr = Point_Probes%nr_at_rank(my_column_rank)
-            this_np = Point_Probes%np_global
+            nphi_probe = Point_Probes%np_global
 
             ALLOCATE( row_probes(1:npts_this_row, 1:nq, ncache) )
 
-            ALLOCATE(buff(1:nq, 1:Point_Probes%cache_size, 1:npts_this_row ))            
+            ALLOCATE(buff(1:nq, 1:ncache, 1:npts_this_row ))            
 
             row_probes(:,:,:) = 0.0d0
                   buff(:,:,:) = 0.0d0
@@ -767,24 +774,29 @@ Contains
             irqc = 0  !irq counter -- everyone in the row does not necessarily have points
             inds(3) = 1
             Do nn = 1, nproc2-1
-                inds(3) = inds(3)+npts_at_rowrank(nn-1) ! Keep this out of the conditional
+                inds(3) = inds(3)+Point_Probes%npts_at_rowrank(nn-1) ! Keep this out of the conditional
 
-                IF (npts_at_rowrank(nn) .gt. 0) THEN
+                IF (Point_Probes%npts_at_rowrank(nn) .gt. 0) THEN
                     irqc = irqc+1
 				    your_id = nn
 
                     inds(1) = 1
                     inds(2) = 1
 
-				    nelem = npts_at_rowrank(nn-1)
+				    nelem = npts_at_rowrank(nn-1)*ncache*nq
 
              		Call IReceive(buff, rirqs(irqc),n_elements = nelem, source= your_id, tag=mpi_tag, grp = pfi%rcomm, indstart = inds)
                 ENDIF
             Enddo
+            ! Strip my own data
+
+            buff(:,:,1:Point_Probes%npts_at_rowrank(my_row_rank)) = probe_outputs(:,:,:)
+            Call IWaitAll(irqc,rirqs(1:irqc))  ! wait on the sends to come through
+
             !At this point, buff is striped phi,r,theta.  We need to stripe it phi,theta,r
-            Allocate(slice(1:this_np))
+            Allocate(slice(1:nphi_probe))
             nt_row = SUM(Point_Probes%nt_at_rank)
-            rslab_size = nt_row*this_np
+            rslab_size = nt_row*nphi_probe
             ichunk = 1
             tind = 1
             DO nn = 0, nproc2-1
@@ -795,74 +807,40 @@ Contains
                     Do j = 1, this_nt
                         rind = 1
                         Do i = 1, this_nr
-                            slice(:,:,1:this_np) = buff(:,:,ichunk:ichunk+this_np-1)
-                            ichunk = ichunk+this_np
+                            slice(:,:,1:nphi_probe) = buff(:,:,ichunk:ichunk+nphi_probe-1)
+                            ichunk = ichunk+nphi_probe
 
                             ind = rind+tind
                             Do jj = 1, ncache
                                 Do ii = 1, nq
-                                    row_probes(ind:ind+this_np-1,ii,jj) = slice(ii,jj,1:this_np)
+                                    row_probes(ind:ind+nphi_probe-1,ii,jj) = slice(ii,jj,1:nphi_probe)
                                 Enddo
                             Enddo
 
                             rind = rind+rslab_size
                         Enddo
-                        tind = tind+this_np
+                        tind = tind+nphi_probe
                     ENDDO
                 ENDIF
             ENDDO
 
-            ! Stripe my own data into buff
-
-            Do k = 1, nq_shell
-                Do j = 1, this_nshell
-                    Do t = my_theta_min, my_theta_max
-                        Do i = 1, nphi
-                            buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
-                        Enddo
-                    Enddo
-                Enddo
-            Enddo
-            
-
-            Call IWaitAll(irqc,rirqs(1:irqc))
-
-
-            Do k = 1, nq_shell
-                Do j = 1, this_nshell
-                    Do t = 1, ntheta
-                        Do i = 1, nphi
-                            all_shell_slices(i,t,j,k) = buff(i,j,k,t)
-                        Enddo
-                    Enddo
-                Enddo
-            Enddo
-
+            DeAllocate(probe_outputs)
+            DeAllocate(slice)
             DeAllocate(buff)
-            DeAllocate(rirqs)
-            DeAllocate(shell_slice_outputs)
 		Else
 			!  Non responsible nodes send their info
-			If (Shell_Slices%my_nlevels .gt. 0) Then
+			If (npts_this_row .gt. 0) Then
                 !Everyone needs to restripe their data before sending it down the row
                 !Stripe so that theta is slowest 
-                Allocate(buff(1:nphi,1:this_nshell,1:nq_shell, my_theta_min:my_theta_max))
-                Do t = my_theta_min, my_theta_max
-                    Do k = 1, nq_shell
-                        Do j = 1, this_nshell
-                            Do i = 1, nphi
-                                buff(i,j,k,t) = shell_slice_outputs(i,t,j,k)
-                            Enddo
-                        Enddo
-                    Enddo
-                Enddo
-                nelem = nphi*my_ntheta*this_nshell*nq_shell
+
+
+                nelem = nelem = Point_Probes%npts_at_rowrank(my_row_rank)*ncache*nq
                 inds(:) = 1
-				Call Isend(buff,sirq,n_elements = nelem,dest = 0,tag=shell_slice_tag, grp = pfi%rcomm, indstart = inds)
+				Call Isend(probe_outputs,sirq,n_elements = nelem,dest = 0,tag=mpi_tag, grp = pfi%rcomm, indstart = inds)
             
                 Call IWait(sirq)
-                DeAllocate(shell_slice_outputs)
-                DeAllocate(buff)
+                DeAllocate(probe_outputs)
+
 			Endif
 		Endif
 
@@ -871,61 +849,82 @@ Contains
         
 
         ! For the moment, every process in column 0 participates in the mpi operation
-        ! The plan is to tune this later so that 
-        if (my_row_rank .eq. 0) Call Shell_Slices%OpenFile_Par(this_iter, error)
+ 
+        if (my_row_rank .eq. 0) Call Point_Probes%OpenFile_Par(this_iter, error)
 
         If (responsible .eq. 1) Then   
-           funit = shell_slices%file_unit
-        If (Shell_Slices%current_rec .eq. 1) Then                
-            
-            If (shell_slices%master) Then            
-                ! The master rank (whoever owns the first output shell level) writes the header
-                dims(1) = ntheta
-                dims(2) = Shell_Slices%nlevels
-                dims(3) =  nq_shell
-                buffsize = 3
-                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
-                    mstatus, ierr) 
-
-                buffsize = nq_shell
-                call MPI_FILE_WRITE(funit,Shell_Slices%oqvals, buffsize, MPI_INTEGER, & 
-                    mstatus, ierr) 
-
-                allocate(out_radii(1:Shell_Slices%nlevels))
-                Do i = 1, Shell_Slices%nlevels
-                    out_radii(i) = radius(Shell_Slices%levels(i))
-                Enddo
-                buffsize = Shell_Slices%nlevels
-	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
-                    mstatus, ierr) 
-                DeAllocate(out_radii)
+            funit = Point_Probes%file_unit
+            If (Point_Probes%current_rec .eq. 1) Then                
                 
+                If (Point_Probes%master) Then    !           
+                    ! The master rank (whoever owns the first output shell level) writes the header
+                    dims(1) = probe_nr
+                    dims(2) = probe_nt
+                    dims(3) = probe_np
+                    dims(4) = nq
 
-                allocate(level_inds(1:Shell_Slices%nlevels))
-                Do i = 1, Shell_Slices%nlevels
-                    level_inds(i) = Shell_Slices%levels(i)
-                Enddo
+                    buffsize = 4
+                    call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
 
-	            call MPI_FILE_WRITE(funit, Shell_Slices%levels, buffsize, MPI_INTEGER, & 
-                    mstatus, ierr) 
-                DeAllocate(level_inds)
-                buffsize = ntheta
-	            call MPI_FILE_WRITE(funit, costheta, buffsize, MPI_DOUBLE_PRECISION, & 
-                    mstatus, ierr) 
+                    buffsize = nq
+                    call MPI_FILE_WRITE(funit,Point_Probes%oqvals, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
 
+                    ! Radial grid -----------------------------------
+                    allocate(probe_rvals(1:probe_nr))
+                    Do i = 1, probe_nr
+                        probe_rvals(i) = radius(Point_Probes%probe_r_global(i))
+                        
+                    Enddo
+                    buffsize = probe_nr
+                    call MPI_FILE_WRITE(funit, probe_rvals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    call MPI_FILE_WRITE(funit, Point_Probes%probe_r_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+                    DeAllocate(probe_rvals)
+
+                    !Theta grid-----------------------------------------
+                    ALLOCATE(probe_tvals(1:probe_nt))
+                    DO i = 1, probe_nt
+                        probe_tvals(i) = costheta(Point_Probes%probe_t_global(i))
+                        
+                    ENDDO
+                    buffsize = probe_nt
+                    CALL MPI_FILE_WRITE(funit, probe_tvals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    CALL MPI_FILE_WRITE(funit, Point_Probes%probe_t_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+                    DEALLOCATE(probe_tvals)
+
+                    !Phi grid----------------------------------
+                    ALLOCATE(probe_pvals(1:probe_np))
+                    DO i = 1, probe_np
+                        probe_pvals(i) = (Point_Probes%probe_p_global(i)-1)*(two_pi/nphi)
+                        
+                    ENDDO
+                    buffsize = probe_np
+                    CALL MPI_FILE_WRITE(funit, probe_pvals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    CALL MPI_FILE_WRITE(funit, Point_Probes%probe_p_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+                    DEALLOCATE(probe_pvals)
+
+
+                Endif
             Endif
-        Endif
 
-            ! I might really (really) want to look into file views later.
-            ! Depending on the offset size mpi type, disp will crap out past 2GB
+
             hdisp = 24 ! dimensions+endian+version+record count
-            hdisp = hdisp+nq_shell*4 ! nq
-            hdisp = hdisp+Shell_Slices%nlevels*12  ! level indices and level values
-            hdisp = hdisp+ ntheta*8  ! costheta
+            hdisp = hdisp+4 ! cache size <-------------------------------- REVISIT THIS
+            hdisp = hdisp+nq*4 ! nq
+            hdisp = hdisp+probe_nr*12  ! radial indices and values
+            hdisp = hdisp+probe_nt*12  ! theta  indices and values
+            hdisp = hdisp+probe_np*12  ! phi indices and values
 
-            qdisp = ntheta*Shell_Slices%nlevels*nphi*8
-            full_disp = qdisp*nq_shell+12  ! 12 is for the simtime+iteration at the end
-            disp = hdisp+full_disp*(Shell_Slices%current_rec-1)
+            qdisp = probe_nr*probe_nt_*probe_np*8
+            full_disp = qdisp*nq+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(Shell_Slices%current_rec-1)*cache_size
             
             buffsize = Shell_Slices%my_nlevels*ntheta*nphi
             ! The file is striped with time step slowest, followed by q
@@ -938,27 +937,33 @@ Contains
                 Endif
             Enddo
             my_rdisp = rcount*ntheta*nphi*8
-            Do i = 1, nq_shell
-                new_disp = disp+qdisp*(i-1)+my_rdisp                
-                Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
-                
-                Call MPI_FILE_WRITE(funit, all_shell_slices(1,1,1,i), buffsize, & 
-                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+            Do j = 1, cache_size
+
+
+
+                Do i = 1, nq_shell
+                    new_disp = disp+qdisp*(i-1)+my_rdisp                
+                    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                    
+                    Call MPI_FILE_WRITE(funit, all_shell_slices(1,1,1,i), buffsize, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Enddo
+                disp = hdisp+full_disp*Shell_Slices%current_rec
+                disp = disp-12
+                Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+
+                If (shell_slices%master) Then
+                    buffsize = 1
+                    Call MPI_FILE_WRITE(funit, Point_Probes%time_save(j), buffsize, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+                    Call MPI_FILE_WRITE(funit, Point_Probes%iter_save(j), buffsize, & 
+                           MPI_INTEGER, mstatus, ierr)
+                Endif
+
+
+                disp = disp+full_disp ! cache aware
             Enddo
-            disp = hdisp+full_disp*Shell_Slices%current_rec
-            disp = disp-12
-            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
-
-
-            If (shell_slices%master) Then
-                buffsize = 1
-                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
-                       MPI_DOUBLE_PRECISION, mstatus, ierr)
-                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
-                       MPI_INTEGER, mstatus, ierr)
-            Endif
-
-
 			DeAllocate(all_shell_slices)
         Endif  ! Responsible
 
