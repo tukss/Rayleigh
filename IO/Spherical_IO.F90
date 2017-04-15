@@ -358,6 +358,7 @@ Contains
         Call       SPH_Mode_Samples%Init(averaging_level,compute_q,myid, &
             & 62,values = sph_mode_values)
 
+
         Call       Point_Probes%Init(averaging_level,compute_q,myid, &
             & 63,values = point_probe_values)
 
@@ -383,13 +384,16 @@ Contains
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
             Endif
 
-            
+
             If (maxval(point_probes%npts_at_colrank) .gt. 0) THEN
+
                 i = 0    
                 master_rank = -1
                 Do While (master_rank .eq. -1) 
                     if (point_probes%npts_at_colrank(i) .gt. 0) master_rank = i
+                    i = i+1
                 Enddo
+
                 Call Point_Probes%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank)
             ENDIF
         Endif
@@ -697,7 +701,7 @@ Contains
                 probe_outputs(:,:,:) = 0.0d0
             ENDIF
         ENDIF
-        
+
         IF (npts .gt. 0) THEN
             cache_ind = Point_Probes%cc
             ind = 1
@@ -709,7 +713,7 @@ Contains
                     rind = Point_Probes%probe_r_local(j)
                     DO i = 1, Point_Probes%probe_np_global
                         probe_outputs(q_ind,cache_ind,ind) = &
-                            qty(Point_Probes%probe_p_global(i),j,k)
+                            qty(Point_Probes%probe_p_global(i),rind,tind)
                         ind = ind+1
                     ENDDO
                 ENDDO
@@ -718,6 +722,7 @@ Contains
 
         Point_Probes%oqvals(q_ind) = current_qval
         Call Point_Probes%AdvanceInd()
+
     End Subroutine Get_Point_Probes
 
 
@@ -745,9 +750,9 @@ Contains
         INTEGER, Allocatable :: level_inds(:), rirqs(:)
         Point_Probes%time_save(Point_Probes%cc) = simtime
         Point_Probes%iter_save(Point_Probes%cc) = this_iter
-
+        WRite(6,*)'IN Write'
         If (Point_Probes%cache_size .eq. Point_Probes%cc) Then
-
+        WRITE(6,*)'In conditional', my_row_rank, my_column_rank
         nq      = Point_Probes%nq
         ncache  = Point_Probes%cache_size
         probe_tag = Point_Probes%mpi_tag
@@ -2267,6 +2272,7 @@ Contains
 
                 Call SPH_Mode_Samples%getq_now(yesno)
                 Call Point_Probes%getq_now(yesno)
+
                 Call Shell_Spectra%getq_now(yesno)
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
@@ -3772,6 +3778,7 @@ Contains
             Allocate(self%probe_r_global(1:rcount))
             self%probe_r_global(1:rcount) = rinds(1:rcount)
         ENDIF
+
         IF (tcount .gt. 0) THEN
             Allocate(self%probe_t_global(1:tcount))
             self%probe_t_global(1:tcount) = tinds(1:tcount)
@@ -3781,6 +3788,9 @@ Contains
             self%probe_p_global(1:pcount) = pinds(1:pcount)
         ENDIF
 
+        self%probe_nr_global = rcount
+        self%probe_nt_global = tcount
+        self%probe_np_global = pcount
         !probe_nr_atrank(:)
 		!my_theta_min = pfi%my_2p%min
 		!my_theta_max = pfi%my_2p%max
@@ -3835,18 +3845,19 @@ Contains
         Allocate(self%probe_t_local(1:self%probe_nt_local))
         ind = 1
         Do j = 1, tcount
-            IF ( (tinds(j) .le. my_theta_max) .and. (rinds(j) .ge. my_theta_min) ) THEN
+            IF ( (tinds(j) .le. my_theta_max) .and. (tinds(j) .ge. my_theta_min) ) THEN
                self%probe_t_local(ind) = tinds(j) 
                ind = ind+1
             ENDIF
         Enddo 
-
+        WRite(6,*)'Check: ', my_theta_min, my_theta_max, ':', self%probe_t_local
 
         ! Calculate how many points are located on rank 0 of each row (just prior to parallel write)
         Do i = 0, nproc1-1
             self%npts_at_colrank(i) = self%probe_nr_atrank(i)*self%probe_nt_global*&
                 self%probe_np_global
         Enddo
+
 
         ! Calculate how many points are located at each rank within a row
         Do i = 0, nproc2-1
