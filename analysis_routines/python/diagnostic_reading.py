@@ -402,14 +402,14 @@ class Point_Probe:
         self.ntheta = ntheta
         self.nphi = nphi
 
-        print nr,ntheta,nphi,nq
-        print 'nrec is: ', nrec
+        #print nr,ntheta,nphi,nq
+        #print 'nrec is: ', nrec
         hsize = (nr+ntheta+nphi)*12 + nq*4 + 8 + 16+4
-        print 'hsize is: ', hsize
+        #print 'hsize is: ', hsize
         recsize = nq*nphi*ntheta*nr*8 + 12
 
-        print 'expected filesize (bytes): ', recsize*nrec+hsize
-        print 'single rec size (bytes): ', recsize
+        #print 'expected filesize (bytes): ', recsize*nrec+hsize
+        #print 'single rec size (bytes): ', recsize
 
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
 
@@ -423,13 +423,13 @@ class Point_Probe:
         self.phi_inds = np.reshape(swapread(fd,dtype='int32',count=nphi,swap=bs),(nphi), order = 'F')
 
 
-        print 'rad inds: ', self.rad_inds
-        print 'theta inds: ', self.theta_inds
-        print 'phi_inds: ', self.phi_inds
-        print 'qvals : ', self.qv
-        print ''
-        print 'radius: ', self.radius
-        print 'ctheta: ', self.costheta
+        #print 'rad inds: ', self.rad_inds
+        #print 'theta inds: ', self.theta_inds
+        #print 'phi_inds: ', self.phi_inds
+        #print 'qvals : ', self.qv
+        #print ''
+        #print 'radius: ', self.radius
+        #print 'ctheta: ', self.costheta
         self.sintheta = (1.0-self.costheta**2)**0.5
         self.vals  = np.zeros((nphi,ntheta,nr,nq,nrec),dtype='float64')
         self.iters = np.zeros(nrec,dtype='int32')
@@ -442,8 +442,8 @@ class Point_Probe:
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
 
-        print 'iters: ', self.iters
-        print 'times: ', self.time
+        #print 'iters: ', self.iters
+        #print 'times: ', self.time
         maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
