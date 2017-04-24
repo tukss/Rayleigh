@@ -25,12 +25,12 @@ DEBUG   = dbg     #         No optimization; debugging flags turned on
 AVX     = avx     #         SandyBridge/IvyBridge cores
 SSE     = sse     #         Westmere cores
 IPO     = ipo     #   avx2 and itraprocedural optimization
-
+ALIGN   = a64
 ################################################################################
 # III.  Create a simple white-space-separated list of the version names.
 #       The spaces are required here.
 
-VERSIONS = $(DEFAULT) $(DEBUG) $(AVX) $(SSE) $(IPO)
+VERSIONS = $(DEFAULT) $(DEBUG) $(AVX) $(SSE) $(IPO) $(ALIGN)
 
 
 #################################################################################
@@ -73,6 +73,11 @@ LIB_$(SSE)   = $(LIB_$(DEFAULT))   # Note that this is how we copy the value of
 FFLAGS_$(IPO) = -FR -fpp -r8 -O3 -xCORE-AVX2 -ipo -shared_intel $(MKL_INC)
 LIB_$(IPO)   = $(LIB_$(DEFAULT))   # Note that this is how we copy the value of 
 
+# Optimization 5 ; cache alignment
+FFLAGS_$(ALIGN)    = -FR -fpp -r8 -O3 -xCORE-AVX2 -align array64byte -shared_intel $(MKL_INC)
+LIB_$(ALIGN)   = $(LIB_$(DEFAULT))   # Note that this is how we copy the value of 
+
+
 ##################################################################################
 # VI.  (Optional)   Add a description for each version described by this machine file.
 #                   The description will be printed when its respective version is built.
@@ -81,4 +86,5 @@ DESC_$(DEBUG)   = " No optimization; debugging flags turned on."
 DESC_$(AVX)     = " Intel SandyBridge/IvyBridge cores"
 DESC_$(SSE)     = " Intel Westmere cores"
 DESC_$(IPO)     = " Intel Haswell/Broadwell cores with -ipo"
+DESC_$(ALIGN)     = " Intel Haswell/Broadwell cores with cache alignment"
 
