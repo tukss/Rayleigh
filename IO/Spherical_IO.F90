@@ -22,7 +22,7 @@ Module Spherical_IO
 
 	!////////////////////////////////////////////
     Integer, Parameter :: nqmax=800, nshellmax=100, nmeridmax=100, nmodemax=100
-    Integer, Parameter :: nprobemax=1000
+    Integer, Parameter :: nprobemax=4096
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
     Integer, Parameter :: reallybig = 90000000
     ! Each diagnostic type has an associated version number that is written to the file
@@ -746,7 +746,7 @@ Contains
 		INTEGER :: mstatus(MPI_STATUS_SIZE)
         INTEGER :: npts_this_row, this_nr, nphi_probe, irqc, ncache, npts
         INTEGER :: probe_nr, probe_nt, probe_np, nvals, this_nt, tind
-        INTEGER, Allocatable :: probe_vals(:)
+        Real*8, Allocatable :: probe_vals(:)
         INTEGER, Allocatable :: level_inds(:), rirqs(:)
         Point_Probes%time_save(Point_Probes%cc) = simtime
         Point_Probes%iter_save(Point_Probes%cc) = this_iter
@@ -811,8 +811,9 @@ Contains
                 ENDIF
             Enddo  
             ! Strip my own data
-
-            buff(:,:,1:Point_Probes%npts_at_rowrank(my_row_rank)) = probe_outputs(:,:,:)
+            If (Point_Probes%npts_at_rowrank(my_row_rank) .gt. 0) THEN
+                buff(:,:,1:Point_Probes%npts_at_rowrank(my_row_rank)) = probe_outputs(:,:,:)
+            ENDIF
             Call IWaitAll(irqc,rirqs(1:irqc))  ! wait on the sends to come through
 
             ! Checked down to here:  2:00 p.m., April 14, 2017
@@ -821,15 +822,16 @@ Contains
             Allocate(slice(1:nq,1:ncache,1:nphi_probe))
             nt_row = SUM(Point_Probes%probe_nt_atrank)
             rslab_size = nt_row*nphi_probe
+            !write(6,*)'Check: ', nt_row, rslab_size, this_nr
             ichunk = 1
             tind = 1
             DO nn = 0, nproc2-1
                 this_nt = Point_Probes%probe_nt_atrank(nn)
                 IF (this_nt .gt. 0) THEN
                     !Iterate through the receive buffer, grabbing one r-theta combination at a time
-                    tind = 1
+                    !tind = 1
                     Do j = 1, this_nt
-                        rind = 1
+                        rind = 0
                         Do i = 1, this_nr
                             slice(:,:,1:nphi_probe) = buff(:,:,ichunk:ichunk+nphi_probe-1)
                             ichunk = ichunk+nphi_probe
@@ -848,7 +850,7 @@ Contains
                 ENDIF
             ENDDO
 
-            DeAllocate(probe_outputs)
+            If (allocated(probe_outputs)) DeAllocate(probe_outputs)
             DeAllocate(slice)
             DeAllocate(buff)
 		Else
@@ -900,10 +902,12 @@ Contains
                     nvals = max(probe_nr,probe_nt)
                     nvals = max(nvals,probe_np)
                     ALLOCATE(probe_vals(1:nvals))
+                    probe_vals(:) = 0
                     Do i = 1, probe_nr
                         probe_vals(i) = radius(Point_Probes%probe_r_global(i))                       
                     Enddo
                     buffsize = probe_nr
+
                     call MPI_FILE_WRITE(funit, probe_vals, buffsize, MPI_DOUBLE_PRECISION, & 
                         mstatus, ierr) 
                     call MPI_FILE_WRITE(funit, Point_Probes%probe_r_global, buffsize, MPI_INTEGER, & 
@@ -946,32 +950,33 @@ Contains
 
             qdisp = probe_nr*probe_nt*probe_np*8
             full_disp = qdisp*nq+12  ! 12 is for the simtime+iteration at the end
-            disp = hdisp+full_disp*(Shell_Slices%current_rec-ncache)
-            
+            disp = hdisp+full_disp*(Point_Probes%current_rec-ncache)
+            Write(6,*) 'disp is: ', disp
             buffsize = Point_Probes%npts_at_colrank(my_column_rank)
             ! The file is striped with time step slowest, followed by q
 
 
             pcount = 0
-            Do p = 1, nproc2
+            Do p = 0, nproc1
                 if (p .lt. my_column_rank) Then
                     pcount = pcount+ Point_Probes%npts_at_colrank(p)
                 Endif
             Enddo
+            !Write(6,*)'CHECK: ', my_column_rank, pcount
             my_pdisp = pcount*8
 
             Do j = 1, ncache
 
 
                 Do i = 1, nq
-                    new_disp = disp+qdisp*(i-1)+my_pdisp                
+                    new_disp = disp+full_disp*(j-1)+qdisp*(i-1)+my_pdisp                
                     Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
                     
                     Call MPI_FILE_WRITE(funit, row_probes(1,i,j), buffsize, & 
                            MPI_DOUBLE_PRECISION, mstatus, ierr)
                 Enddo
                 !tdisp = hdisp+full_disp*(Point_Probes%current_rec-ncache+j)
-                tdisp = disp+full_disp-12
+                tdisp = disp+(full_disp*j)-12
                 !tdisp = tdisp-12
                 Call MPI_File_Seek(funit,tdisp,MPI_SEEK_SET,ierr)
 
@@ -3234,6 +3239,7 @@ Contains
             !mstatus, ierr)
 
             self%current_rec = self%current_rec+self%cc
+
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
                 Write(6,*)'Failed to find needed file: ', filename
@@ -3677,7 +3683,6 @@ Contains
 
         IF (PRESENT(rev_inds)) THEN
            IF (rev_inds) THEN ! in case someone specified rev_inds = .false. ...
-
                 i = 1
                 DO WHILE(i .le. numi)
                     IF (indices(i) .lt. 0) THEN
@@ -3850,7 +3855,7 @@ Contains
                ind = ind+1
             ENDIF
         Enddo 
-        WRite(6,*)'Check: ', my_theta_min, my_theta_max, ':', self%probe_t_local
+        !WRite(6,*)'Check: ', my_theta_min, my_theta_max, ':', self%probe_t_local
 
         ! Calculate how many points are located on rank 0 of each row (just prior to parallel write)
         Do i = 0, nproc1-1
@@ -3901,16 +3906,17 @@ Contains
         ENDDO
 
         DO i = 1, nphi
-            tmp_phi(i) = i*two_pi/DBLE(nphi)
+            tmp_phi(i) = (i-1)*two_pi/DBLE(nphi)
         ENDDO
 
 
-        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r, revg =.true.)
-        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,revg=.true.)
+        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r,      revg =.true.)
+        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,  revg=.true.)
         CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
-        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels, revg=.true.)
+        WRITE(6,*)'Point probe phi: ', point_probe_phi(1:5)
+        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels,  revg=.true.)
         CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
-        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices,revg=.true.)
+        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices, revg=.true.)
 
         DeALLOCATE(tmp_theta,tmp_phi)
     END SUBROUTINE PROCESS_COORDINATES
@@ -3920,14 +3926,17 @@ Contains
         INTEGER, INTENT(InOut) :: indices(:)
         REAL*8, INTENT(InOut) :: coord_grid(:), indices_nrm(:)
         LOGICAL, INTENT(In), Optional :: revg
-        LOGICAL :: reverse_grid = .false.
+        LOGICAL :: reverse_grid 
         IF (present(revg)) THEN
             IF (revg) reverse_grid = .true.
+        ELSE
+            reverse_grid = .false.
         ENDIF
 
         ! If needed, convert normalized coordinates to indices
         ! e.g., map [0.1, 0.25, 0.5] to [4, 15, 32]  
         IF (maxval(indices_nrm) .gt. -2.9d0) THEN
+            
             CALL nrm_to_index(indices_nrm, coord_grid, indices, rev_inds =reverse_grid)
         ENDIF
 
