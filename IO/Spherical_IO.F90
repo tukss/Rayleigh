@@ -750,9 +750,9 @@ Contains
         INTEGER, Allocatable :: level_inds(:), rirqs(:)
         Point_Probes%time_save(Point_Probes%cc) = simtime
         Point_Probes%iter_save(Point_Probes%cc) = this_iter
-        WRite(6,*)'IN Write'
+        !WRite(6,*)'IN Write'
         If (Point_Probes%cache_size .eq. Point_Probes%cc) Then
-        WRITE(6,*)'In conditional', my_row_rank, my_column_rank
+        !WRITE(6,*)'In conditional', my_row_rank, my_column_rank
         nq      = Point_Probes%nq
         ncache  = Point_Probes%cache_size
         probe_tag = Point_Probes%mpi_tag
