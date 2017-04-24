@@ -3275,7 +3275,7 @@ Contains
         disp = 8
         Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
             If (ierr .ne. 0) Then
-                Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid
+                Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid, self%file_prefix
             Endif
         If (self%master) Then  
 
@@ -3283,10 +3283,10 @@ Contains
 
             call MPI_FILE_WRITE(self%file_unit,self%current_rec , buffsize, MPI_INTEGER, & 
                 mstatus, ierr) 
-            If (ierr .ne. 0) Write(6,*)'Error writing to header.  Error code: ', ierr
+            If (ierr .ne. 0) Write(6,*)'Error writing to header.  Error code: ', ierr, myid, self%file_prefix
         Endif
         Call MPI_FILE_CLOSE(self%file_unit, ierr)
-        If (ierr .ne. 0) Write(6,*)'Error closing file.  Error code: ',ierr
+        If (ierr .ne. 0) Write(6,*)'Error closing file.  Error code: ',ierr, myid, self%file_prefix
     End Subroutine CloseFile_Par
 
 
