@@ -3223,7 +3223,7 @@ Contains
             self%cc = 1            
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
-                Write(6,*)'Unable to create file!!: ',filename
+                if (myid .eq. 0) Write(6,*)'Unable to create file!!: ',filename
             Endif
         Else
     		call MPI_FILE_OPEN(self%ocomm, filename, & 
@@ -3242,9 +3242,11 @@ Contains
 
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
+                if (myid .eq. 0) Then
                 Write(6,*)'Failed to find needed file: ', filename
                 Write(6,*)'Partial diagnostic files are not currently supported.'
                 Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
+                Endif
             Endif
         Endif
 
@@ -3913,7 +3915,7 @@ Contains
         CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r,      revg =.true.)
         CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,  revg=.true.)
         CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
-        WRITE(6,*)'Point probe phi: ', point_probe_phi(1:5)
+        if (myid .eq. 0) WRITE(6,*)'Point probe phi: ', point_probe_phi(1:5)
         CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels,  revg=.true.)
         CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
         CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices, revg=.true.)
