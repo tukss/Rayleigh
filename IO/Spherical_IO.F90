@@ -810,7 +810,7 @@ Contains
                         source= your_id, tag=probe_tag, grp = pfi%rcomm, indstart = inds)
                 ENDIF
             Enddo  
-            ! Strip my own data
+            ! Stripe my own data
             If (Point_Probes%npts_at_rowrank(my_row_rank) .gt. 0) THEN
                 buff(:,:,1:Point_Probes%npts_at_rowrank(my_row_rank)) = probe_outputs(:,:,:)
             ENDIF
@@ -950,7 +950,7 @@ Contains
             qdisp = probe_nr*probe_nt*probe_np*8
             full_disp = qdisp*nq+12  ! 12 is for the simtime+iteration at the end
             disp = hdisp+full_disp*(Point_Probes%current_rec-ncache)
-            !Write(6,*) 'disp is: ', disp, full_disp, Point_Probes%current_rec-ncache
+
             buffsize = Point_Probes%npts_at_colrank(my_column_rank)
             ! The file is striped with time step slowest, followed by q
 
@@ -961,11 +961,11 @@ Contains
                     pcount = pcount+ Point_Probes%npts_at_colrank(p)
                 Endif
             Enddo
-            !Write(6,*)'CHECK: ', my_column_rank, pcount
+
             my_pdisp = pcount*8
 
             Do j = 1, ncache
-                !Write(6,*)'disp is: ', disp, my_pdisp
+
 
                 Do i = 1, nq
                     new_disp = disp+qdisp*(i-1)+my_pdisp                
@@ -982,7 +982,7 @@ Contains
 
                 If (Point_Probes%master) Then
                     buffsize2 = 1
-                    !Write(6,*)'Writing.. : ', Point_Probes%time_save(j), Point_Probes%iter_save(j), tdisp
+
                     Call MPI_FILE_WRITE(funit, Point_Probes%time_save(j), buffsize2, & 
                            MPI_DOUBLE_PRECISION, mstatus, ierr)
                     Call MPI_FILE_WRITE(funit, Point_Probes%iter_save(j), buffsize2, & 
@@ -3101,7 +3101,7 @@ Contains
     Subroutine set_file_info(self,oversion,rcount, freq, fpref,funit)
         Implicit None
         Class(DiagnosticInfo) :: self
-        Integer :: oversion, rcount, freq
+        Integer :: oversion, rcount, freq, modcheck
         Integer, Optional, Intent(In) :: funit
         Character*120 :: fpref
         If (present(funit)) Then
@@ -3111,6 +3111,55 @@ Contains
         self%output_version = oversion
         self%rec_per_file = rcount
         self%frequency = freq
+
+        !Now that we have set the file info, let's make sure the
+        !that the cache size is appropriate
+
+        If (self%cache_size .lt. 1) Then
+            If (myid .eq. 0) Then
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size must be at least 1.'
+                    Write(6,*)'   Specified cache_size: ', self%cache_size
+                    Write(6,*)'   Caching has been deactivated for ', self%file_prefix
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+            Endif
+            self%cache_size = 1
+        Endif
+        If (self%cache_size .gt. self%rec_per_file) Then
+            modcheck = MOD(rcount,self%cache_size)
+            IF (modcheck .ne. 0) THEN
+
+                If (myid .eq. 0) THEN
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size cannot be larger than nrec.'
+                    Write(6,*)'   Cache_size: ', self%cache_size
+                    Write(6,*)'   nrec      : ', self%rec_per_file
+                    Write(6,*)'   Cache_size has been set to nrec.'
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+                ENDIF
+                self%cache_size = self%rec_per_file
+            ENDIF
+        Endif
+        
+        If (self%cache_size .gt. 1) Then
+            modcheck = MOD(rcount,self%cache_size)
+            IF (modcheck .ne. 0) THEN
+
+                If (myid .eq. 0) THEN
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size must divide evenly into nrec.'
+                    Write(6,*)'   Cache_size: ', self%cache_size
+                    Write(6,*)'   nrec      : ', self%rec_per_file
+                    Write(6,*)'   Caching has been deactivated for ', self%file_prefix
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+                ENDIF
+                self%cache_size = 1
+            ENDIF
+        Endif
+
     End Subroutine set_file_info
 
     Subroutine OpenFile(self,iter,errcheck)
@@ -3187,12 +3236,10 @@ Contains
 
 
         modcheck = self%frequency*self%rec_per_file
-        icomp = 0
+
 
         icomp = iter - (self%cache_size-1)*self%frequency
-        if (icomp .ne. iter) Then
-            if (myid .eq. 0) Write(6,*)'iter,icomp: ', iter, icomp
-        endif
+
 
         imod = Mod(icomp,modcheck) 
 
@@ -3260,7 +3307,6 @@ Contains
                 Endif
             Endif
         Endif
-        if (myid .eq. 0) Write(6,*)'Current record on open: ', self%current_rec, self%cc
     End Subroutine OpenFile_Par
 
 
@@ -3926,7 +3972,6 @@ Contains
         CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r,      revg =.true.)
         CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,  revg=.true.)
         CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
-        if (myid .eq. 0) WRITE(6,*)'Point probe phi: ', point_probe_phi(1:5)
         CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels,  revg=.true.)
         CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
         CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices, revg=.true.)
