@@ -3223,7 +3223,7 @@ Contains
             self%cc = 1            
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
-                if (myid .eq. 0) Write(6,*)'Unable to create file!!: ',filename
+                if (self%master) Write(6,*)'Unable to create file!!: ',filename
             Endif
         Else
     		call MPI_FILE_OPEN(self%ocomm, filename, & 
@@ -3242,7 +3242,7 @@ Contains
 
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
-                if (myid .eq. 0) Then
+                if (self%master) Then
                 Write(6,*)'Failed to find needed file: ', filename
                 Write(6,*)'Partial diagnostic files are not currently supported.'
                 Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
