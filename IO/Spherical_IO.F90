@@ -95,7 +95,7 @@ Module Spherical_IO
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !  Variables used for cached output (currently only used for point probes)
         INTEGER :: cache_size = 1
-        INTEGER :: cc = 1  ! cache counter
+        INTEGER :: cc = 0  ! cache counter
         INTEGER, ALLOCATABLE :: iter_save(:)
         REAL*8 , ALLOCATABLE :: time_save(:)
 
@@ -176,6 +176,7 @@ Module Spherical_IO
     REAL*8 ::     point_probe_r_nrm(1:nprobemax)  = -3.0d0
     REAL*8 :: point_probe_theta_nrm(1:nprobemax)  = -3.0d0
     REAL*8 ::   point_probe_phi_nrm(1:nprobemax)  = -3.0d0
+    Integer :: point_probe_cache_size = 1
 
     Namelist /output_namelist/ mem_friendly, &
         ! All output types require that a minimal set of information is specified 
@@ -195,7 +196,9 @@ Module Spherical_IO
                sph_mode_ell,             sph_mode_m,                      &
 
         shellslice_levels_nrm, shellspectra_levels_nrm, meridional_indices_nrm, &
-        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm
+        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm, &
+
+        point_probe_cache_size
 
 
     Integer :: integer_zero = 0
@@ -360,7 +363,7 @@ Contains
 
 
         Call       Point_Probes%Init(averaging_level,compute_q,myid, &
-            & 63,values = point_probe_values)
+            & 63,values = point_probe_values, cache_size = point_probe_cache_size)
 
 
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
@@ -695,7 +698,7 @@ Contains
         q_ind = Point_Probes%ind
         npts = Point_Probes%npts_at_rowrank(my_row_rank)
         IF (Point_Probes%begin_output) THEN
-            If (npts .gt. 0) THEN
+            If ((npts .gt. 0) .and. (Point_Probes%cc .eq. 0)) THEN
                 ALLOCATE( probe_outputs( &
                      1:Point_Probes%nq, 1:Point_Probes%cache_size,1:npts) )
                 probe_outputs(:,:,:) = 0.0d0
@@ -703,7 +706,7 @@ Contains
         ENDIF
 
         IF (npts .gt. 0) THEN
-            cache_ind = Point_Probes%cc
+            cache_ind = Point_Probes%cc+1
             ind = 1
             ! We stripe phi,r,theta (just as qty's indexing)
 
@@ -740,7 +743,7 @@ Contains
 		INTEGER :: i, j, k,qq, p, sizecheck, t
 		INTEGER :: n, nn, this_nshell, nq, probe_tag
 		INTEGER :: your_theta_min, your_theta_max, your_ntheta, your_id
-		INTEGER :: nelem, buffsize, sirq, nrirqs, inds(1:3)
+		INTEGER :: nelem, buffsize, sirq, nrirqs, inds(1:3), buffsize2
         INTEGER :: file_pos, funit, error, dims(1:4), first_shell_rank        
         INTEGER :: ierr, pcount, ichunk, ii, jj, ind, nt_row, rind, rslab_size
 		INTEGER :: mstatus(MPI_STATUS_SIZE)
@@ -748,11 +751,8 @@ Contains
         INTEGER :: probe_nr, probe_nt, probe_np, nvals, this_nt, tind
         Real*8, Allocatable :: probe_vals(:)
         INTEGER, Allocatable :: level_inds(:), rirqs(:)
-        Point_Probes%time_save(Point_Probes%cc) = simtime
-        Point_Probes%iter_save(Point_Probes%cc) = this_iter
-        !WRite(6,*)'IN Write'
-        If (Point_Probes%cache_size .eq. Point_Probes%cc) Then
-        !WRITE(6,*)'In conditional', my_row_rank, my_column_rank
+
+
         nq      = Point_Probes%nq
         ncache  = Point_Probes%cache_size
         probe_tag = Point_Probes%mpi_tag
@@ -816,7 +816,7 @@ Contains
             ENDIF
             Call IWaitAll(irqc,rirqs(1:irqc))  ! wait on the sends to come through
 
-            ! Checked down to here:  2:00 p.m., April 14, 2017
+
 
             !At this point, buff is striped phi,r,theta.  We need to stripe it phi,theta,r
             Allocate(slice(1:nq,1:ncache,1:nphi_probe))
@@ -829,7 +829,6 @@ Contains
                 this_nt = Point_Probes%probe_nt_atrank(nn)
                 IF (this_nt .gt. 0) THEN
                     !Iterate through the receive buffer, grabbing one r-theta combination at a time
-                    !tind = 1
                     Do j = 1, this_nt
                         rind = 0
                         Do i = 1, this_nr
@@ -869,7 +868,7 @@ Contains
 
 		Endif
 
-        ! Check to here:  2:15 p.m., April 14, 2017
+
 
 
         ! Communication is complete.  Now we open the file using MPI-IO
@@ -951,7 +950,7 @@ Contains
             qdisp = probe_nr*probe_nt*probe_np*8
             full_disp = qdisp*nq+12  ! 12 is for the simtime+iteration at the end
             disp = hdisp+full_disp*(Point_Probes%current_rec-ncache)
-            Write(6,*) 'disp is: ', disp
+            !Write(6,*) 'disp is: ', disp, full_disp, Point_Probes%current_rec-ncache
             buffsize = Point_Probes%npts_at_colrank(my_column_rank)
             ! The file is striped with time step slowest, followed by q
 
@@ -966,26 +965,27 @@ Contains
             my_pdisp = pcount*8
 
             Do j = 1, ncache
-
+                !Write(6,*)'disp is: ', disp, my_pdisp
 
                 Do i = 1, nq
-                    new_disp = disp+full_disp*(j-1)+qdisp*(i-1)+my_pdisp                
+                    new_disp = disp+qdisp*(i-1)+my_pdisp                
                     Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
                     
                     Call MPI_FILE_WRITE(funit, row_probes(1,i,j), buffsize, & 
                            MPI_DOUBLE_PRECISION, mstatus, ierr)
                 Enddo
-                !tdisp = hdisp+full_disp*(Point_Probes%current_rec-ncache+j)
-                tdisp = disp+(full_disp*j)-12
-                !tdisp = tdisp-12
+
+                tdisp = disp+full_disp-12
+
                 Call MPI_File_Seek(funit,tdisp,MPI_SEEK_SET,ierr)
 
 
                 If (Point_Probes%master) Then
-                    buffsize = 1
-                    Call MPI_FILE_WRITE(funit, Point_Probes%time_save(j), buffsize, & 
+                    buffsize2 = 1
+                    !Write(6,*)'Writing.. : ', Point_Probes%time_save(j), Point_Probes%iter_save(j), tdisp
+                    Call MPI_FILE_WRITE(funit, Point_Probes%time_save(j), buffsize2, & 
                            MPI_DOUBLE_PRECISION, mstatus, ierr)
-                    Call MPI_FILE_WRITE(funit, Point_Probes%iter_save(j), buffsize, & 
+                    Call MPI_FILE_WRITE(funit, Point_Probes%iter_save(j), buffsize2, & 
                            MPI_INTEGER, mstatus, ierr)
                 Endif
 
@@ -997,8 +997,6 @@ Contains
 
         If (my_row_rank .eq. 0) Call Point_Probes%closefile_par()
 
-        Endif ! Check cache counter
-        Call Point_Probes%AdvanceCC()    ! NOTE:  THERE MAY BE AN ISSUE WITH THE RECORD COUNTER WHEN THE FILE IS OPENED/CLOSED DUE TO THE CACHING.  Last thing to Check before debugging.
 	End Subroutine Write_Point_Probes
 
 
@@ -2373,8 +2371,12 @@ Contains
         !    If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
         !Endif
 	    If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
-            Call Write_Point_Probes(iter,sim_time)
-
+            Point_Probes%time_save(Point_Probes%cc+1) = sim_time
+            Point_Probes%iter_save(Point_Probes%cc+1) = iter
+            If ((Point_Probes%cache_size-1) .eq. Point_Probes%cc) Then
+                Call Write_Point_Probes(iter,sim_time)
+            Endif            
+            Call Point_Probes%AdvanceCC() 
         Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
@@ -3010,7 +3012,7 @@ Contains
         Implicit None
         Class(DiagnosticInfo) :: self
         self%cc = self%cc+1
-        self%cc = MOD(self%cc,self%cache_size)+1
+        self%cc = MOD(self%cc,self%cache_size)
     End Subroutine AdvanceCC
 
     Subroutine Diagnostic_Output_Reset(self)
@@ -3178,29 +3180,37 @@ Contains
         Integer, Intent(InOut) :: ierr
         Character*8 :: iterstring
         Character*120 :: filename
-        Integer :: modcheck, imod, file_iter, next_iter, ibelong
+        Integer :: modcheck, imod, file_iter, next_iter, ibelong, icomp
         Integer :: buffsize, funit
         Integer :: mstatus(MPI_STATUS_SIZE)
         integer(kind=MPI_OFFSET_KIND) :: disp
 
 
         modcheck = self%frequency*self%rec_per_file
-        imod = Mod(iter,modcheck) 
+        icomp = 0
+
+        icomp = iter - (self%cache_size-1)*self%frequency
+        if (icomp .ne. iter) Then
+            if (myid .eq. 0) Write(6,*)'iter,icomp: ', iter, icomp
+        endif
+
+        imod = Mod(icomp,modcheck) 
 
         if (imod .eq. 0) then
             ibelong = iter
         else
-            ibelong = iter-imod+modcheck    ! This iteration belongs in a file with number= ibelong
+            ibelong = icomp-imod+modcheck    ! This iteration belongs in a file with number= ibelong
         endif
 
         write(iterstring,i_ofmt) ibelong
         filename = trim(local_file_path)//trim(self%file_prefix)//trim(iterstring)
 
+
         If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
             
 
-    		call MPI_FILE_OPEN(self%ocomm, filename, & 
+    	    Call MPI_FILE_OPEN(self%ocomm, filename, & 
                  MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
                  MPI_INFO_NULL, funit, ierr) 
             self%file_unit = funit
@@ -3219,8 +3229,9 @@ Contains
             Endif
 
             
-            self%current_rec = 1
-            self%cc = 1            
+            self%current_rec = 1+self%cc
+            
+                       
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
                 if (self%master) Write(6,*)'Unable to create file!!: ',filename
@@ -3238,7 +3249,7 @@ Contains
             !call MPI_FILE_READ(self%file_unit, self%current_rec, 1, MPI_INTEGER, & 
             !mstatus, ierr)
 
-            self%current_rec = self%current_rec+(self%cc-1)
+            self%current_rec = self%current_rec+1+self%cc
 
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
@@ -3249,7 +3260,7 @@ Contains
                 Endif
             Endif
         Endif
-
+        if (myid .eq. 0) Write(6,*)'Current record on open: ', self%current_rec, self%cc
     End Subroutine OpenFile_Par
 
 
@@ -3274,9 +3285,9 @@ Contains
         Class(DiagnosticInfo) :: self
         disp = 8
         Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
-            If (ierr .ne. 0) Then
-                Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid, self%file_prefix
-            Endif
+        If (ierr .ne. 0) Then
+            Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid, self%file_prefix
+        Endif
         If (self%master) Then  
 
             buffsize = 1

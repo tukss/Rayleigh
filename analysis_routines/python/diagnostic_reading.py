@@ -405,10 +405,11 @@ class Point_Probe:
         print nr,ntheta,nphi,nq
         print 'nrec is: ', nrec
         hsize = (nr+ntheta+nphi)*12 + nq*4 + 8 + 16+4
+        print 'hsize is: ', hsize
         recsize = nq*nphi*ntheta*nr*8 + 12
 
         print 'expected filesize (bytes): ', recsize*nrec+hsize
-        print 'single rec size (bytes): ', recsize+hsize
+        print 'single rec size (bytes): ', recsize
 
         self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
 
@@ -440,6 +441,9 @@ class Point_Probe:
             self.vals[:,:,:,:,i] = tmp
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        print 'iters: ', self.iters
+        print 'times: ', self.time
         maxq = 801
         lut = np.zeros(maxq)+int(1000)
         self.lut = lut.astype('int32')
