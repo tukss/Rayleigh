@@ -786,6 +786,126 @@ class ShellSlice:
 
         fd.close()
 
+class SPH_Modes:
+    """Rayleigh Shell Spectrum Structure
+    ----------------------------------
+    self.niter                                    : number of time steps
+    self.nq                                       : number of diagnostic quantities output
+    self.nr                                       : number of shell slices output
+    self.nell                                     : number of ell values
+    self.nm                                       : number of m values
+    self.lmax                                     : maximum spherical harmonic degree l
+    self.mmax                                     : maximum spherical harmonic degree m
+    self.qv[0:nq-1]                               : quantity codes for the diagnostics output
+    self.radius[0:nr-1]                           : radii of the shell slices output
+    self.inds[0:nr-1]                             : radial indices of the shell slices output
+    self.vals[0:lmax,0:mmax,0:nr-1,0:nq-1,0:niter-1] 
+                                                  : The complex spectra of the shells output 
+    self.lpower[0:lmax,0:nr-1,0:nq-1,0:niter-1,3]    : The power as a function of ell, integrated over m
+                                                     :  index indicates (0:total,1:m=0, 2:total-m=0 power)
+    self.iters[0:niter-1]                         : The time step numbers stored in this output file
+    self.time[0:niter-1]                          : The simulation time corresponding to each time step
+    self.version                                  : The version code for this particular output (internal use)
+    self.lut                                      : Lookup table for the different diagnostics output
+    """
+
+    def print_info(self):
+        """ Prints all metadata associated with the shell-spectra object."""
+        print 'version  : ', self.version
+        print 'niter    : ', self.niter
+        print 'nq       : ', self.nq
+        print 'nr       : ', self.nr
+        print 'nell     : ', self.nell
+        print 'nm       : ', self.nm
+        print 'lmax     : ', self.lmax
+        print 'mmax     : ', self.mmax
+        print '.......................'
+        print 'radius   : ', self.radius
+        print '.......................'
+        print 'inds     : ', self.inds
+        print '.......................'
+        print 'iters    : ', self.iters
+        print '.......................'
+        print 'time     : ', self.time
+        print '.......................'
+        print 'qv       : ', self.qv
+
+
+    def __init__(self,filename='none',path='SPH_Mode_Samples/'):
+        """
+           filename  : The reference state file to read.
+           path      : The directory where the file is located (if full path not in filename
+        """
+        if (filename == 'none'):
+            the_file = path+'00000001'
+        else:
+            the_file = path+filename
+        fd = open(the_file,'rb')
+        # We read an integer to assess which endian the file was written in...
+        bs = check_endian(fd,314,'int32')
+        version = swapread(fd,dtype='int32',count=1,swap=bs)
+        nrec = swapread(fd,dtype='int32',count=1,swap=bs)
+        nell = swapread(fd,dtype='int32',count=1,swap=bs)
+        nr = swapread(fd,dtype='int32',count=1,swap=bs)
+        nq = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        self.niter = nrec
+        self.nq = nq
+        self.nr = nr
+        self.nell = nell
+
+
+        self.qv = np.reshape(swapread(fd,dtype='int32',count=nq,swap=bs),(nq), order = 'F')
+        self.radius = np.reshape(swapread(fd,dtype='float64',count=nr,swap=bs),(nr), order = 'F')
+        self.inds = np.reshape(swapread(fd,dtype='int32',count=nr,swap=bs),(nr), order = 'F')
+        self.lvals = np.reshape(swapread(fd,dtype='int32',count=nell,swap=bs),(nell), order = 'F')
+        lmax = np.max(self.lvals)
+        nm = lmax+1
+        print self.lvals
+        print lmax, nm
+        print self.inds
+        self.vals  = np.zeros((nm,nell,nr,nq,nrec),dtype='complex128')
+        
+        self.iters = np.zeros(nrec,dtype='int32')
+        self.time  = np.zeros(nrec,dtype='float64')
+        self.version = version
+        for i in range(nrec):
+            for qv in range(nq):
+                for p in range(2):
+                    for lv in range(nell):
+                        lval = self.lvals[lv]
+                        nm = lval+1
+                        tmp = np.reshape(swapread(fd,dtype='float64',count=nr*nm,swap=bs),(nm,nr), order = 'F')
+                        print tmp
+                        if (p == 0):
+                            self.vals[0:nm,lv,0:nr,qv,i].real = tmp
+                        else:
+                            self.vals[0:nm,lv,0:nr,qv,i].imag = tmp
+
+            self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
+            self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
+
+        if (self.version < 4):
+            # The m>0 --power-- is too high by a factor of 2
+            # We divide the --complex amplitude-- by sqrt(2)
+            sqrttwo = np.sqrt(2)
+            for k in range(nrec):
+                for q in range(nq):
+                    for j in range(nr):
+                        for m in range(1,nm):
+                            self.vals[m,:,j,q,k] = self.vals[m,:,j,q,k]/sqrttwo
+
+        maxq = 801
+        lut = np.zeros(maxq)+int(1000)
+        self.lut = lut.astype('int32')
+        for i,q in enumerate(self.qv):
+            self.lut[q] = i
+        fd.close()
+
+
+
+
+
 class ShellSpectra:
     """Rayleigh Shell Spectrum Structure
     ----------------------------------
