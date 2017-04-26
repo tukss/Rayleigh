@@ -4314,14 +4314,7 @@ Contains
                 sph_mode_nmode = sph_mode_nmode+(sph_mode_ell(i)+1)
             Enddo
         ENDIF
-        IF (myid .eq. 0) THEN
-        !    Write(6,*)'Checking SPH radii: ', sph_mode_levels(1:10)
-        !    Write(6,*)'norm              : ', sph_mode_levels_nrm(1:10)
-        !    Write(6,*)' '
-            Write(6,*)'Checking SPH ell: ', sph_mode_ell(1:sph_mode_nell)
-            WRITE(6,*)'nell is: ', sph_mode_nell
-            write(6,*)'nmode is: ', sph_mode_nmode
-        ENDIF
+
     END SUBROUTINE PROCESS_COORDINATES
 
     SUBROUTINE Interpret_Indices(indices_nrm, coord_grid, indices, revg)
