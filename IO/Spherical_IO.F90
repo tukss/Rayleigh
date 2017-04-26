@@ -1157,7 +1157,7 @@ Contains
             funit = SPH_Mode_Samples%file_unit
             current_rec = SPH_Mode_Samples%current_rec  ! Note that we have to do this after the file is opened
             If  ( (current_rec .eq. 1) .and. (SPH_Mode_Samples%master) ) Then                
-                !Write(6,*)'I am master: ', my_column_rank
+
                 dims(1) =  sph_mode_nell
                 dims(2) =  nlevels
                 dims(3) =  nq_shell
@@ -1271,16 +1271,6 @@ Contains
 
                 !Stripe the receiver buffer into the spectra buffer
 
-          
-                !Do mp = 1,lp1
-                !    m = pfi%inds_3s(mp)
-                !    Do p = 1, 2  ! Real and imaginary parts
-                !        Do r = 1, my_nlevels   
-                !            all_spectra(m:lmax,m,r,1,p) = buff(m:lmax,r,1,p,mp)  
-                !        Enddo
-                !    Enddo
-                !Enddo
-
                 !Modified stripe (we stripe m, ell  vs. ell, m as in shell_spectra)
 
                 Do mp = 1,lp1
@@ -1293,27 +1283,24 @@ Contains
                 Enddo
 
 
-                !Write the slice we just received
-                !Do p = 1, 2
-                !    new_disp = disp+my_rdisp +(p-1)*qsize*nq_shell +(qindex-1)*qsize        
-                !    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
-                !    
-                !    Call MPI_FILE_WRITE(funit, all_spectra(0,0,1,1,p), buffsize, & 
-                !           MPI_DOUBLE_PRECISION, mstatus, ierr)
-                !Enddo
 
 
-                !Modified Write
+
+
                 Do p = 1, 2
-                    new_disp = disp+my_rdisp +(p-1)*qsize*nq_shell +(qindex-1)*qsize        
+                    new_disp = disp+  (qindex-1)*qsize*2 +(p-1)*qsize +my_rdisp  
                     Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
-
+                    Do r = 1, my_nlevels
                     Do lv = 1, SPH_MODE_NELL                    
                         lval = SPH_MODE_ELL(lv)
-                        buffsize = (lval+1)*my_nlevels
-                        Call MPI_FILE_WRITE(funit, all_spectra(0,lval,1,1,p), buffsize, & 
+                        buffsize = lval+1
+                        !if ((lval .eq. 0)) Then
+                        !    Write(6,*)p, myid, my_rdisp, all_spectra(0,lval,r,1,p)
+                        !Endif
+                        Call MPI_FILE_WRITE(funit, all_spectra(0,lval,r,1,p), buffsize, & 
                                MPI_DOUBLE_PRECISION, mstatus, ierr)
                     ENDDO
+                    Enddo
                 Enddo
 
             Else

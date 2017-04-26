@@ -872,15 +872,20 @@ class SPH_Modes:
         for i in range(nrec):
             for qv in range(nq):
                 for p in range(2):
-                    for lv in range(nell):
-                        lval = self.lvals[lv]
-                        nm = lval+1
-                        tmp = np.reshape(swapread(fd,dtype='float64',count=nr*nm,swap=bs),(nm,nr), order = 'F')
-                        print tmp
-                        if (p == 0):
-                            self.vals[0:nm,lv,0:nr,qv,i].real = tmp
-                        else:
-                            self.vals[0:nm,lv,0:nr,qv,i].imag = tmp
+                    for rr in range(nr):
+                        for lv in range(nell):
+                            lval = self.lvals[lv]
+                            nm = lval+1
+                            tmp = np.reshape(swapread(fd,dtype='float64',count=nm,swap=bs),(nm), order = 'F')
+
+                            if (p == 0):
+                                self.vals[0:nm,lv,rr,qv,i].real = tmp
+                                if (lval == 0):
+                                    print 'real: ', tmp
+                            else:
+                                self.vals[0:nm,lv,rr,qv,i].imag = tmp
+                                if (lval == 0):
+                                    print 'imag: ', tmp
 
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
