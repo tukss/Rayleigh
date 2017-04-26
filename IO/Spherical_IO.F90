@@ -487,7 +487,7 @@ Contains
         fdir = 'Meridional_Slices/'
         Call Meridional_Slices%set_file_info(meridslice_version,meridional_nrec,meridional_frequency,fdir) 
 
-        fdir = 'SPH_Mode_Samples/'
+        fdir = 'SPH_Modes/'
         Call SPH_Mode_Samples%set_file_info(sphmode_version,sph_mode_nrec,sph_mode_frequency,fdir) 
 
         !Point-wise Probes

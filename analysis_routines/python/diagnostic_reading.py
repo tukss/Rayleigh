@@ -793,45 +793,23 @@ class SPH_Modes:
     self.nq                                       : number of diagnostic quantities output
     self.nr                                       : number of shell slices output
     self.nell                                     : number of ell values
-    self.nm                                       : number of m values
-    self.lmax                                     : maximum spherical harmonic degree l
-    self.mmax                                     : maximum spherical harmonic degree m
     self.qv[0:nq-1]                               : quantity codes for the diagnostics output
     self.radius[0:nr-1]                           : radii of the shell slices output
     self.inds[0:nr-1]                             : radial indices of the shell slices output
-    self.vals[0:lmax,0:mmax,0:nr-1,0:nq-1,0:niter-1] 
-                                                  : The complex spectra of the shells output 
-    self.lpower[0:lmax,0:nr-1,0:nq-1,0:niter-1,3]    : The power as a function of ell, integrated over m
-                                                     :  index indicates (0:total,1:m=0, 2:total-m=0 power)
+    self.lvals[0:nell-1]                          : ell-values output
+    self.vals[0:lmax,0:nell-1,0:nr-1,0:nq-1,0:niter-1] 
+                                                  : The complex spectra of the SPH modes output
+                                                  :  (here lmax denotes the maximum l-value output; not the simulation lmax)
     self.iters[0:niter-1]                         : The time step numbers stored in this output file
     self.time[0:niter-1]                          : The simulation time corresponding to each time step
     self.version                                  : The version code for this particular output (internal use)
     self.lut                                      : Lookup table for the different diagnostics output
     """
 
-    def print_info(self):
-        """ Prints all metadata associated with the shell-spectra object."""
-        print 'version  : ', self.version
-        print 'niter    : ', self.niter
-        print 'nq       : ', self.nq
-        print 'nr       : ', self.nr
-        print 'nell     : ', self.nell
-        print 'nm       : ', self.nm
-        print 'lmax     : ', self.lmax
-        print 'mmax     : ', self.mmax
-        print '.......................'
-        print 'radius   : ', self.radius
-        print '.......................'
-        print 'inds     : ', self.inds
-        print '.......................'
-        print 'iters    : ', self.iters
-        print '.......................'
-        print 'time     : ', self.time
-        print '.......................'
-        print 'qv       : ', self.qv
 
 
-    def __init__(self,filename='none',path='SPH_Mode_Samples/'):
+
+    def __init__(self,filename='none',path='SPH_Modes/'):
         """
            filename  : The reference state file to read.
            path      : The directory where the file is located (if full path not in filename
@@ -861,9 +839,9 @@ class SPH_Modes:
         self.lvals = np.reshape(swapread(fd,dtype='int32',count=nell,swap=bs),(nell), order = 'F')
         lmax = np.max(self.lvals)
         nm = lmax+1
-        print self.lvals
-        print lmax, nm
-        print self.inds
+        #print self.lvals
+        #print lmax, nm
+        #print self.inds
         self.vals  = np.zeros((nm,nell,nr,nq,nrec),dtype='complex128')
         
         self.iters = np.zeros(nrec,dtype='int32')
@@ -880,12 +858,12 @@ class SPH_Modes:
 
                             if (p == 0):
                                 self.vals[0:nm,lv,rr,qv,i].real = tmp
-                                if (lval == 0):
-                                    print 'real: ', tmp
+                                #if (lval == 0):
+                                #    print 'real: ', tmp
                             else:
                                 self.vals[0:nm,lv,rr,qv,i].imag = tmp
-                                if (lval == 0):
-                                    print 'imag: ', tmp
+                                #if (lval == 0):
+                                #    print 'imag: ', tmp
 
             self.time[i] = swapread(fd,dtype='float64',count=1,swap=bs)
             self.iters[i] = swapread(fd,dtype='int32',count=1,swap=bs)
