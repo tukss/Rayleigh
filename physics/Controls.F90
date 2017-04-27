@@ -68,7 +68,7 @@ Module Controls
     Real*8  :: min_time_step = 1.0d-13
     Integer :: chk_type = 1                    ! Set to 2 for memory friendly IO (WRITE).  In development
     Integer :: read_chk_type = 1               ! Same, but (READ)
-    Integer :: diagnostic_reboot_interval = -1
+    Integer :: diagnostic_reboot_interval = 10000000
     Integer :: new_iteration = 0
     Namelist /Temporal_Controls_Namelist/ alpha_implicit, max_iterations, check_frequency, &
                 & cflmax, cflmin, max_time_step,chk_type, diagnostic_reboot_interval, min_time_step, &
@@ -105,7 +105,7 @@ Contains
 
         !Set default for diagnostic_reboot_interval (if necessary)
         If (diagnostic_reboot_interval .le. 0) Then
-            diagnostic_reboot_interval = check_frequency
+            diagnostic_reboot_interval = checkpoint_interval
         Endif
 
         !Initialize the stdout buffer -- by default, write to unit 6 with frequency of 1
