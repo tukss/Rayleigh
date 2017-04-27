@@ -655,6 +655,32 @@ Module Diagnostics_Base
 
     Logical :: azimuthal_mean = .true. ! when false, the m0_values are overwritten with the ell0_values
 
+    !///////////////////////////////////////////////////////////////////////////
+    ! A special buffer used for holding second derivatives at output time
+    Type(SphericalBuffer) :: d2buffer
+    ! ell0 and m0 values of those variables stored in d2buffer
+    Real*8, Allocatable :: d2_ell0(:,:), d2_m0(:,:,:)
+
+    ! This array will hold fluctuating quantities from the d2buffer { q - <q>}      
+    Real*8, Allocatable :: d2_fbuffer(:,:,:,:)	
+
+
+    ! Indices within the d2buffer
+    Integer :: dvrdrdr, dvrdtdt, dvrdpdp, dvrdrdt, dvrdrdp, dvrdtdp
+
+    Integer :: dvtdrdr, dvtdtdt, dvtdpdp, dvtdrdt, dvtdrdp, dvtdtdp
+    Integer :: dvpdrdr, dvpdtdt, dvpdpdp, dvpdrdt, dvpdrdp, dvpdtdp
+
+    Integer :: dtdrdr, dtdtdt, dtdpdp, dtdrdt, dtdrdp, dtdtdp
+    Integer :: dpdrdr, dpdtdt, dpdpdp, dpdrdt, dpdrdp, dpdtdp
+
+    Integer :: dbrdrdr, dbrdtdt, dbrdpdp, dbrdrdt, dbrdrdp, dbrdtdp
+    Integer :: dbtdrdr, dbtdtdt, dbtdpdp, dbtdrdt, dbtdrdp, dbtdtdp
+    Integer :: dbpdrdr, dbpdtdt, dbpdpdp, dbpdrdt, dbpdrdp, dbpdtdp
+
+    ! Support variables
+    Integer :: dd_vr, dd_vt, dd_vp, dd_t, dd_p
+    Integer :: dd_dvrdr, dd_dvtdr, dd_dvpdr, dd_dtdr, dd_dpdr
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
