@@ -105,7 +105,7 @@ Contains
 
         !Set default for diagnostic_reboot_interval (if necessary)
         If (diagnostic_reboot_interval .le. 0) Then
-            diagnostic_reboot_interval = check_frequency
+            diagnostic_reboot_interval = checkpoint_interval
         Endif
 
         !Initialize the stdout buffer -- by default, write to unit 6 with frequency of 1
