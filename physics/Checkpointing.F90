@@ -1098,10 +1098,10 @@ Contains
 		Call chktmp%deconstruct('s2a')
         If (ItIsTimeForAQuickSave) Then
             write(autostring,'(i2.2)') (quicksave_num+1) !quick save number starts at 1
-            checkpoint_prefix = 'Checkpoints/quicksave_'//trim(autostring)
+            checkpoint_prefix = trim(my_path)//'Checkpoints/quicksave_'//trim(autostring)
         Else
             write(iterstring,'(i8.8)') iteration
-            checkpoint_prefix = 'Checkpoints/'//trim(iterstring)
+            checkpoint_prefix = trim(my_path)//'Checkpoints/'//trim(iterstring)
         Endif
 
 		Call Write_Spectral_Field3D(myarr,1,wchar)
