@@ -9,6 +9,8 @@ Module Diagnostics_Interface
     Use Math_Constants
     Use Diagnostics_Base
 
+    Use Diagnostics_Second_Derivatives
+
     Use Diagnostics_Velocity_Field
     Use Diagnostics_Magnetic_Field
     Use Diagnostics_Energies
@@ -144,6 +146,8 @@ Contains
             Call Compute_Fluctuations(buffer)
         
 
+            Call Compute_Second_Derivatives(buffer)
+
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
@@ -245,6 +249,9 @@ Contains
         !DeAllocate(rweights)
         
         !Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
+
+
+        Call Initialize_Second_Derivatives()
 
         Call Initialize_Diagnostics_Buffer()
 

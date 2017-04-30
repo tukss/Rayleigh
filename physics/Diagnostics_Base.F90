@@ -678,9 +678,7 @@ Module Diagnostics_Base
     Integer :: dbtdrdr, dbtdtdt, dbtdpdp, dbtdrdt, dbtdrdp, dbtdtdp
     Integer :: dbpdrdr, dbpdtdt, dbpdpdp, dbpdrdt, dbpdrdp, dbpdtdp
 
-    ! Support variables
-    Integer :: dd_vr, dd_vt, dd_vp, dd_t, dd_p
-    Integer :: dd_dvrdr, dd_dvtdr, dd_dvpdr, dd_dtdr, dd_dpdr
+
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
