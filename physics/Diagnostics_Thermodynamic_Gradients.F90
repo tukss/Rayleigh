@@ -16,8 +16,6 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     Integer :: r,k, t
     ! Here we compute the gradient of pressure and entropy/temperature
 
-    ! April 30, 2017: NOTE:  It looks as though dtdt and dtdp variables already have a 1/r
-    ! correcting by adding *radius and removing 1/radius below
 
     !////////////////////////////////////////
     !       Entropy
@@ -69,21 +67,21 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     ! Entropy:  theta derivatives
     If (compute_quantity(entropy_dtheta)) Then
         DO_PSI
-            qty(PSI) = buffer(PSI,dtdt)*radius(r)
+            qty(PSI) = buffer(PSI,dtdt)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_p_dtheta)) Then
         DO_PSI
-            qty(PSI) = fbuffer(PSI,dtdt)*radius(r)
+            qty(PSI) = fbuffer(PSI,dtdt)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_m_dtheta)) Then
         DO_PSI
-            qty(PSI) = m0_values(PSI2,dtdt)*radius(r)
+            qty(PSI) = m0_values(PSI2,dtdt)
         END_DO
         Call Add_Quantity(qty)
     Endif
@@ -91,21 +89,21 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     ! Entropy:  phi derivatives
     If (compute_quantity(entropy_dphi)) Then
         DO_PSI
-            qty(PSI) = buffer(PSI,dtdp)*radius(r)
+            qty(PSI) = buffer(PSI,dtdp)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_p_dphi)) Then
         DO_PSI
-            qty(PSI) = fbuffer(PSI,dtdp)*radius(r)
+            qty(PSI) = fbuffer(PSI,dtdp)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_m_dphi)) Then
         DO_PSI
-            qty(PSI) = m0_values(PSI2,dtdp)*radius(r)
+            qty(PSI) = m0_values(PSI2,dtdp)
         END_DO
         Call Add_Quantity(qty)
     Endif
@@ -113,21 +111,21 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     ! Entropy:  (1/r)*theta derivatives
     If (compute_quantity(entropy_dtr)) Then
         DO_PSI
-            qty(PSI) = buffer(PSI,dtdt) !*One_Over_R(r)
+            qty(PSI) = buffer(PSI,dtdt)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_p_dtr)) Then
         DO_PSI
-            qty(PSI) = fbuffer(PSI,dtdt) !*One_Over_R(r)
+            qty(PSI) = fbuffer(PSI,dtdt)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_m_dtr)) Then
         DO_PSI
-            qty(PSI) = m0_values(PSI2,dtdt) !*One_Over_R(r)
+            qty(PSI) = m0_values(PSI2,dtdt)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
@@ -135,21 +133,21 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     ! Entropy:  (1/{r sintheta}) * phi derivatives
     If (compute_quantity(entropy_dprs)) Then
         DO_PSI
-            qty(PSI) = buffer(PSI,dtdp)*csctheta(t) !*One_Over_R(r)
+            qty(PSI) = buffer(PSI,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_p_dprs)) Then
         DO_PSI
-            qty(PSI) = fbuffer(PSI,dtdp)*csctheta(t) !*One_Over_R(r)
+            qty(PSI) = fbuffer(PSI,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_m_dprs)) Then
         DO_PSI
-            qty(PSI) = m0_values(PSI2,dtdp)*csctheta(t) !*One_Over_R(r)
+            qty(PSI) = m0_values(PSI2,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif

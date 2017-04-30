@@ -158,9 +158,10 @@ Contains
 		Do t = my_theta%min, my_theta%max
 			Do r = my_r%min, my_r%max
 				Do k =1, n_phi
-				wsp%p3b(k,r,t,tvar) = -wsp%p3a(k,r,t,vr)*wsp%p3a(k,r,t,dtdr) &
-									 - wsp%p3a(k,r,t,dtdt)*wsp%p3a(k,r,t,vtheta) &
-									 - wsp%p3a(k,r,t,vphi)*wsp%p3a(k,r,t,dtdp)*csctheta(t)
+				wsp%p3b(k,r,t,tvar) = -wsp%p3a(k,r,t,vr)*wsp%p3a(k,r,t,dtdr)     &
+                                     - one_over_r(r)*(                           & 
+									   wsp%p3a(k,r,t,dtdt)*wsp%p3a(k,r,t,vtheta) &
+									 + wsp%p3a(k,r,t,vphi)*wsp%p3a(k,r,t,dtdp)*csctheta(t) )
 
 				Enddo
 			Enddo

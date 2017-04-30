@@ -78,14 +78,14 @@ Contains
     !   dvrdt   -- d(v_r)/dtheta
     !   dvtdt   -- d(v_theta)/dtheta
     !   dvpdt   -- d(v_phi)/dtheta
-    !   dtdt    -- (1/r)*d(temperature or entropy)/dtheta (<--- Note 1/r)
+    !   dtdt    -- d(temperature or entropy)/dtheta 
     !
 
     ! Phi Derivatives:
     !   dvrdp   --  d(v_r)/dphi
     !   dvtdp   --  d(v_theta)/dphi
     !   dvpdp   --  d(v_phi)/dphi
-    !   dtdp    --  (1/r)*d(temperature or entropy)/dphi   (<--- Note 1/r)
+    !   dtdp    --  d(temperature or entropy)/dphi
 
 
     ! If Magnetism is On, six additional variables are present:
