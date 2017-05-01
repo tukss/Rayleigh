@@ -146,8 +146,9 @@ Contains
             Call Compute_Fluctuations(buffer)
         
 
-            Call Compute_Second_Derivatives(buffer)
-
+            IF (need_second_derivatives) THEN
+                Call Compute_Second_Derivatives(buffer)
+            ENDIF
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
@@ -199,6 +200,10 @@ Contains
 
             DeAllocate(ell0_values,m0_values)
             Call DeAllocate_Fluctuations()
+            IF (need_second_derivatives) THEN
+                Call d2buffer%deconstruct('p3a')
+                DeAllocate(d2_ell0,d2_m0,d2_fbuffer)
+            ENDIF
         Endif  ! time_to_output(iteration)
     End Subroutine PS_Output
 

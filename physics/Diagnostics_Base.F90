@@ -667,7 +667,6 @@ Module Diagnostics_Base
 
     ! Indices within the d2buffer
     Integer :: dvrdrdr, dvrdtdt, dvrdpdp, dvrdrdt, dvrdrdp, dvrdtdp
-
     Integer :: dvtdrdr, dvtdtdt, dvtdpdp, dvtdrdt, dvtdrdp, dvtdtdp
     Integer :: dvpdrdr, dvpdtdt, dvpdpdp, dvpdrdt, dvpdrdp, dvpdtdp
 
@@ -678,7 +677,7 @@ Module Diagnostics_Base
     Integer :: dbtdrdr, dbtdtdt, dbtdpdp, dbtdrdt, dbtdrdp, dbtdtdp
     Integer :: dbpdrdr, dbpdtdt, dbpdpdp, dbpdrdt, dbpdrdp, dbpdtdp
 
-
+    Logical :: need_second_derivatives = .false.
 Contains
 
     Subroutine Generate_Diagnostic_Labels()
