@@ -162,12 +162,12 @@ Contains
 		Call Add_Derivative(weq,tvar,0, wsp%p1b,wsp%p1a,tvar)	! gravity
 
 		! Convert temperature to temperature/r (will take derivatives of this for advection)
-
-		Do m = 1, my_num_lm
-			Do i = 1, 2
-				wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)/radius(:)
-			Enddo
-		Enddo
+        ! As of April 30, 2017, we multiply by 1/r in physical space instead
+		!Do m = 1, my_num_lm
+		!	Do i = 1, 2
+		!		wsp%p1a(:,i,m,tvar) = wsp%p1a(:,i,m,tvar)/radius(:)
+		!	Enddo
+		!Enddo
 
 
 		!///////////////////////////////

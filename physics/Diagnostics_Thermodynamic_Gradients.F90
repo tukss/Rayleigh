@@ -16,6 +16,7 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     Integer :: r,k, t
     ! Here we compute the gradient of pressure and entropy/temperature
 
+
     !////////////////////////////////////////
     !       Entropy
 
@@ -132,21 +133,21 @@ Subroutine Compute_Thermodynamic_Gradients(buffer)
     ! Entropy:  (1/{r sintheta}) * phi derivatives
     If (compute_quantity(entropy_dprs)) Then
         DO_PSI
-            qty(PSI) = buffer(PSI,dtdp)*One_Over_R(r)*csctheta(t)
+            qty(PSI) = buffer(PSI,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_p_dprs)) Then
         DO_PSI
-            qty(PSI) = fbuffer(PSI,dtdp)*One_Over_R(r)*csctheta(t)
+            qty(PSI) = fbuffer(PSI,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif
 
     If (compute_quantity(entropy_m_dprs)) Then
         DO_PSI
-            qty(PSI) = m0_values(PSI2,dtdp)*One_Over_R(r)*csctheta(t)
+            qty(PSI) = m0_values(PSI2,dtdp)*csctheta(t)*One_Over_R(r)
         END_DO
         Call Add_Quantity(qty)
     Endif

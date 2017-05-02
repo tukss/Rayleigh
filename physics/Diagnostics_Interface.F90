@@ -9,6 +9,8 @@ Module Diagnostics_Interface
     Use Math_Constants
     Use Diagnostics_Base
 
+    Use Diagnostics_Second_Derivatives
+
     Use Diagnostics_Velocity_Field
     Use Diagnostics_Magnetic_Field
     Use Diagnostics_Energies
@@ -76,14 +78,14 @@ Contains
     !   dvrdt   -- d(v_r)/dtheta
     !   dvtdt   -- d(v_theta)/dtheta
     !   dvpdt   -- d(v_phi)/dtheta
-    !   dtdt    -- (1/r)*d(temperature or entropy)/dtheta (<--- Note 1/r)
+    !   dtdt    -- d(temperature or entropy)/dtheta 
     !
 
     ! Phi Derivatives:
     !   dvrdp   --  d(v_r)/dphi
     !   dvtdp   --  d(v_theta)/dphi
     !   dvpdp   --  d(v_phi)/dphi
-    !   dtdp    --  (1/r)*d(temperature or entropy)/dphi   (<--- Note 1/r)
+    !   dtdp    --  d(temperature or entropy)/dphi
 
 
     ! If Magnetism is On, six additional variables are present:
@@ -144,6 +146,9 @@ Contains
             Call Compute_Fluctuations(buffer)
         
 
+            !IF (need_second_derivatives) THEN
+            !    Call Compute_Second_Derivatives(buffer)
+            !ENDIF
 
             Allocate(qty(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
             Allocate(tmp1(1:n_phi, my_r%min:my_r%max, my_theta%min:my_theta%max))
@@ -195,6 +200,10 @@ Contains
 
             DeAllocate(ell0_values,m0_values)
             Call DeAllocate_Fluctuations()
+            !IF (need_second_derivatives) THEN
+            !    Call d2buffer%deconstruct('p3a')
+            !    DeAllocate(d2_ell0,d2_m0,d2_fbuffer)
+            !ENDIF
         Endif  ! time_to_output(iteration)
     End Subroutine PS_Output
 
@@ -245,6 +254,9 @@ Contains
         !DeAllocate(rweights)
         
         !Call Set_Spherical_IO_Integration_Weights(gl_weights, r_int_weights)
+
+
+        !Call Initialize_Second_Derivatives()
 
         Call Initialize_Diagnostics_Buffer()
 
