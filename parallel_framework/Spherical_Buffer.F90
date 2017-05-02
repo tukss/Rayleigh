@@ -437,7 +437,13 @@ Contains
         n1 = pfi%n1p
         np = pfi%ccomm%np
 
-        nfields = self%nf2b
+        !nfields = self%nf2b
+        ! In some situations, we may not want to transmit all fields
+        ! and the next buffer may have less space.
+        ! Use the smaller number of fields from this config and the next
+        ! to determine how many fields are sent
+        nfields = MIN(self%nf2b,self%nf1b)
+
 
         !/////
         ! First loading, should be relatively straight forward

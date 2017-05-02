@@ -21,8 +21,8 @@ Module Spherical_IO
     ! 9. Equatorial Slices
 
 	!////////////////////////////////////////////
-    Integer, Parameter :: nqmax=800, nshellmax=100, nmeridmax=100, nmodemax=100
-    Integer, Parameter :: nprobemax=1000
+    Integer, Parameter :: nqmax=800, nshellmax=2048, nmeridmax=8192, nmodemax=2048
+    Integer, Parameter :: nprobemax=4096
     Integer, Parameter :: endian_tag = 314      ! first 4 bits of each diagnostic file - used for assessing endianness on read-in
     Integer, Parameter :: reallybig = 90000000
     ! Each diagnostic type has an associated version number that is written to the file
@@ -38,7 +38,7 @@ Module Spherical_IO
     Integer, Parameter :: shellspectra_version = 3
     Integer, Parameter :: equslice_version = 1  
     Integer, Parameter :: meridslice_version = 1
-    Integer, Parameter :: sphmode_version =1
+    Integer, Parameter :: sphmode_version =3
     INTEGER, PARAMETER :: probe_version = 1
     Integer, Parameter :: full3d_version = 3    !currently unused
     Type, Public :: DiagnosticInfo
@@ -92,6 +92,13 @@ Module Spherical_IO
         INTEGER, Allocatable :: phi_indices(:)
         INTEGER :: nphi_indices
 
+        !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        !  Variables used for cached output (currently only used for point probes)
+        INTEGER :: cache_size = 1
+        INTEGER :: cc = 0  ! cache counter
+        INTEGER, ALLOCATABLE :: iter_save(:)
+        REAL*8 , ALLOCATABLE :: time_save(:)
+
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         ! Point-probe Variables
         INTEGER, ALLOCATABLE :: probe_p_global(:)  !phi-indces (phi is in-process at I/O time) 
@@ -101,7 +108,8 @@ Module Spherical_IO
         INTEGER :: probe_nt_local, probe_nt_global, probe_np_global !" " theta-indices & phi-indices
         INTEGER, ALLOCATABLE :: probe_nr_atrank(:)  ! Number of radial indices held by each column rank
         INTEGER, ALLOCATABLE :: probe_nt_atrank(:)  ! Number of theta indices held by each theta rank
-
+        INTEGER, ALLOCATABLE :: npts_at_colrank(:)  ! Number of points contained on a given row
+        INTEGER, ALLOCATABLE :: npts_at_rowrank(:)  ! Number of points contained at a given rank within a row
         !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         !Communicatory Info for parallel writing (if used)
         Integer :: ocomm, orank, onp
@@ -111,6 +119,7 @@ Module Spherical_IO
         Contains
         Procedure :: Init => Initialize_Diagnostic_Info
         Procedure :: AdvanceInd
+        Procedure :: AdvanceCC
         Procedure :: reset => diagnostic_output_reset
         Procedure :: Shell_Balance
         Procedure :: Scattered_Balance
@@ -142,8 +151,10 @@ Module Spherical_IO
     Integer :: full3d_values(1:nqmax) = -1, shellspectra_values(1:nqmax)=-1, shellspectra_levels(1:nshellmax)=-1
     Integer :: histo_values(1:nqmax) = -1, histo_levels(1:nshellmax)=-1
     Integer :: equatorial_values(1:nqmax) = -1, meridional_values(1:nqmax) = -1, meridional_indices(1:nmeridmax) = -1
-    Integer :: SPH_Mode_Values(1:nqmax), SPH_Mode_ell(1:nmodemax), SPH_Mode_m(1:nmodemax)
+    Integer :: SPH_Mode_Values(1:nqmax) = -1, SPH_Mode_ell(1:nmodemax) = -1, SPH_Mode_Levels(1:nshellmax) = -1
     INTEGER :: point_probe_values(1:nqmax)
+
+    INTEGER :: SPH_Mode_nell = 0, SPH_Mode_nmode = 0
 
     INTEGER :: point_probe_r(1:nprobemax) = -1, point_probe_theta(1:nprobemax) = -1, point_probe_phi(1:nprobemax) = -1
 
@@ -162,11 +173,13 @@ Module Spherical_IO
 
     REAL*8 ::   shellslice_levels_nrm(1:nshellmax) = -3.0d0
     REAL*8 :: shellspectra_levels_nrm(1:nshellmax) = -3.0d0
+    REAL*8 ::     sph_mode_levels_nrm(1:nshellmax) = -3.0d0
     REAL*8 ::  meridional_indices_nrm(1:nmeridmax) = -3.0d0
 
     REAL*8 ::     point_probe_r_nrm(1:nprobemax)  = -3.0d0
     REAL*8 :: point_probe_theta_nrm(1:nprobemax)  = -3.0d0
     REAL*8 ::   point_probe_phi_nrm(1:nprobemax)  = -3.0d0
+    Integer :: point_probe_cache_size = 1
 
     Namelist /output_namelist/ mem_friendly, &
         ! All output types require that a minimal set of information is specified 
@@ -183,19 +196,20 @@ Module Spherical_IO
         !Some outputs have additional information that needs to be specified
          meridional_indices,      shellslice_levels, shellspectra_levels, &
               point_probe_r,      point_probe_theta,     point_probe_phi, &
-               sph_mode_ell,             sph_mode_m,                      &
+               sph_mode_ell,                             sph_mode_levels, &
 
         shellslice_levels_nrm, shellspectra_levels_nrm, meridional_indices_nrm, &
-        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm
+        point_probe_r_nrm    ,     point_probe_phi_nrm,  point_probe_theta_nrm, &
+        sph_mode_levels_nrm,        point_probe_cache_size
 
 
     Integer :: integer_zero = 0
     Real*8, Private, Allocatable :: circumference(:,:), qty(:,:,:), f_of_r_theta(:,:)
     Real*8, Private, Allocatable :: azav_outputs(:,:,:), f_of_r(:), rdtheta_total(:)
     Real*8, Private, Allocatable :: shellav_outputs(:,:,:), globav_outputs(:), shell_slice_outputs(:,:,:,:)
-    Real*8, Private, Allocatable :: meridional_outputs(:,:,:,:)
+    Real*8, Private, Allocatable :: meridional_outputs(:,:,:,:), probe_outputs(:,:,:)
 
-    Type(SphericalBuffer) :: spectra_buffer
+    Type(SphericalBuffer) :: spectra_buffer, sph_sample_buffer
     Real*8, Private :: da_total, int_vol, int_dphi, int_rsquared_dr, int_sintheta_dtheta
     Real*8, Private, Allocatable :: sintheta_dtheta(:), rsquared_dr(:)
     Character*6, Public :: i_ofmt = '(i8.8)', i_pfmt = '(i5.5)'
@@ -264,7 +278,7 @@ Contains
 
 	Subroutine Initialize_Spherical_IO(rad_in,sintheta_in, rw_in, tw_in, costheta_in,file_path)
 		Implicit None
-		Integer :: k, fcount(3,2), ntot, fcnt, master_rank
+		Integer :: k, fcount(3,2), ntot, fcnt, master_rank, i
         Integer :: thmax, thmin, nth1, nth2, nn
 		Real*8, Intent(In) :: rad_in(:), sintheta_in(:), rw_in(:), tw_in(:), costheta_in(:)
         Character*120 :: fdir
@@ -347,16 +361,18 @@ Contains
             & 61,values = meridional_values, phi_inds = meridional_indices)
 
         Call       SPH_Mode_Samples%Init(averaging_level,compute_q,myid, &
-            & 62,values = sph_mode_values)
+            & 62,values = sph_mode_values, levels = sph_mode_levels)
+
 
         Call       Point_Probes%Init(averaging_level,compute_q,myid, &
-            & 63,values = point_probe_values)
+            & 63,values = point_probe_values, cache_size = point_probe_cache_size)
 
 
         !Outputs involve saving and communicating partial shell slices (e.g. Shell_Slices or spectra)
         !require an additional initialization step to load-balance the shells
         Call Shell_Slices%Shell_Balance()
         Call Shell_Spectra%Shell_Balance()
+        Call SPH_Mode_Samples%Shell_Balance()
         Call Point_Probes%Scattered_Balance(point_probe_r, point_probe_theta, &
             & point_probe_phi)
         if (my_row_rank .eq. 0) Then
@@ -368,11 +384,27 @@ Contains
             Call AZ_Averages%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0) ! 0 handles file headers etc. for AZ Average output
             Call Equatorial_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
             Call Meridional_Slices%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
-            Call Point_Probes%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,0)
+
             If (Shell_Spectra%nshell_r_ids .gt. 0) Then
                 master_rank = shell_spectra%shell_r_ids(1)
                 Call Shell_Spectra%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
             Endif
+
+            If (SPH_Mode_Samples%nshell_r_ids .gt. 0) Then
+                master_rank = SPH_Mode_Samples%shell_r_ids(1)
+                Call SPH_Mode_Samples%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank) 
+            Endif
+            If (maxval(point_probes%npts_at_colrank) .gt. 0) THEN
+
+                i = 0    
+                master_rank = -1
+                Do While (master_rank .eq. -1) 
+                    if (point_probes%npts_at_colrank(i) .gt. 0) master_rank = i
+                    i = i+1
+                Enddo
+
+                Call Point_Probes%init_ocomm(pfi%ccomm%comm,nproc1,my_column_rank,master_rank)
+            ENDIF
         Endif
         
         If (Shell_Spectra%nlevels .gt. 0) Then
@@ -388,6 +420,20 @@ Contains
            		Call spectra_buffer%init(field_count = fcount, config = 'p3b')		
             Endif	
         Endif 
+
+        If (SPH_Mode_Samples%nlevels .gt. 0) Then
+            !Similarly so for SPH_Mode_Samples
+            ntot = SPH_Mode_Samples%nq*SPH_Mode_Samples%my_nlevels
+            fcnt = ntot/my_nr
+            k = Mod(ntot,my_nr)
+            if (k .gt. 0) fcnt = fcnt+1
+            If (fcnt .gt. 0) Then
+                fcount(:,:) = fcnt
+           		Call sph_sample_buffer%init(field_count = fcount, config = 'p3b')		
+            Endif	
+        Endif 
+
+
 
         !/////////////////////////////////////////////////
         !Some BookKeeping for Equatorial Slices
@@ -441,7 +487,7 @@ Contains
         fdir = 'Meridional_Slices/'
         Call Meridional_Slices%set_file_info(meridslice_version,meridional_nrec,meridional_frequency,fdir) 
 
-        fdir = 'SPH_Mode_Samples/'
+        fdir = 'SPH_Modes/'
         Call SPH_Mode_Samples%set_file_info(sphmode_version,sph_mode_nrec,sph_mode_frequency,fdir) 
 
         !Point-wise Probes
@@ -665,29 +711,637 @@ Contains
     Subroutine Get_Point_Probes(qty)
         Implicit None
         REAL*8, INTENT(IN) :: qty(:,my_rmin:,my_theta_min:)
+        INTEGER :: q_ind, npts, ind, cache_ind
+        INTEGER :: i,j,k
+        INTEGER :: rind, tind
  
-
+        q_ind = Point_Probes%ind
+        npts = Point_Probes%npts_at_rowrank(my_row_rank)
         IF (Point_Probes%begin_output) THEN
-        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
+            If ((npts .gt. 0) .and. (Point_Probes%cc .eq. 0)) THEN
+                ALLOCATE( probe_outputs( &
+                     1:Point_Probes%nq, 1:Point_Probes%cache_size,1:npts) )
+                probe_outputs(:,:,:) = 0.0d0
+            ENDIF
         ENDIF
 
+        IF (npts .gt. 0) THEN
+            cache_ind = Point_Probes%cc+1
+            ind = 1
+            ! We stripe phi,r,theta (just as qty's indexing)
 
+            DO k = 1, Point_Probes%probe_nt_local
+                tind = Point_Probes%probe_t_local(k)
+                DO j = 1, Point_Probes%probe_nr_local
+                    rind = Point_Probes%probe_r_local(j)
+                    DO i = 1, Point_Probes%probe_np_global
+                        probe_outputs(q_ind,cache_ind,ind) = &
+                            qty(Point_Probes%probe_p_global(i),rind,tind)
+                        ind = ind+1
+                    ENDDO
+                ENDDO
+            ENDDO
+        ENDIF
+
+        Point_Probes%oqvals(q_ind) = current_qval
         Call Point_Probes%AdvanceInd()
+
     End Subroutine Get_Point_Probes
 
 
-    Subroutine Get_SPH_Modes(qty)
-        Implicit None
-        REAL*8, INTENT(IN) :: qty(:,:,my_theta_min:)
+	Subroutine Write_Point_Probes(this_iter,simtime)
+        USE MPI_BASE
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+
+		Real*8, Allocatable :: buff(:,:,:), row_probes(:,:,:), slice(:,:,:)
+
+		INTEGER(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_pdisp, new_disp, qdisp, full_disp, tdisp
+
+		INTEGER :: responsible, current_shell, s_start, s_end, this_rid
+		INTEGER :: i, j, k,qq, p, sizecheck, t
+		INTEGER :: n, nn, this_nshell, nq, probe_tag
+		INTEGER :: your_theta_min, your_theta_max, your_ntheta, your_id
+		INTEGER :: nelem, buffsize, sirq, nrirqs, inds(1:3), buffsize2
+        INTEGER :: file_pos, funit, error, dims(1:4), first_shell_rank        
+        INTEGER :: ierr, pcount, ichunk, ii, jj, ind, nt_row, rind, rslab_size
+		INTEGER :: mstatus(MPI_STATUS_SIZE)
+        INTEGER :: npts_this_row, this_nr, nphi_probe, irqc, ncache, npts
+        INTEGER :: probe_nr, probe_nt, probe_np, nvals, this_nt, tind
+        Real*8, Allocatable :: probe_vals(:)
+        INTEGER, Allocatable :: level_inds(:), rirqs(:)
+
+
+        nq      = Point_Probes%nq
+        ncache  = Point_Probes%cache_size
+        probe_tag = Point_Probes%mpi_tag
+        funit   = Point_Probes%file_unit
+
+        probe_nr = Point_Probes%probe_nr_global
+        probe_nt = Point_Probes%probe_nt_global
+        probe_np = Point_Probes%probe_np_global
+
+        ! Initially, we carry out communication down-row, but only if our row has points
+		responsible = 0
+        npts_this_row = Point_Probes%npts_at_colrank(my_column_rank)
+		If (my_row_rank .eq. 0) Then
+            If (npts_this_row .gt. 0) Then
+                responsible = 1
+            Endif
+        Endif
+
+        !////////////////////////////////
+
+
+
+
+		If (responsible .eq. 1) Then
+            this_nr = Point_Probes%probe_nr_atrank(my_column_rank)
+            nphi_probe = Point_Probes%probe_np_global
+
+            ALLOCATE( row_probes(1:npts_this_row, 1:nq, ncache) )
+
+            ALLOCATE(buff(1:nq, 1:ncache, 1:npts_this_row ))            
+
+            row_probes(:,:,:) = 0.0d0
+                  buff(:,:,:) = 0.0d0
+
+
+            ! Post Ireceives
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))          
+            irqc = 0  !irq counter -- everyone in the row does not necessarily have points
+            inds(3) = 1
+            Do nn = 1, nproc2-1
+                npts = Point_Probes%npts_at_rowrank(nn)
+                inds(3) = inds(3)+Point_Probes%npts_at_rowrank(nn-1) ! Keep this out of the conditional
+
+                IF (npts .gt. 0) THEN
+                    irqc = irqc+1
+				    your_id = nn
+
+                    inds(1) = 1
+                    inds(2) = 1
+
+				    nelem = npts*ncache*nq
+
+             		Call IReceive(buff, rirqs(irqc),n_elements = nelem, & 
+                        source= your_id, tag=probe_tag, grp = pfi%rcomm, indstart = inds)
+                ENDIF
+            Enddo  
+            ! Stripe my own data
+            If (Point_Probes%npts_at_rowrank(my_row_rank) .gt. 0) THEN
+                buff(:,:,1:Point_Probes%npts_at_rowrank(my_row_rank)) = probe_outputs(:,:,:)
+            ENDIF
+            Call IWaitAll(irqc,rirqs(1:irqc))  ! wait on the sends to come through
+
+
+
+            !At this point, buff is striped phi,r,theta.  We need to stripe it phi,theta,r
+            Allocate(slice(1:nq,1:ncache,1:nphi_probe))
+            nt_row = SUM(Point_Probes%probe_nt_atrank)
+            rslab_size = nt_row*nphi_probe
+            !write(6,*)'Check: ', nt_row, rslab_size, this_nr
+            ichunk = 1
+            tind = 1
+            DO nn = 0, nproc2-1
+                this_nt = Point_Probes%probe_nt_atrank(nn)
+                IF (this_nt .gt. 0) THEN
+                    !Iterate through the receive buffer, grabbing one r-theta combination at a time
+                    Do j = 1, this_nt
+                        rind = 0
+                        Do i = 1, this_nr
+                            slice(:,:,1:nphi_probe) = buff(:,:,ichunk:ichunk+nphi_probe-1)
+                            ichunk = ichunk+nphi_probe
+
+                            ind = rind+tind
+                            Do jj = 1, ncache
+                                Do ii = 1, nq
+                                    row_probes(ind:ind+nphi_probe-1,ii,jj) = slice(ii,jj,1:nphi_probe)
+                                Enddo
+                            Enddo
+
+                            rind = rind+rslab_size
+                        Enddo
+                        tind = tind+nphi_probe
+                    ENDDO
+                ENDIF
+            ENDDO
+
+            If (allocated(probe_outputs)) DeAllocate(probe_outputs)
+            DeAllocate(slice)
+            DeAllocate(buff)
+		Else
+			!  Non responsible nodes send their info
+
+            nelem = Point_Probes%npts_at_rowrank(my_row_rank)*ncache*nq
+            IF (nelem .gt. 0) THEN
+                inds(:) = 1
+			    CALL Isend(probe_outputs,sirq,n_elements = nelem,dest = 0, &
+                    tag=probe_tag, grp = pfi%rcomm, indstart = inds)            
+                CALL IWait(sirq)
+                DEALLOCATE(probe_outputs)
+            ENDIF
+
+
+
+		Endif
+
+
+
+
+        ! Communication is complete.  Now we open the file using MPI-IO
+        
+
+        ! For the moment, every process in column 0 participates in the mpi file-open operation
  
+        if (my_row_rank .eq. 0) Call Point_Probes%OpenFile_Par(this_iter, error)
 
-        IF (SPH_Mode_Samples%begin_output) THEN
-        !    If (myid .eq. 0) Write(6,*)'I would be grabbing SPH modes now...'
-        ENDIF
+        If (responsible .eq. 1) Then   
+            funit = Point_Probes%file_unit
+            If (Point_Probes%current_rec .eq. ncache) Then                
+                
+                If (Point_Probes%master) Then    !           
+                    ! The master rank (whoever owns the first radius output) writes the header
+                    dims(1) = probe_nr
+                    dims(2) = probe_nt
+                    dims(3) = probe_np
+                    dims(4) = nq
+
+                    buffsize = 4
+                    CALL MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+
+                    buffsize = nq
+                    CALL MPI_FILE_WRITE(funit,Point_Probes%oqvals, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+
+                    ! Radial grid -----------------------------------
+                    nvals = max(probe_nr,probe_nt)
+                    nvals = max(nvals,probe_np)
+                    ALLOCATE(probe_vals(1:nvals))
+                    probe_vals(:) = 0
+                    Do i = 1, probe_nr
+                        probe_vals(i) = radius(Point_Probes%probe_r_global(i))                       
+                    Enddo
+                    buffsize = probe_nr
+
+                    call MPI_FILE_WRITE(funit, probe_vals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    call MPI_FILE_WRITE(funit, Point_Probes%probe_r_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
 
 
-        Call SPH_Mode_Samples%AdvanceInd()
-    End Subroutine Get_SPH_Modes
+                    !Theta grid-----------------------------------------
+                    DO i = 1, probe_nt
+                        probe_vals(i) = costheta(Point_Probes%probe_t_global(i))                       
+                    ENDDO
+                    buffsize = probe_nt
+                    CALL MPI_FILE_WRITE(funit, probe_vals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    CALL MPI_FILE_WRITE(funit, Point_Probes%probe_t_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+
+
+                    !Phi grid----------------------------------
+
+                    DO i = 1, probe_np
+                        probe_vals(i) = (Point_Probes%probe_p_global(i)-1)*(two_pi/nphi)                        
+                    ENDDO
+                    buffsize = probe_np
+                    CALL MPI_FILE_WRITE(funit, probe_vals, buffsize, MPI_DOUBLE_PRECISION, & 
+                        mstatus, ierr) 
+                    CALL MPI_FILE_WRITE(funit, Point_Probes%probe_p_global, buffsize, MPI_INTEGER, & 
+                        mstatus, ierr) 
+                    DEALLOCATE(probe_vals)
+
+
+                Endif
+            Endif
+
+
+            hdisp = 28 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq*4 ! nq
+            hdisp = hdisp+probe_nr*12  ! radial indices and values
+            hdisp = hdisp+probe_nt*12  ! theta  indices and values
+            hdisp = hdisp+probe_np*12  ! phi indices and values
+
+            qdisp = probe_nr*probe_nt*probe_np*8
+            full_disp = qdisp*nq+12  ! 12 is for the simtime+iteration at the end
+            disp = hdisp+full_disp*(Point_Probes%current_rec-ncache)
+
+            buffsize = Point_Probes%npts_at_colrank(my_column_rank)
+            ! The file is striped with time step slowest, followed by q
+
+
+            pcount = 0
+            Do p = 0, nproc1
+                if (p .lt. my_column_rank) Then
+                    pcount = pcount+ Point_Probes%npts_at_colrank(p)
+                Endif
+            Enddo
+
+            my_pdisp = pcount*8
+
+            Do j = 1, ncache
+
+
+                Do i = 1, nq
+                    new_disp = disp+qdisp*(i-1)+my_pdisp                
+                    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                    
+                    Call MPI_FILE_WRITE(funit, row_probes(1,i,j), buffsize, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Enddo
+
+                tdisp = disp+full_disp-12
+
+                Call MPI_File_Seek(funit,tdisp,MPI_SEEK_SET,ierr)
+
+
+                If (Point_Probes%master) Then
+                    buffsize2 = 1
+
+                    Call MPI_FILE_WRITE(funit, Point_Probes%time_save(j), buffsize2, & 
+                           MPI_DOUBLE_PRECISION, mstatus, ierr)
+                    Call MPI_FILE_WRITE(funit, Point_Probes%iter_save(j), buffsize2, & 
+                           MPI_INTEGER, mstatus, ierr)
+                Endif
+
+
+                disp = disp+full_disp 
+            Enddo
+			DeAllocate(row_probes)
+        Endif  ! Responsible
+
+        If (my_row_rank .eq. 0) Call Point_Probes%closefile_par()
+
+	End Subroutine Write_Point_Probes
+
+
+
+	Subroutine Get_SPH_Modes(qty)
+		Implicit None
+		Integer :: j, ilocal, shell_ind, field_ind, rind, counter
+        Integer :: k, jj
+		Real*8, Intent(In) :: qty(1:,1:,my_theta_min:)
+
+        If (SPH_Mode_Samples%nlevels .gt. 0) Then
+            shell_ind = SPH_Mode_Samples%ind
+
+            SPH_Mode_Samples%oqvals(shell_ind) = current_qval
+
+        
+
+		    If (SPH_Mode_Samples%my_nlevels .gt. 0) Then
+
+		        If (SPH_Mode_Samples%begin_output) Then
+			        Call sph_sample_buffer%construct('p3b')
+                    sph_sample_buffer%p3b(:,:,:,:) = 0.0d0
+		        Endif
+
+                            
+
+		        Do j = 1, SPH_Mode_Samples%my_nlevels
+
+
+
+		            ilocal = SPH_Mode_Samples%my_shell_levs(j)-my_rmin+1
+
+                    counter = (shell_ind-1)*SPH_Mode_Samples%my_nlevels+ j-1 
+
+                    field_ind = counter/my_nr+1
+                    rind = MOD(counter,my_nr)+my_rmin
+
+                    Do k = 1, nphi
+                    Do jj = my_theta_min, my_theta_max
+				        sph_sample_buffer%p3b(k,rind,jj,field_ind) = &
+                        & qty(k, ilocal, jj)
+                    Enddo
+                    Enddo
+
+		        Enddo
+            Endif
+            Call SPH_Mode_Samples%AdvanceInd()
+		Endif
+
+	End Subroutine Get_SPH_Modes
+
+	Subroutine Write_SPH_Modes(this_iter,simtime)
+        ! This version mirrors the mem-friendly shell_spectra writing routine
+		Implicit None
+		Real*8, Intent(in) :: simtime
+		Integer, Intent(in) :: this_iter
+		Real*8, Allocatable :: buff(:,:,:,:,:), all_spectra(:,:,:,:,:)
+        Real*8, Allocatable :: sendbuffer(:,:,:,:,:), out_radii(:)
+        Real*8, Allocatable :: bsendbuffer(:,:,:,:,:)
+		Integer :: responsible, current_shell, s_start, s_end, this_rid
+		Integer :: i, j, k,qq, m, mp, lmax,rind,field_ind,f,r
+        Integer :: rone,  p,  counter, nf
+		Integer :: n, nn, this_nshell, nq_shell, sph_samples_tag, nmodes
+        Integer(kind=MPI_OFFSET_KIND) :: disp, hdisp, my_rdisp, new_disp
+        Integer(kind=MPI_OFFSET_KIND)  :: qsize, qdisp, rec_size
+		Integer :: your_mp_min, your_mp_max, your_nm, your_id
+		Integer :: nelem, m_ind, m_val, current_rec
+        Integer :: funit, error, sirq, inds(5), dims(3)
+        Integer :: my_nlevels, nlevels, qindex
+        Integer :: lp1, nrirqs, ind5
+        Integer :: ierr, rcount, buffsize, lv,lval
+        Integer, Allocatable :: rirqs(:)
+        Integer :: mstatus(MPI_STATUS_SIZE)       
+
+        nlevels = SPH_Mode_Samples%nlevels             ! The total number of spectra levels that needs to be output
+        my_nlevels = SPH_Mode_Samples%my_nlevels       ! The number of radial levels that this rank needs to write out
+        nq_shell = SPH_Mode_Samples%nq                 ! The number of quantities 
+        sph_samples_tag = SPH_Mode_Samples%mpi_tag
+        funit = SPH_Mode_Samples%file_unit
+        lmax = maxval(pfi%inds_3s)
+        lp1 = lmax+1
+        nmodes = sph_mode_nmode
+		responsible = 0
+		If ( (my_row_rank .eq. 0) .and. (my_nlevels .gt. 0) )  Then
+            responsible = 1
+            Allocate(all_spectra(0:lmax,0:lmax, my_nlevels,1, 1:2))
+            Allocate(buff(0:lmax,my_nlevels,1,1:2,1:lp1))  !note - indexing starts at 1 not zero for mp_min etc.
+            nrirqs = nproc2-1
+            Allocate(rirqs(1:nrirqs))
+        Endif
+
+
+        !Before we start the main communication, all processes that contribute to the
+        ! spectral output must get their buffers in the correct form
+        If (my_nlevels .gt. 0) Then
+            !//////////////////////
+            ! First thing we do is FFT/reform the buffer/Legendre Transform
+            !
+            Call FFT_To_Spectral(sph_sample_buffer%p3b, rsc = .true.)
+            sph_sample_buffer%config ='p3b'
+            Call sph_sample_buffer%reform()
+            Call sph_sample_buffer%construct('s2b')
+            Call Legendre_Transform(sph_sample_buffer%p2b,sph_sample_buffer%s2b)
+            Call sph_sample_buffer%deconstruct('p2b')
+
+            Allocate(bsendbuffer(0:lmax,my_nlevels,nq_shell,2, my_mp_min:my_mp_max ))
+            Allocate(sendbuffer(0:lmax,my_nlevels,1,2, my_mp_min:my_mp_max ))
+            bsendbuffer = 0.0d0 
+            sendbuffer = 0.0d0
+            nf = sph_sample_buffer%nf2b
+            Do p = 1, 2  ! Real and imaginary parts
+            Do mp = my_mp_min,my_mp_max
+                m = pfi%inds_3s(mp)
+                    counter = 0
+                    Do f = 1, nq_shell
+
+                        field_ind = counter/my_nr+1
+                        Do r = 1, SPH_Mode_Samples%my_nlevels   
+                                
+                            rind = MOD(counter,my_nr)+my_rmin
+                            bsendbuffer(m:lmax,r,f,p,mp) = &
+                                & sph_sample_buffer%s2b(mp)%data(m:lmax,rind,p,field_ind)
+                            counter = counter+1
+                        Enddo
+                    Enddo
+                Enddo
+
+            Enddo
+            call sph_sample_buffer%deconstruct('s2b')
+
+        Endif
+
+
+        If (my_row_rank .eq. 0) Call SPH_Mode_Samples%OpenFile_Par(this_iter, error)
+
+        If (responsible .eq. 1) Then
+            ! Processes that take part in the write have some extra work to do
+            funit = SPH_Mode_Samples%file_unit
+            current_rec = SPH_Mode_Samples%current_rec  ! Note that we have to do this after the file is opened
+            If  ( (current_rec .eq. 1) .and. (SPH_Mode_Samples%master) ) Then                
+
+                dims(1) =  sph_mode_nell
+                dims(2) =  nlevels
+                dims(3) =  nq_shell
+                buffsize = 3
+                call MPI_FILE_WRITE(funit, dims, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = nq_shell
+                call MPI_FILE_WRITE(funit,SPH_Mode_Samples%oqvals, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                allocate(out_radii(1:nlevels))
+                Do i = 1, nlevels
+                    out_radii(i) = radius(SPH_Mode_Samples%levels(i))
+                Enddo
+                buffsize = nlevels
+	            call MPI_FILE_WRITE(funit, out_radii, buffsize, MPI_DOUBLE_PRECISION, & 
+                    mstatus, ierr) 
+                DeAllocate(out_radii)
+                
+	            call MPI_FILE_WRITE(funit, SPH_Mode_Samples%levels, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr) 
+
+                buffsize = sph_mode_nell
+	            call MPI_FILE_WRITE(funit, SPH_Mode_Ell, buffsize, MPI_INTEGER, & 
+                    mstatus, ierr)                 
+
+            Endif
+
+            hdisp = 24 ! dimensions+endian+version+record count
+            hdisp = hdisp+nq_shell*4 ! nq
+            hdisp = hdisp+nlevels*12  ! level indices and level values
+            hdisp = hdisp+sph_mode_nell*4  !ell-values
+            rcount = 0
+            Do p = 1, SPH_Mode_Samples%nshell_r_ids
+                if (SPH_Mode_Samples%shell_r_ids(p) .lt. my_column_rank) Then
+                    rcount = rcount+ SPH_Mode_Samples%nshells_at_rid(p)
+                Endif
+            Enddo
+            my_rdisp = rcount*nmodes*8
+
+                
+
+            ! This is the LOCAL number ELEMENTS in the real or imaginary component of
+            ! of a single quantity  (This is not in bytes)
+            !buffsize = my_nlevels*nmodes 
+
+            !This is the half-size (bytes) of a single quantity's information
+            !Each quantity has real/imaginary components, and
+            ! so the full size is twice this value.  THIS IS GLOBAL
+            qsize = nlevels*nmodes*8
+
+            !This is the size (bytes) of a single iteration's record
+            rec_size = qsize*2*nq_shell+12  ! 12 is for the simtime+iteration at the end
+
+            disp = hdisp+rec_size*(current_rec-1)
+
+        Endif
+
+
+        Do qindex = 1, nq_shell  ! Q LOOP starts here!
+
+            !Load the current quantity into the sendbuffer
+            If (my_nlevels .gt. 0) Then
+                sendbuffer(:,:,1,:,:) = & 
+                    & bsendbuffer(:,:,qindex,:,:)
+            Endif
+
+
+
+            If (responsible .eq. 1) Then
+                ! Rank 0 in reach row receives  all pieces of the shell spectra from the other nodes
+
+                all_spectra(:,:,:,:,:) = 0.0d0
+                buff(:,:,:,:,:) = 0.0d0
+
+
+                rirqs(:) = 0
+                ind5 = pfi%all_3s(0)%delta+1
+                Do nn = 1, nrirqs
+                    !Write(6,*)'Ind5: ', ind5
+                    your_id = nn
+
+                    your_nm     = pfi%all_3s(nn)%delta
+                    your_mp_min = pfi%all_3s(nn)%min
+                    your_mp_max = pfi%all_3s(nn)%max
+
+
+                    nelem = your_nm*my_nlevels*2*lp1
+
+                    inds(:) = 1
+                    inds(5) = ind5  !This is the mp_index here.
+
+                    Call Ireceive(buff, rirqs(nn), n_elements = nelem,source= your_id, &
+                        &  tag=sph_samples_tag,grp = pfi%rcomm, indstart = inds)
+                    ind5 = ind5+your_nm
+                Enddo
+
+                ! Stripe my own data into the receive buffer
+
+                Do mp = my_mp_min,  my_mp_max
+                    m = pfi%inds_3s(mp)
+                    Do p = 1,2
+                        Do r = 1, my_nlevels   
+                            buff(m:lmax,r,1,p,mp) = sendbuffer(m:lmax,r,1,p,mp) 
+                        Enddo
+                    Enddo
+                Enddo
+
+                Call IWaitAll(nrirqs,rirqs)
+
+                !Stripe the receiver buffer into the spectra buffer
+
+                !Modified stripe (we stripe m, ell  vs. ell, m as in shell_spectra)
+
+                Do mp = 1,lp1
+                    m = pfi%inds_3s(mp)
+                    Do p = 1, 2  ! Real and imaginary parts
+                        Do r = 1, my_nlevels   
+                            all_spectra(m,m:lmax,r,1,p) = buff(m:lmax,r,1,p,mp)
+                        Enddo
+                    Enddo
+                Enddo
+
+
+
+
+
+
+                Do p = 1, 2
+                    new_disp = disp+  (qindex-1)*qsize*2 +(p-1)*qsize +my_rdisp  
+                    Call MPI_File_Seek(funit,new_disp,MPI_SEEK_SET,ierr)
+                    Do r = 1, my_nlevels
+                    Do lv = 1, SPH_MODE_NELL                    
+                        lval = SPH_MODE_ELL(lv)
+                        buffsize = lval+1
+                        !if ((lval .eq. 0)) Then
+                        !    Write(6,*)p, myid, my_rdisp, all_spectra(0,lval,r,1,p)
+                        !Endif
+                        Call MPI_FILE_WRITE(funit, all_spectra(0,lval,r,1,p), buffsize, & 
+                               MPI_DOUBLE_PRECISION, mstatus, ierr)
+                    ENDDO
+                    Enddo
+                Enddo
+
+            Else
+			    !  Non-responsible nodes send their info
+			    If (my_nlevels .gt. 0) Then
+                    inds(:) = 1
+				    Call Isend(sendbuffer,sirq, dest = 0,tag=sph_samples_tag, grp = pfi%rcomm, indstart = inds)
+                    Call IWait(sirq)
+			    Endif
+		    Endif
+
+        Enddo  ! Q-LOOP
+
+        If (responsible .eq. 1) Then
+            disp = hdisp+rec_size*current_rec
+            disp = disp-12
+            Call MPI_File_Seek(funit,disp,MPI_SEEK_SET,ierr)
+
+            If (SPH_Mode_Samples%master) Then
+
+                buffsize = 1
+                Call MPI_FILE_WRITE(funit, simtime, buffsize, & 
+                       MPI_DOUBLE_PRECISION, mstatus, ierr)
+                Call MPI_FILE_WRITE(funit, this_iter, buffsize, & 
+                       MPI_INTEGER, mstatus, ierr)
+            Endif
+
+            DeAllocate(all_spectra)
+            DeAllocate(buff)
+            DeAllocate(rirqs)
+        Endif
+
+
+        If (my_row_rank .eq. 0) Call SPH_Mode_Samples%closefile_par()
+        If (my_nlevels .gt. 0) Then 
+            DeAllocate(sendbuffer, bsendbuffer)
+        Endif
+
+
+
+	End Subroutine Write_SPH_Modes
 
 
     Subroutine Get_Equatorial_Slice(qty)
@@ -1949,6 +2603,7 @@ Contains
 
                 Call SPH_Mode_Samples%getq_now(yesno)
                 Call Point_Probes%getq_now(yesno)
+
                 Call Shell_Spectra%getq_now(yesno)
                 Call AZ_Averages%getq_now(yesno)
                 Call Shell_Averages%getq_now(yesno)
@@ -2040,12 +2695,17 @@ Contains
 	    If (Mod(iter,Meridional_Slices%frequency) .eq. 0 ) Then
             Call Write_Meridional_Slices(iter,sim_time)
         Endif
-	    !If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
-        !    If (myid .eq. 0) Write(6,*)'I would be writing SPH Mode Samples...'
-        !Endif
-	    !If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
-        !    If (myid .eq. 0) Write(6,*)'I would be writing Point Probes...'
-        !Endif
+	    If (Mod(iter,SPH_Mode_Samples%frequency) .eq. 0 ) Then
+            Call Write_SPH_Modes(iter,sim_time)
+        Endif
+	    If (Mod(iter,Point_Probes%frequency) .eq. 0 ) Then
+            Point_Probes%time_save(Point_Probes%cc+1) = sim_time
+            Point_Probes%iter_save(Point_Probes%cc+1) = iter
+            If ((Point_Probes%cache_size-1) .eq. Point_Probes%cc) Then
+                Call Write_Point_Probes(iter,sim_time)
+            Endif            
+            Call Point_Probes%AdvanceCC() 
+        Endif
 	    If (Mod(iter,AZ_Averages%frequency) .eq. 0 ) Call Write_Azimuthal_Average(iter,sim_time)
 	    If (Mod(iter,Shell_Averages%frequency) .eq. 0 ) Call Write_Shell_Average(iter,sim_time)
 	    If (Mod(iter,Global_Averages%frequency) .eq. 0 ) Call Write_Global_Average(iter,sim_time)
@@ -2591,10 +3251,11 @@ Contains
     !       Diagnostic Class Methods
 
     Subroutine Initialize_Diagnostic_Info(self,avg_levels,computes,pid,mpi_tag,avg_level,values, &
-            levels, phi_inds)
+            levels, phi_inds, cache_size)
         Implicit None
         Integer :: i,ind
         Integer, Intent(In) :: pid, mpi_tag
+        Integer, Intent(In), Optional :: cache_size
         Integer, Optional, Intent(In) :: avg_level
         Integer, Optional, Intent(In) :: values(1:)
         Integer, Optional, Intent(In) :: levels(1:)
@@ -2606,6 +3267,15 @@ Contains
         Endif
         self%mpi_tag = mpi_tag
         self%nq = 0
+        IF (present(cache_size)) THEN
+            IF (cache_size .ge. 1) THEN
+                self%cache_size = cache_size
+            ENDIF
+        ENDIF
+        Allocate(self%iter_save(1:self%cache_size))
+        Allocate(self%time_save(1:self%cache_size))
+
+
         If (present(values)) Then
             self%values(:) = values(:)  ! This is clunky - will look into getting the object attributes directly into a namelist later
             
@@ -2657,12 +3327,22 @@ Contains
             self%oqvals(:) = nqmax+100
         !Endif
     End Subroutine Initialize_Diagnostic_Info
+
     Subroutine AdvanceInd(self)
         Implicit None
         Class(DiagnosticInfo) :: self
         self%ind = self%ind+1
         self%begin_output = .false.
     End Subroutine AdvanceInd
+
+    Subroutine AdvanceCC(self)
+        !Advances the cache counter
+        Implicit None
+        Class(DiagnosticInfo) :: self
+        self%cc = self%cc+1
+        self%cc = MOD(self%cc,self%cache_size)
+    End Subroutine AdvanceCC
+
     Subroutine Diagnostic_Output_Reset(self)
         Implicit None
         Class(DiagnosticInfo) :: self
@@ -2749,7 +3429,7 @@ Contains
     Subroutine set_file_info(self,oversion,rcount, freq, fpref,funit)
         Implicit None
         Class(DiagnosticInfo) :: self
-        Integer :: oversion, rcount, freq
+        Integer :: oversion, rcount, freq, modcheck
         Integer, Optional, Intent(In) :: funit
         Character*120 :: fpref
         If (present(funit)) Then
@@ -2759,6 +3439,55 @@ Contains
         self%output_version = oversion
         self%rec_per_file = rcount
         self%frequency = freq
+
+        !Now that we have set the file info, let's make sure the
+        !that the cache size is appropriate
+
+        If (self%cache_size .lt. 1) Then
+            If (myid .eq. 0) Then
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size must be at least 1.'
+                    Write(6,*)'   Specified cache_size: ', self%cache_size
+                    Write(6,*)'   Caching has been deactivated for ', self%file_prefix
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+            Endif
+            self%cache_size = 1
+        Endif
+        If (self%cache_size .gt. self%rec_per_file) Then
+            modcheck = MOD(rcount,self%cache_size)
+            IF (modcheck .ne. 0) THEN
+
+                If (myid .eq. 0) THEN
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size cannot be larger than nrec.'
+                    Write(6,*)'   Cache_size: ', self%cache_size
+                    Write(6,*)'   nrec      : ', self%rec_per_file
+                    Write(6,*)'   Cache_size has been set to nrec.'
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+                ENDIF
+                self%cache_size = self%rec_per_file
+            ENDIF
+        Endif
+        
+        If (self%cache_size .gt. 1) Then
+            modcheck = MOD(rcount,self%cache_size)
+            IF (modcheck .ne. 0) THEN
+
+                If (myid .eq. 0) THEN
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'
+                    Write(6,*)'   Warning:  Incorrect cache_size specification for ',self%file_prefix
+                    Write(6,*)'   Cache_size must divide evenly into nrec.'
+                    Write(6,*)'   Cache_size: ', self%cache_size
+                    Write(6,*)'   nrec      : ', self%rec_per_file
+                    Write(6,*)'   Caching has been deactivated for ', self%file_prefix
+                    Write(6,*)'////////////////////////////////////////////////////////////////////'                    
+                ENDIF
+                self%cache_size = 1
+            ENDIF
+        Endif
+
     End Subroutine set_file_info
 
     Subroutine OpenFile(self,iter,errcheck)
@@ -2828,29 +3557,35 @@ Contains
         Integer, Intent(InOut) :: ierr
         Character*8 :: iterstring
         Character*120 :: filename
-        Integer :: modcheck, imod, file_iter, next_iter, ibelong
+        Integer :: modcheck, imod, file_iter, next_iter, ibelong, icomp
         Integer :: buffsize, funit
         Integer :: mstatus(MPI_STATUS_SIZE)
         integer(kind=MPI_OFFSET_KIND) :: disp
 
 
         modcheck = self%frequency*self%rec_per_file
-        imod = Mod(iter,modcheck) 
+
+
+        icomp = iter - (self%cache_size-1)*self%frequency
+
+
+        imod = Mod(icomp,modcheck) 
 
         if (imod .eq. 0) then
             ibelong = iter
         else
-            ibelong = iter-imod+modcheck    ! This iteration belongs in a file with number= ibelong
+            ibelong = icomp-imod+modcheck    ! This iteration belongs in a file with number= ibelong
         endif
 
         write(iterstring,i_ofmt) ibelong
         filename = trim(local_file_path)//trim(self%file_prefix)//trim(iterstring)
 
+
         If ( (imod .eq. self%frequency) .or. (self%rec_per_file .eq. 1) ) Then   ! time to begin a new file 
 
             
 
-    		call MPI_FILE_OPEN(self%ocomm, filename, & 
+    	    Call MPI_FILE_OPEN(self%ocomm, filename, & 
                  MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
                  MPI_INFO_NULL, funit, ierr) 
             self%file_unit = funit
@@ -2869,10 +3604,12 @@ Contains
             Endif
 
             
-            self%current_rec = 1            
+            self%current_rec = 1+self%cc
+            
+                       
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
-                Write(6,*)'Unable to create file!!: ',filename
+                if (self%master) Write(6,*)'Unable to create file!!: ',filename
             Endif
         Else
     		call MPI_FILE_OPEN(self%ocomm, filename, & 
@@ -2887,15 +3624,17 @@ Contains
             !call MPI_FILE_READ(self%file_unit, self%current_rec, 1, MPI_INTEGER, & 
             !mstatus, ierr)
 
-            self%current_rec = self%current_rec+1
+            self%current_rec = self%current_rec+1+self%cc
+
             If (ierr .ne. 0) Then
                 next_iter =file_iter+modcheck
+                if (self%master) Then
                 Write(6,*)'Failed to find needed file: ', filename
                 Write(6,*)'Partial diagnostic files are not currently supported.'
                 Write(6,*)'No data will be written until a new file is created at iteration: ', ibelong+self%frequency
+                Endif
             Endif
         Endif
-
     End Subroutine OpenFile_Par
 
 
@@ -2920,19 +3659,19 @@ Contains
         Class(DiagnosticInfo) :: self
         disp = 8
         Call MPI_File_Seek(self%file_unit,disp,MPI_SEEK_SET,ierr)
-            If (ierr .ne. 0) Then
-                Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid
-            Endif
+        If (ierr .ne. 0) Then
+            Write(6,*)'Error rewinding to header.  Error code: ', ierr, myid, self%file_prefix
+        Endif
         If (self%master) Then  
 
             buffsize = 1
 
             call MPI_FILE_WRITE(self%file_unit,self%current_rec , buffsize, MPI_INTEGER, & 
                 mstatus, ierr) 
-            If (ierr .ne. 0) Write(6,*)'Error writing to header.  Error code: ', ierr
+            If (ierr .ne. 0) Write(6,*)'Error writing to header.  Error code: ', ierr, myid, self%file_prefix
         Endif
         Call MPI_FILE_CLOSE(self%file_unit, ierr)
-        If (ierr .ne. 0) Write(6,*)'Error closing file.  Error code: ',ierr
+        If (ierr .ne. 0) Write(6,*)'Error closing file.  Error code: ',ierr, myid, self%file_prefix
     End Subroutine CloseFile_Par
 
 
@@ -3331,7 +4070,6 @@ Contains
 
         IF (PRESENT(rev_inds)) THEN
            IF (rev_inds) THEN ! in case someone specified rev_inds = .false. ...
-
                 i = 1
                 DO WHILE(i .le. numi)
                     IF (indices(i) .lt. 0) THEN
@@ -3394,7 +4132,7 @@ Contains
         CLASS(DiagnosticInfo) :: self
         INTEGER, INTENT(INOUT) :: rinds(:), tinds(:), pinds(:)
         INTEGER, ALLOCATABLE :: tmp(:)
-        INTEGER :: i, j,k, ind
+        INTEGER :: i, j,k, ind, this_min, this_max
         INTEGER :: rcount, tcount, pcount, ntmp
         INTEGER :: error_code = 0
         ! Few steps here:
@@ -3432,6 +4170,7 @@ Contains
             Allocate(self%probe_r_global(1:rcount))
             self%probe_r_global(1:rcount) = rinds(1:rcount)
         ENDIF
+
         IF (tcount .gt. 0) THEN
             Allocate(self%probe_t_global(1:tcount))
             self%probe_t_global(1:tcount) = tinds(1:tcount)
@@ -3441,10 +4180,91 @@ Contains
             self%probe_p_global(1:pcount) = pinds(1:pcount)
         ENDIF
 
+        self%probe_nr_global = rcount
+        self%probe_nt_global = tcount
+        self%probe_np_global = pcount
+        !probe_nr_atrank(:)
+		!my_theta_min = pfi%my_2p%min
+		!my_theta_max = pfi%my_2p%max
+		!my_rmin = pfi%my_1p%min
+		!my_rmax = pfi%my_1p%max
+        !nproc1 => processes per column
+        !nproc2 => processes per row
+        Allocate(self%probe_nr_atrank(0:nproc1-1))
+        Allocate(self%probe_nt_atrank(0:nproc2-1))
+        ALLOCATE(self%npts_at_colrank(0:nproc1-1))
+        ALLOCATE(self%npts_at_rowrank(0:nproc2-1))
+
+        self%npts_at_colrank(:) = 0
+        self%npts_at_rowrank(:) = 0
+        self%probe_nr_atrank(:) = 0
+        self%probe_nr_local     = 0
+        self%probe_nt_atrank(:) = 0
+        self%probe_nt_local     = 0
+
+        Do i = 0, nproc1-1 
+            this_min = pfi%all_1p(i)%min
+            this_max = pfi%all_1p(i)%max
+            Do j = 1, rcount
+                IF ( (rinds(j) .le. this_max) .and. (rinds(j) .ge. this_min) ) THEN
+                    self%probe_nr_atrank(i) = self%probe_nr_atrank(i)+1
+                ENDIF
+            Enddo
+        Enddo
+
+        self%probe_nr_local = self%probe_nr_atrank(my_column_rank)
+        Allocate(self%probe_r_local(1:self%probe_nr_local))
+        ind = 1
+        Do j = 1, rcount
+            IF ( (rinds(j) .le. my_rmax) .and. (rinds(j) .ge. my_rmin) ) THEN
+               self%probe_r_local(ind) = rinds(j) 
+               ind = ind+1
+            ENDIF
+        Enddo       
+
+
+        Do j = 1, tcount
+            Do i = 0, nproc2-1 
+                this_min = pfi%all_2p(i)%min
+                this_max = pfi%all_2p(i)%max
+                IF ( (tinds(j) .le. this_max) .and. (tinds(j) .ge. this_min) ) THEN
+                    self%probe_nt_atrank(i) = self%probe_nt_atrank(i)+1
+                ENDIF
+            Enddo
+        Enddo
+
+        self%probe_nt_local = self%probe_nt_atrank(my_row_rank)
+        Allocate(self%probe_t_local(1:self%probe_nt_local))
+        ind = 1
+        Do j = 1, tcount
+            IF ( (tinds(j) .le. my_theta_max) .and. (tinds(j) .ge. my_theta_min) ) THEN
+               self%probe_t_local(ind) = tinds(j) 
+               ind = ind+1
+            ENDIF
+        Enddo 
+        !WRite(6,*)'Check: ', my_theta_min, my_theta_max, ':', self%probe_t_local
+
+        ! Calculate how many points are located on rank 0 of each row (just prior to parallel write)
+        Do i = 0, nproc1-1
+            self%npts_at_colrank(i) = self%probe_nr_atrank(i)*self%probe_nt_global*&
+                self%probe_np_global
+        Enddo
+
+
+        ! Calculate how many points are located at each rank within a row
+        Do i = 0, nproc2-1
+            self%npts_at_rowrank(i) = self%probe_nr_atrank(my_column_rank)* &
+                self%probe_nt_atrank(i)*self%probe_np_global
+        Enddo
+
+
+
+        !Write(6,*)'INITIALIZED!'
+
         ! The indexing seems to be working, but let's leave this code around for a bit
         ! just in case.
         !IF ( ( rcount .gt. 0) .and. (tcount .gt. 0) .and. (pcount .gt. 0) ) THEN
-        !    IF (myid .eq. 0) THEN
+        !    IF (myid .eq. 0) THEN0
         !        WRITE(6,*)'Probes specified (phi,theta,r) :  '
         !        DO k = 1, rcount
         !            DO j = 1, tcount
@@ -3473,18 +4293,28 @@ Contains
         ENDDO
 
         DO i = 1, nphi
-            tmp_phi(i) = i*two_pi/DBLE(nphi)
+            tmp_phi(i) = (i-1)*two_pi/DBLE(nphi)
         ENDDO
 
 
-        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r, revg =.true.)
-        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,revg=.true.)
+        CALL INTERPRET_INDICES(      point_probe_r_nrm, radius   , point_probe_r,      revg =.true.)
+        CALL INTERPRET_INDICES(  point_probe_theta_nrm, tmp_theta, point_probe_theta,  revg=.true.)
         CALL INTERPRET_INDICES(    point_probe_phi_nrm, tmp_phi  , point_probe_phi)
-        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels, revg=.true.)
+        CALL INTERPRET_INDICES(  shellslice_levels_nrm, radius   , shellslice_levels,  revg=.true.)
         CALL INTERPRET_INDICES(shellspectra_levels_nrm, radius   , shellspectra_levels,revg=.true.)
-        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices,revg=.true.)
+        CALL INTERPRET_INDICES(sph_mode_levels_nrm, radius   , sph_mode_levels,revg=.true.)
+        CALL INTERPRET_INDICES( meridional_indices_nrm, tmp_phi  , meridional_indices, revg=.true.)
 
         DeALLOCATE(tmp_theta,tmp_phi)
+        
+        ! Parse the SPH_MODE_ELL list:
+        Call Parse_inds(sph_mode_ell, SPH_MODE_Nell)
+        If (SPH_Mode_nell .gt. 0) Then
+            Do i =1, sph_mode_nell
+                sph_mode_nmode = sph_mode_nmode+(sph_mode_ell(i)+1)
+            Enddo
+        ENDIF
+
     END SUBROUTINE PROCESS_COORDINATES
 
     SUBROUTINE Interpret_Indices(indices_nrm, coord_grid, indices, revg)
@@ -3492,14 +4322,17 @@ Contains
         INTEGER, INTENT(InOut) :: indices(:)
         REAL*8, INTENT(InOut) :: coord_grid(:), indices_nrm(:)
         LOGICAL, INTENT(In), Optional :: revg
-        LOGICAL :: reverse_grid = .false.
+        LOGICAL :: reverse_grid 
         IF (present(revg)) THEN
             IF (revg) reverse_grid = .true.
+        ELSE
+            reverse_grid = .false.
         ENDIF
 
         ! If needed, convert normalized coordinates to indices
         ! e.g., map [0.1, 0.25, 0.5] to [4, 15, 32]  
         IF (maxval(indices_nrm) .gt. -2.9d0) THEN
+            
             CALL nrm_to_index(indices_nrm, coord_grid, indices, rev_inds =reverse_grid)
         ENDIF
 

@@ -115,8 +115,9 @@ Contains
 			Call AdvanceTime()
 
             
-
-            Call Reboot_Diagnostics(iteration)
+            ! Disabling this for the time being.  It needs to be brought up-to-date with the
+            ! rest of the code.
+            !Call Reboot_Diagnostics(iteration)
             !Note:  The above only reboots the diagnostics if: 
             !       1.) It's time to check for the reboot file (based on diagnostic_reboot_interval)
             !       2.) The appropriately named reboot file exists (reboot_diagnostics0, reboot_diagnostics1, etc.)
