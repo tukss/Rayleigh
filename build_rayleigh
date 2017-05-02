@@ -164,4 +164,5 @@ grep -o '^[^#]*' $MACHINEFILE > $NOCOMM
 sed 's/[ \t]*$//' $NOCOMM > $MACHDEF
 echo " "
 echo "PREFIX IS: "$PREFIX
+mkdir -p $PREFIX
 make ${TARGET}  PREFIX=${PREFIX}
