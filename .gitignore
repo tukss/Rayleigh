@@ -1,4 +1,4 @@
-src/build/**/*
+/src/build/**/*
 
 *~
 
@@ -12,4 +12,5 @@ fd_notes.aux
 
 fd_notes.dvi
 
-bin/**/rayleigh.*
+/bin/**/rayleigh.*
+
