@@ -1,5 +1,13 @@
-!Rayleigh's main program
-Program Main
+!/////////////////////////////////////////////////////////////////////////////////////////
+!
+!                   
+!
+!                                      Rayleigh
+!                      
+!
+!/////////////////////////////////////////////////////////////////////////////////////////
+!Once, there was the
+Program Main!
     Use MakeDir
     Use Controls
 	Use Fields
@@ -17,7 +25,7 @@ Program Main
     Use Benchmarking, Only : Initialize_Benchmarking, Benchmark_Input_Reset
 	Implicit None
     
-    Call Main_MPI_Init(global_rank)    !Initialize MPI
+    Call Main_MPI_Init(global_rank)   !Initialize MPI
 
     Call Check_Run_Mode()   !This needs to be done before ever reading main input (handles multiple runs)
 
