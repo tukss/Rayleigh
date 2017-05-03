@@ -9,6 +9,7 @@ POBJ  = Controls.o ClockInfo.o Timers.o ProblemSize.o ReferenceState.o BoundaryC
         Fields.o Checkpointing.o Initial_Conditions.o \
         Diagnostics_Base.o \
         Diagnostics_Second_Derivatives.o \
+        Diagnostics_Velocity_Diffusion.o \
         Diagnostics_ADotGradB.o \
         Diagnostics_Velocity_Field.o Diagnostics_Magnetic_Field.o \
         Diagnostics_Current_Density.o Diagnostics_Vorticity_Field.o \
