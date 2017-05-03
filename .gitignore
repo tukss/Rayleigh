@@ -6,6 +6,8 @@
 
 *.o
 
+*.swp 
+
 fd_notes.log
 
 fd_notes.aux
