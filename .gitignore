@@ -8,6 +8,8 @@
 
 *.swp 
 
+*.pyc
+
 fd_notes.log
 
 fd_notes.aux
