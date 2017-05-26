@@ -99,7 +99,7 @@ Contains
     Subroutine Initialize_Controls()
         Implicit None
         character*120 :: ofilename
-        chebyshev = .true.   ! finite-difference is not currently supported
+        !chebyshev = .true.   ! finite-difference is not currently supported
         Allocate(global_msgs(1:nglobal_msgs))
         global_msgs = 0.0d0
 

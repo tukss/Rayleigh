@@ -4,6 +4,7 @@ Module ProblemSize
 	Use Spectral_Derivatives, Only : Initialize_Angular_Derivatives
 	Use Controls, Only : Chebyshev, use_parity, multi_run_mode, run_cpus, my_path
 	Use Chebyshev_Polynomials, Only : Cheby_Grid
+	Use Finite_Difference, Only  : Initialize_Derivatives, Rescale_Grid_FD
     Use Math_Constants
     Use BufferedOutput
 	Use Timers
@@ -38,6 +39,7 @@ Module ProblemSize
     Real*8              :: aspect_ratio = -1.0d0
     Real*8              :: shell_depth = -1.0d0
     Real*8              :: shell_volume
+    Real*8              :: stretch_factor = 0.0d0
 	Real*8, Allocatable :: Radius(:), R_squared(:), One_Over_R(:)
 	Real*8, Allocatable :: Two_Over_R(:), OneOverRSquared(:), Delta_R(:)
 	Real*8, Allocatable :: radial_integral_weights(:)
@@ -67,7 +69,7 @@ Module ProblemSize
 	Namelist /ProblemSize_Namelist/ n_r,n_theta, nprow, npcol,rmin,rmax,npout, & 
             &  precise_bounds,grid_type, l_max, &
             &  aspect_ratio, shell_depth, ncheby, domain_bounds, dealias_by, &
-            &  n_uniform_domains, uniform_bounds
+            &  n_uniform_domains, uniform_bounds, stretch_factor
 Contains
 
 	Subroutine Init_ProblemSize()
@@ -303,6 +305,9 @@ Contains
 		Implicit None
 		Integer :: r, nthr,i ,n
 
+		real*8 :: uniform_dr, arg, pi_over_N, rmn, rmx, delta, scaling
+        real*8 :: delr0
+
 		nthr = pfi%nthreads
 		Allocate(Delta_r(1:N_R))
 		Allocate( Radius(1:N_R))
@@ -325,6 +330,76 @@ Contains
                     r = r+1
                 Enddo
             Enddo
+
+        Else
+
+			Select Case (grid_type)
+				Case (1)	! Uniform Grid
+					Radius(N_R) = rmin	! Follow ASH convention of reversed radius
+					uniform_dr = 1.0d0/(N_R-1.0d0)*(rmax-rmin)
+					Do r=N_R,1,-1
+						Delta_r(r) = uniform_dr
+						Radius(r) = (N_R-r)*uniform_dr + rmin		
+					Enddo
+
+                Case (2)  ! Chebyshev Grid
+
+		            pi_over_N = pi/(N_r*1.0d0)
+		            arg = (0.5d0)*pi_over_N
+		            Do i = 1, N_R
+			            radius(i) = cos(arg)
+			            arg = arg+pi_over_N
+		            Enddo
+                    delta = rmax-rmin
+                    scaling = (radius(1)-radius(n_r) )/ delta
+                    radius = radius/scaling
+                    rmn = minval(radius)
+                    radius(:) = radius(:)-rmn+rmin                    
+
+                Case (3) ! Stretched Grid -  high res near boundaries
+                         ! Each cell is (1+stretch_factor) bigger than the one before it
+                         ! n_r is assumed to be even for this to work
+                    delta = rmax-rmin
+                    arg = 0.0d0
+                    radius(1) = 0.0d0
+                    r = (n_r/2)+1
+
+                    Do i = 0, r-2
+                        arg = arg + (1.0d0+stretch_factor)**i
+                    Enddo
+                    delr0 = delta/arg  ! This is the grid spacing at the outer boundary
+
+                    ! Set up the top half of the grid (1 through nr/2+1)                    
+                    Do i = 1, r-1
+                        arg = delr0*( (1.0+stretch_factor)**i )
+                        radius(i+1) = radius(i)+arg
+                    Enddo
+
+                    ! Reflect to get the other half.
+                    Do i = 1, (n_r/2)-1
+                        arg = radius(r)-radius(r-i )
+                        radius(r+i )=radius(r)+arg
+                    Enddo
+
+                    !Finally, rescale the grid
+                    rmx = maxval(radius)
+                    radius(:) = radius(:)*delta/rmx
+                    radius(:) = delta-radius(:)+rmin
+                    !If (my_rank .eq. 0) Then
+                    !    Do i = 1, n_r
+                    !       Write(6,*)'Radius : ', radius(i)
+                    !    Enddo
+                    !Endif
+
+				Case Default	! Uniform Grid - Same as case 1
+					Radius(N_R) = rmin
+					uniform_dr = 1.0d0/(N_R-1.0d0)*(rmax-rmin)
+					Do r=N_R,1,-1
+						Delta_r(r) = uniform_dr
+						Radius(r) = (N_R-r)*uniform_dr + rmin		
+					Enddo
+			End Select
+
         Endif
 
         Allocate(OneOverRSquared(1:N_R),r_squared(1:N_R),One_Over_r(1:N_R),Two_Over_r(1:N_R))
@@ -334,6 +409,7 @@ Contains
         OneOverRSquared = (1.0d0)/r_Squared
 		r_inner = rmin
 		r_outer = rmax
+        If (.not. chebyshev) Call Initialize_Derivatives(Radius,radial_integral_weights)
 	End Subroutine Initialize_Radial_Grid
 
     Subroutine Report_Grid_Parameters()

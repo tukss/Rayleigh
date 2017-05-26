@@ -797,12 +797,14 @@ Module Linear_Solve
         Integer, Intent(In) :: eqind, varind, mode, row, dorder
         Integer :: colblock, rowblock
         real*8, Pointer, Dimension(:,:) :: mpointer
+
+        If (chebyshev) then
         mpointer => equation_set(mode,eqind)%mpointer
         colblock = equation_set(mode,eqind)%colblock(varind)
         rowblock = equation_set(mode,eqind)%rowblock
 
         Call Cheby_Continuity(row,rowblock,colblock,dorder,mpointer)
-
+        Endif
     End Subroutine FEContinuity
     Subroutine Clear_Row(eqind, mode,row)
         Implicit None
