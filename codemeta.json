@@ -1,0 +1,90 @@
+{
+    "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+    "@type": "SoftwareSourceCode",
+    "license": "https://spdx.org/licenses/GPL-3.0-or-later",
+    "codeRepository": "https://github.com/geodynamics/Rayleigh.git",
+    "contIntegration": "https://github.com/geodynamics/Rayleigh/actions",
+    "datePublished": "2018-01-23",
+    "dateModified": "2022-04-29",
+    "downloadUrl": "https://github.com/geodynamics/Rayleigh/releases",
+    "issueTracker": "https://github.com/geodynamics/Rayleigh/issues",
+    "name": "Rayleigh",
+    "version": "1.1.0",
+    "identifier": "https://doi.org/10.5281/zenodo.6522806",
+    "description": "Rayleigh is a 3-D convection code designed for the study of dynamo behavior in spherical geometry. It evolves the incompressible and anelastic MHD equations in spherical geometry using a pseudo-spectral approach. Rayleigh employs spherical harmonics in the horizontal direction and Chebyshev polynomials in the radial direction. The code has undergone extensive accuracy testing using the Christensen et al. (2001) Boussinesq benchmarks and the Jones et al. (2011) anelastic benchmarks.",
+    "funding": "NSF-0949446, NSF-1550901, NSF-2149126",
+    "funder": {
+        "@type": "Organization",
+        "name": "Computational Infrastructure for Geodynamics"
+    },
+    "keywords": [
+        "magnetohydrodynamics"
+    ],
+    "programmingLanguage": [
+        "Fortran"
+    ],
+    "author": [
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0002-2256-5884",
+            "givenName": "Nicholas",
+            "familyName": "Featherstone",
+            "email": "nicholas.featherstone@swri.org",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Southwest Research Institute"
+            }
+        },
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0001-7019-9578",
+            "givenName": "Philipp",
+            "familyName": "Edelmann",
+            "email": "pedelmann@lanl.gov",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Los Alamos National Laboratory"
+            }
+        },
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0001-7098-8198",
+            "givenName": "Rene",
+            "familyName": "Gassmoeller",
+            "email": "rene.gassmoeller@ufl.edu",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "University of Florida"
+            }
+        },
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0001-9001-6118",
+            "givenName": "Loren",
+            "familyName": "Matilsky",
+            "email": "loren.matilsky@gmail.com",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "UC Santa Cruz"
+            }
+        },
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0002-7306-6436",
+            "givenName": "Ryan",
+            "familyName": "Orvedahl",
+            "email": "ryan.orvedahl@gmail.com"
+        },
+        {
+            "@type": "Person",
+            "@id": "https://orcid.org/0000-0002-4083-6529",
+            "givenName": "Cian",
+            "familyName": "Wilson",
+            "email": "cwilson@carnegiescience.edu",
+            "affiliation": {
+                "@type": "Organization",
+                "name": "Carnegie Institution for Science"
+            }
+        }
+    ]
+}
