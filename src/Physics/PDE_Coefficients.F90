@@ -1604,6 +1604,8 @@ Contains
             !Transform back to physical space.
             Call gridcp%From_Spectral(dtemp2,dtemp)
             arr2(:) = dtemp(:,1,1,2)
+            
+            DeAllocate(dtemp,dtemp2)
         
         Else
         
@@ -1614,10 +1616,6 @@ Contains
         ! If desired, convert to logarithmic derivative (default)
         If (.not. present(no_log)) Then
             arr2(:) = arr2(:)/arr1(:)
-        Endif
-
-        If (chebyshev) Then
-           DeAllocate(dtemp,dtemp2)
         Endif
 
     End Subroutine log_deriv
